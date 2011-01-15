@@ -7,38 +7,31 @@
 #ifndef CACHE_H_
 #define CACHE_H_
 
-#include "scsrv.h"
-#include "worker.h"
+#include "lightcache.h"
 
-#define CACHE_LOCK (pthread_mutex_lock(&cache.lock))
-#define CACHE_UNLOCK (pthread_mutex_unlock(&cache.lock))
+#define CACHE_LOCK(cache) (pthread_mutex_lock(&cache.lock))
+#define CACHE_UNLOCK(cache) (pthread_mutex_unlock(&cache.lock))
 
 typedef struct {
     char *data;
-    int size;
-    time_t last_access;
-    int ref_count; // >0 when client is sending this, for clean cache audit.
-} _img;
+    unsigned int size;
+} cache_item_t;
 
 typedef struct {
     _htab *tab;
-    pthread_mutex_t lock; // initialized at definition, see cache.c
-    int req_persec;
-    int sent_persec; // in KB
-    unsigned long long sent_count; // in KB
-    unsigned long long miss_count;
-    unsigned long long req_count;
-    unsigned long long mem_used; // in bytes
+    pthread_mutex_t lock;
+    unsigned int req_persec;
+    unsigned int sent_persec; // in KB
+    unsigned int sent_count; // augmented to fit in max int
+    unsigned int miss_count;
+    unsigned int req_count;
+    unsigned int mem_used; // augmented to fit in max int
     int terminate;
     pthread_t thread;
-} _cache;
+} cache_t;
 
-int get_or_insert_img(char *imgname, char **res);
-int create_cache_clean_audit(void);
-int get_cache_statistics(char *s);
-void dec_ref(_img *i);
-void inc_ref(_img *i);
-
-extern _cache cache; // extern cache defined in cache.c
+int get(char *key);
+int set(char *key);
+int stats(void);
 
 #endif /* CACHE_H_ */
