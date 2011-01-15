@@ -1,0 +1,27 @@
+v 0.1
+-----
+[+] make client with epoll.SO_SNDTIMEO / SO_RCVTIMEO, alarm or select based? cannot decide, read Stevens again:)
+[+] test boundary conditioons for inputs, off by one errors.
+[+] hfree() on keys, key copy optimization with chekcing, whjere to free keys? on hadd when we find
+	free slot we fdeallocate if we need a longer key.
+[+] log socket errors in first version.
+[+] epoll in the scsrv itself.
+[+] Handle timeouts by traversing all clients list. please update last_op_time by the epoll structure via
+	a pointer and only use the list for traversing, there should be no need for indexing thru the list.
+[+] TEST memleaks.
+[+] exclude _client struct only have _cdata rename it and traverse it, 
+[+] TEST: hgrow test ok fixed key deallocation mem leak.
+[+] TEST: write auto tests. memleaks on different socket scenarios.
+[+] buffer overflow on recv, think about it and also tidy up IS_REABLE code.
+[*] EXCLUDED freelist, SEG faults.client pool freelist deallocation wors? freelist mem leaks?
+[*] REDUNDANT:optimize client linked list?
+[+] TEST: deamonize works? and syslog?
+[+] SIGSEGV in idle client audit, change audit func code.
+[+] show cache request-per-sec
+[+] show cache Kb per sec if possible.
+[*] REDUNDANT:optimize client list access idle audit function
+
+v0.2
+-----
+[-] fastest way to return mem used.
+[-] pool allocation for client.
