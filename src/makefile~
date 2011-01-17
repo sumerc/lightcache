@@ -1,0 +1,5 @@
+all:
+	gcc lightcache.c epoll.c -o lightcache -I include
+
+
+	

@@ -6,6 +6,8 @@ main(void)
 {
     int s, nfds, n;
 
+    printf("sumercip\r\n");    
+
     openlog("lightcache", LOG_PID, LOG_LOCAL5);
     //log_info("lightcache started.");
     
