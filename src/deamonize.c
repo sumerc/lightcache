@@ -1,4 +1,4 @@
-#include "scsrv.h"
+#include "lightcache.h"
 
 
 #define EXIT_SUCCESS 0

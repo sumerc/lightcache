@@ -1,5 +1,5 @@
 all:
-	gcc scsrv.c hashtab.c mem.c worker.c socket.c cache.c deamonize.c -o scsrv -lpthread -i jemalloc/include/jemalloc
+	gcc lightcache.c hashtab.c worker.c socket.c cache.c deamonize.c -o lightcache -lpthread
 
 
 	

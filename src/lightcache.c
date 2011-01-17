@@ -1,8 +1,7 @@
 
-#include "scsrv.h"
+#include "lightcache.h"
 #include "deamonize.h"
 #include "worker.h"
-#include "mem.h"
 #include "hashtab.h"
 #include "cache.h"
 #include "socket.h"
