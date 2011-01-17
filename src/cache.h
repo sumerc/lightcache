@@ -9,9 +9,6 @@
 
 #include "lightcache.h"
 
-#define CACHE_LOCK(cache) (pthread_mutex_lock(&cache.lock))
-#define CACHE_UNLOCK(cache) (pthread_mutex_unlock(&cache.lock))
-
 typedef struct {
     char *data;
     unsigned int size;

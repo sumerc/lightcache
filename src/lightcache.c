@@ -10,14 +10,9 @@
 
 // globals
 int terminate_server = 0;
-#ifdef TCP
 int epollfd; // extern in header
 _client *clients_head = NULL;
-#endif
 
-
-
-#ifdef TCP
 static _client *
 _add_client(int fd)
 {
@@ -26,7 +21,7 @@ _add_client(int fd)
     // get a client object
     cli = (_client *)ymalloc(sizeof(_client));
 
-    cli->fd = fd;
+    cli->fd = fd;scip
     cli->ridx = 0;
     cli->swnd = NULL;
     cli->sidx = 0;
@@ -91,55 +86,20 @@ _show_clients(void)
     }
 }
 
-void
-_idle_client_audit_func(void)
-{
-    _client *cp,*next;
-    time_t ctime;
-
-    dprintf("idle client audit invoked.(%p)", clients_head);
-
-    ctime = time(NULL);
-    cp = clients_head;
-    while (cp) {
-        next = (_client *)cp->next;
-        if (ctime - cp->last_heard >= IDLE_CLIENT_TIMEOUT) {
-            _del_client(cp);
-        }
-        cp = next;
-    }
-}
-
-#endif
-
-static int
-_imgenumdel(_hitem *item, void * arg)
-{
-    _img *img;
-
-    img = (_img *)item->val;
-    yfree(img->data);
-    yfree(img);
-}
-
-
 int
 main(void)
 {
-#ifdef TCP
     struct epoll_event ev, events[MAX_EVENTS];
     int conn_sock, nfds, n, optval, tmp;
-    char *picname;
+    
     time_t prev_idle_client_audit_invoke, ctime;
     _client *client;
     _img *tmp;
-#endif
+
     struct sockaddr_in si_me, si_other;
     int s, i, slen, nbytes,rc;
     char buf[MAXBUFLEN];
-#ifdef UDP
-    _cdata *cdata;
-#endif
+
 
     // initialize variables
     s, i, slen=sizeof(si_other);
@@ -147,8 +107,8 @@ main(void)
     prev_idle_client_audit_invoke = 0;
 
     // open log deamon connection
-    openlog("scsrv", LOG_PID, LOG_LOCAL5);
-    syslog(LOG_INFO, "scsrv application started.");
+    openlog("lightcache", LOG_PID, LOG_LOCAL5);
+    syslog(LOG_INFO, "lightcache started.");
 
 #ifdef DEAMON
     deamonize();
@@ -156,21 +116,13 @@ main(void)
 
 
 // create & initialize server socket
-#ifdef TCP
+
     if ((s=socket(AF_INET, SOCK_STREAM, 0))==-1) {
         syslog(LOG_ERR, "socket [%s]", strerror(errno));
         goto err;
     }
     optval = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
-#endif
-#ifdef UDP
-    // create&initialize server socket
-    if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1) {
-        syslog(LOG_ERR, "socket [%s]", strerror(errno));
-        goto err;
-    }
-#endif
 
     memset((char *) &si_me, 0, sizeof(si_me));
     si_me.sin_family = AF_INET;
@@ -181,7 +133,6 @@ main(void)
         goto err;
     }
 
-#ifdef TCP
     ysetnonblocking(s);
     listen(s, LISTEN_BACKLOG);
     epollfd = epoll_create(MAX_EVENTS);
@@ -196,7 +147,6 @@ main(void)
         syslog(LOG_ERR, "epoll_ctl [%s]", strerror(errno));
         goto err;
     }
-#endif
 
     // initialize cache system hash table
     cache.tab = htcreate(IMG_CACHE_LOGSIZE);
@@ -214,38 +164,6 @@ main(void)
         if (terminate_server) {
             break;
         }
-
-#ifdef UDP
-        // This call says that we want to receive a packet from s, that the data should be put info buf, and that
-        // buf can store at most BUFLEN characters. The zero parameter says that no special flags should be used.
-        // Data about the sender should be stored in si_other, which has room for slen byte. Note that recvfrom()
-        // will set slen to the number of bytes actually stored. If you want to play safe, set slen to
-        // sizeof(si_other) after each call to recvfrom().
-        nbytes = recvfrom(s, buf, MAXBUFLEN, 0, (struct sockaddr *)&si_other, &slen);
-        if (nbytes ==-1) {
-            syslog(LOG_ERR, "recvfrom [%s]", strerror(errno));
-            continue;
-        }
-
-        // copy locals to dynamic variables for the worker threads. We do not
-        // check for the overflow of buf as recvfrom() will not recv more than MAXBUFLEN
-        // bytes of data. It will block.
-        cdata = (_cdata *)ymalloc(sizeof(_cdata));
-        strncpy(cdata->cmd, buf, nbytes);
-        cdata->cmd[nbytes] = 0; // paranoid assignment
-        memcpy(&cdata->saddr, &si_other, slen);
-
-        // Worker thread, _if not failed_ is responsible for freeing the
-        // resource.
-        rc = create_worker((void *)cdata);
-        if (rc != 0) {
-            syslog(LOG_ERR, "create_worker [%d]", rc);
-            yfree(cdata);
-            continue;
-        }
-#endif
-
-#ifdef TCP
 
         nfds = epoll_wait(epollfd, events, MAX_EVENTS, EPOLL_TIMEOUT);
         if (nfds == -1) {
@@ -367,7 +285,6 @@ main(void)
                 }
             }
         }
-#endif
     } // server for-loop
 
     dprintf("Closing audit...");
@@ -388,9 +305,8 @@ main(void)
     dprintf("Application closed.");
     syslog(LOG_ERR, "scsrv application closed.", rc);
 
-#ifdef TCP
     yclose(s); // close listen socket
-#endif
+
     YMEMLEAKCHECK();
     return 0;
 err:
