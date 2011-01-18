@@ -1,20 +1,19 @@
 #include "lightcache.h"
 
-
 int
 main(void)
 {
     int s, nfds, n;
 
     openlog("lightcache", LOG_PID, LOG_LOCAL5);
-    //log_info("lightcache started.");
+    log_info("lightcache started.");
     
     //s = make_socket(LIGHTCACHE_PORT);
     //make_nonblocking(s);
     //listen_socket(s, LIGHTCACHE_LISTEN_BACKLOG);
     
     if (!iopoll_create()) {
-        //log_sys_err("I/O poll interface cannot be created."); //logs with errno
+        log_sys_err("I/O poll interface cannot be created:"); //logs with errno
         goto err;
     }
     

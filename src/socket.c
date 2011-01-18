@@ -7,14 +7,9 @@
 
 #include "socket.h"
 
-#ifdef TCP
-
-// globals
-//int epollfd;
-
 
 int
-ysetnonblocking(int sock)
+make_nonblocking(int sock)
 {
     int flags;
 
@@ -32,68 +27,7 @@ ysetnonblocking(int sock)
 }
 
 int
-ychg_interest(int sock, int op, struct epoll_event ev)
+make_socket(int port) // todo: accept an enum type TCP, UDP here?
 {
-
-    if (epoll_ctl(epollfd, op, sock, &ev) == -1) {
-        syslog(LOG_ERR, "chg_interest [%s]", strerror(errno));
-        yclose(sock);
-        return -1;
-    }
-    return 0;
+    return 0;	
 }
-
-int
-ysend(int sock, char *buf, int size)
-{
-    int rc;
-
-    rc = send(sock, buf, size, 0);
-    if (rc == -1) {
-        if ((errno = EWOULDBLOCK) || (errno = EAGAIN)) {
-            return 0; // no bytes sent
-        } else {
-            syslog(LOG_ERR, "_send [%s]", strerror(errno));
-            yclose(sock);
-            return -1;
-        }
-    }
-    return rc;
-}
-
-int
-yrecv(int sock, char *buf, int size)
-{
-    int rc;
-
-    rc = recv(sock, buf, size, 0);
-    if (rc == 0) {
-        yclose(sock);
-        return -1;
-    } else if (rc == -1) {
-        if ((errno = EWOULDBLOCK) || (errno = EAGAIN)) {
-            return 0; // no bytes read
-        } else {
-            syslog(LOG_ERR, "_recv [%s]", strerror(errno));
-            yclose(sock);
-            return -1;
-        }
-    }
-    return rc;
-}
-
-int
-yclose(int sock)
-{
-    if (epoll_ctl(epollfd, EPOLL_CTL_DEL, sock, 0) == -1) {
-        syslog(LOG_ERR, "worker epoll_ctl_del [%s]", strerror(errno));
-        return 0;
-    }
-    if (close(sock) ==-1) {
-        syslog(LOG_ERR, "worker close [%s]", strerror(errno));
-        return 0;
-    }
-    return 1;
-}
-
-#endif

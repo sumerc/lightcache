@@ -22,6 +22,4 @@
 #define IDLE_CLIENT_TIMEOUT 5 // in secs
 #define IDLE_CLIENT_AUDIT_INTERVAL 10 // in secs
 
-
-
 #endif
