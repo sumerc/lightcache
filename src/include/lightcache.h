@@ -21,8 +21,30 @@
 #ifndef LIGHTCACHE_H
 #define LIGHTCACHE_H
 
+struct base_packet {
+	size_t data_size;
+	char *data;
+};
+
+struct req_packet {
+	struct base_packet base_packet;
+};
+
+struct resp_packet {
+	struct base_packet base_packet;
+};
+
 struct client {
-		
+	time_t last_heard;
+	
+	// receive window
+	size_t rsize;
+	char *rbuf; /* recv buffer */
+	char *rcurr; /* current pointer in to the receive buffer */			
+	
+	// send window
+	int ssize;
+	char *scurr; /* current pointer in to the send buffer  */	
 };
 
 #define LIGHTCACHE_PORT 13131

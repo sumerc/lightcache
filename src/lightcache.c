@@ -82,7 +82,7 @@ main(void)
 	            printf("incoming connection\r\n");
 	
 	            ev.events = EPOLLIN;
-	            ev.data.ptr = conn_sock;		        
+	            ev.data.fd = conn_sock;		        
 		        if (epoll_ctl(epollfd, EPOLL_CTL_ADD, conn_sock, &ev) == -1) {
 			    	log_sys_err("epoll ctl error.");
 			    	continue;
@@ -90,7 +90,7 @@ main(void)
 	        } else {
 	
 			    if ( events[n].events & EPOLLIN ) {		
-		            printf("in data\r\n");
+		            read(events[n].data.fd, NULL, RECV_BUF_SIZE); // TODO:burda kaldim
 		            close(events[n].data.fd);
 		        } 
 		
