@@ -1,4 +1,4 @@
-#include "log.h"
+#include "lightcache.h"
 
 void
 log_info(const char *s)

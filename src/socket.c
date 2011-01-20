@@ -1,12 +1,4 @@
-/*
- * socket.c
- *
- *  Created on: Aug 30, 2010
- *      Author: sumer cip
- */
-
-#include "socket.h"
-
+#include "lightcache.h"
 
 int
 make_nonblocking(int sock)
@@ -26,8 +18,3 @@ make_nonblocking(int sock)
 #endif
 }
 
-int
-make_socket(int port) // todo: accept an enum type TCP, UDP here?
-{
-    return 0;	
-}

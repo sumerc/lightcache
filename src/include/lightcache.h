@@ -9,17 +9,31 @@
 #include "arpa/inet.h"
 #include "pthread.h"
 #include "time.h"
-#include "iopoll.h" 
+
+#ifdef TCP
+
+#include "sys/epoll.h"
+#include "fcntl.h"
+
+#endif
+
 
 #ifndef LIGHTCACHE_H
 #define LIGHTCACHE_H
 
-#define LIGHTCACHE_PORT 6666
+struct client {
+		
+};
 
-#define MAX_EVENTS 10
+#define LIGHTCACHE_PORT 13131
+
+#ifdef TCP
+#define LIGHTCACHE_EPOLL_MAX_EVENTS 10
 #define LIGHTCACHE_LISTEN_BACKLOG 100	// 100 clients can be queued between subsequent accept()
 #define EPOLL_TIMEOUT 1000 // in ms
-#define IDLE_CLIENT_TIMEOUT 5 // in secs
-#define IDLE_CLIENT_AUDIT_INTERVAL 10 // in secs
+#endif
+
+#define IDLE_TIMEOUT 1 // in secs -- same as memcached
+#define RECV_BUF_SIZE 2048 // same as memcached
 
 #endif
