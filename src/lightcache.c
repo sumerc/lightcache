@@ -96,13 +96,11 @@ try_read_cmd(struct client* client)
 int
 main(void)
 {	
-#ifdef TCP
     int s, nfds, n, optval, epollfd, conn_sock;    
     struct epoll_event ev, events[LIGHTCACHE_EPOLL_MAX_EVENTS];
     struct client *client;
-#endif
     int slen, ret; 
-    struct sockaddr_in si_me, si_other;
+    struct sockaddr_in si_me, si_other;    
     
     slen=sizeof(si_other);
 
@@ -110,14 +108,14 @@ main(void)
     log_info("lightcache started.");
     
 
-#ifdef TCP    
+ 
     if ((s=socket(AF_INET, SOCK_STREAM, 0))==-1) {
         log_sys_err("socket make error.");
         goto err;
     }
     optval = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
-#endif
+
 
     memset((char *) &si_me, 0, sizeof(si_me));
     si_me.sin_family = AF_INET;
@@ -128,7 +126,6 @@ main(void)
         goto err;
     }
 
-#ifdef TCP
     make_nonblocking(s);
     listen(s, LIGHTCACHE_LISTEN_BACKLOG);
     
@@ -144,16 +141,12 @@ main(void)
         log_sys_err("epoll ctl error.");
         goto err;
     }
-
-#endif
     
     // initialize cache system hash table
     //cache = htcreate(IMG_CACHE_LOGSIZE);
     
     // server loop
     for (;;) {
-
-#ifdef TCP
         nfds = epoll_wait(epollfd, events, LIGHTCACHE_EPOLL_MAX_EVENTS, EPOLL_TIMEOUT);
         if (nfds == -1) {
             log_sys_err("epoll wait error.");
@@ -198,10 +191,8 @@ main(void)
 		        if (events[n].events & EPOLLOUT) {
 		            dprintf("out data");
 		        }
-		    } // incoming connection 
-		    
+		    } // incoming connection 		    
         } // process events end     
-#endif   
     }  // server loop end
 	
    
