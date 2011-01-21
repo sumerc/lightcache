@@ -8,7 +8,10 @@ make_client(int fd)
 	cli = (struct client*)malloc(sizeof(struct client));
 	cli->fd = fd;
 	cli->state = READ_HEADER;
+	cli->rbuf = NULL;
 	cli->needbytes = sizeof(cli->req_header);
+	cli->last_heard = time(NULL);
+	
 	return cli;
 }
 
@@ -104,22 +107,38 @@ main(void)
 				
 				client = (struct client *)events[n].data.ptr;
 				
-			    if ( events[n].events & EPOLLIN ) {		
+			    if ( events[n].events & EPOLLIN ) {	
+			    	
+			    	client->last_heard = time(NULL);		
+			    			    	
 			    	switch (client->state) {
 			            case READ_HEADER:
+			            	dprintf("read_header");
 			            	nbytes = read(client->fd, &client->req_header, sizeof(client->req_header));
 			            	client->needbytes -= nbytes;
-			            	dprintf("read header total %d bytes", ( sizeof(client->req_header)-client->needbytes) );
-			            	if (client->needbytes == 0) {
+			            	
+			            	if (client->needbytes == 0) {			            		
+			            		client->needbytes = client->req_header.data_length;
+			            		client->rbuf = (char *)malloc(client->needbytes);		
+			            		// todo: terminate rbuf string.	            		
 			            		client->state = READ_DATA;
 			            	}
+			            	
 			            	break;
 			            case READ_DATA:
+			            	dprintf("read_data");
 			            	assert(client->needbytes != 0);
+			            	assert(client->rbuf != NULL);
 			            	
-			            	//client->re			            	
-			            			            	
-			            	close(client->fd);
+			            	nbytes = read(client->fd, client->rbuf, client->needbytes);
+			            	client->needbytes -= nbytes;
+			            	
+			            	if (client->needbytes == 0) {			    
+			            		client->state = CONN_CLOSE;
+			            		dprintf("recv_data:%s", client->rbuf);
+			            		close(client->fd);
+			            	}			            			            	
+			            	
 			            	break;
 			    	} // switch client states 
 		        } 

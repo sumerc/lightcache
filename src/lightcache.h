@@ -41,6 +41,7 @@ struct resp_packet {
 enum client_states {
     READ_HEADER,  
     READ_DATA,
+    CONN_CLOSE,
 };
 
 struct client {
@@ -52,9 +53,8 @@ struct client {
 	enum client_states state;
 	
 	// receive window
-	int needbytes;
+	unsigned int needbytes;
 	char *rbuf; /* recv buffer */
-	char *rcurr; /* current pointer in to the receive buffer */			
 	
 };
 
