@@ -1,13 +1,26 @@
 #include "lightcache.h"
 
+struct client* 
+make_client(int fd)
+{
+	struct client* cli;
+	
+	cli = (struct client*)malloc(sizeof(struct client));
+	cli->fd = fd;
+	cli->state = READ_HEADER;
+	cli->needbytes = sizeof(cli->req_header);
+	return cli;
+}
+
 int
 main(void)
 {	
 #ifdef TCP
     int s, nfds, n, optval, epollfd, conn_sock;    
     struct epoll_event ev, events[LIGHTCACHE_EPOLL_MAX_EVENTS];
+    struct client *client;
 #endif
-    int slen; 
+    int slen, nbytes; 
     struct sockaddr_in si_me, si_other;
     
     slen=sizeof(si_other);
@@ -79,23 +92,40 @@ main(void)
 	
 	            make_nonblocking(conn_sock);
 	            
-	            printf("incoming connection\r\n");
+	            dprintf("incoming connection");
 	
 	            ev.events = EPOLLIN;
-	            ev.data.fd = conn_sock;		        
+	            ev.data.ptr = make_client(conn_sock);		        
 		        if (epoll_ctl(epollfd, EPOLL_CTL_ADD, conn_sock, &ev) == -1) {
 			    	log_sys_err("epoll ctl error.");
 			    	continue;
 		        }
 	        } else {
-	
+				
+				client = (struct client *)events[n].data.ptr;
+				
 			    if ( events[n].events & EPOLLIN ) {		
-		            read(events[n].data.fd, NULL, RECV_BUF_SIZE); // TODO:burda kaldim
-		            close(events[n].data.fd);
+			    	switch (client->state) {
+			            case READ_HEADER:
+			            	nbytes = read(client->fd, &client->req_header, sizeof(client->req_header));
+			            	client->needbytes -= nbytes;
+			            	dprintf("read header total %d bytes", ( sizeof(client->req_header)-client->needbytes) );
+			            	if (client->needbytes == 0) {
+			            		client->state = READ_DATA;
+			            	}
+			            	break;
+			            case READ_DATA:
+			            	assert(client->needbytes != 0);
+			            	
+			            	//client->re			            	
+			            			            	
+			            	close(client->fd);
+			            	break;
+			    	} // switch client states 
 		        } 
 		
 		        if (events[n].events & EPOLLOUT) {
-		            printf("out data\r\n");
+		            dprintf("out data");
 		        }
 		    } // incoming connection 
 		    
