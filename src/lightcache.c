@@ -19,14 +19,17 @@ make_client(int fd)
 int 
 disconnect_client(struct client* client)
 {
+	if (client->rbuf) {
+		free(client->rbuf);
+	}
+	dprintf("disconnect client called.");
 	close(client->fd);
 }
 
-int 
-set_client_state(struct client* client, enum client_states state)
+void 
+set_client_state(struct client* client, client_states state)
 {	
 	client->state = state;
-	return 1;
 }
 
 void
@@ -55,6 +58,7 @@ try_read_cmd(struct client* client)
 {
 	int nbytes;
 	
+	nbytes = -1; // read event called in INVALID_STATE, a possible disconnect
 	client->last_heard = time(NULL);
 	
 	switch(client->state) {		
@@ -88,8 +92,9 @@ try_read_cmd(struct client* client)
         		dispatch_cmd(client);
         		
         	}	
-        	break;        	
+        	break;    	
 	} // switch(client->state)
+	
 	return nbytes;
 }
 
@@ -106,9 +111,7 @@ main(void)
 
     openlog("lightcache", LOG_PID, LOG_LOCAL5);
     log_info("lightcache started.");
-    
-
- 
+     
     if ((s=socket(AF_INET, SOCK_STREAM, 0))==-1) {
         log_sys_err("socket make error.");
         goto err;
@@ -181,7 +184,9 @@ main(void)
 			    if ( events[n].events & EPOLLIN ) {	
 			    	
 			    	ret = try_read_cmd(client);
+			    	dprintf("try_read ret:%d", ret);
 	            	if (ret == -1) {
+	            		perror("read:");
 	            		disconnect_client(client);
 	            		continue; // do not check for send events for this client any more.
 	            	}			            	

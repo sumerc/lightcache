@@ -30,24 +30,24 @@ typedef union {
 	uint8_t bytes[6];
 }req_header;
 
-enum client_states {
+typedef enum {
     READ_HEADER,  
     READ_DATA,
     CONN_CLOSE,
     CMD_RECEIVED,
-};
+}client_states;
 
 struct client {
-	int fd; /* socket fd */
-	time_t last_heard;
+	int fd; 						/* socket fd */
+	time_t last_heard; 				/* last time we heard from the client */
 	
-	// protocol handling data
-	req_header req_header; /* header data of the binary protocol */
-	enum client_states state;
+	/* protocol handling data */
+	req_header req_header; 			/* header data of the binary protocol */
+	client_states state;
 	
-	// receive window
-	unsigned int rbytes; /*current index into the receiving buffer, can be either for header or data.*/
-	char *rbuf; /* recv buffer for data */
+	/* receive window */
+	unsigned int rbytes; 			/*current index into the receiving buffer, can be either for header or data.*/
+	char *rbuf; 					/* recv buffer for data */
 	
 };
 
