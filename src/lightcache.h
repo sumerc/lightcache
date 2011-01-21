@@ -24,19 +24,14 @@
 
 #define dprintf(fmt, args...) fprintf(stderr, "[&] [dbg] " fmt "\n", ## args)
 
-struct req_header {
-	uint8_t opcode;
-	uint8_t key_length;
-	uint32_t data_length;
-};
-
-struct req_packet {
-	struct req_header header;
-};
-
-struct resp_packet {
-	;
-};
+typedef union {
+	struct {
+		uint8_t opcode;
+		uint8_t key_length;
+		uint32_t data_length;
+	};
+	uint8_t bytes[6];
+}req_header;
 
 enum client_states {
     READ_HEADER,  
@@ -50,12 +45,12 @@ struct client {
 	time_t last_heard;
 	
 	// protocol handling data
-	struct req_header req_header; /* header data of the binary protocol */
+	req_header req_header; /* header data of the binary protocol */
 	enum client_states state;
 	
 	// receive window
-	unsigned int needbytes;
-	char *rbuf; /* recv buffer */
+	unsigned int rbytes; /*current index into the receiving buffer, can be either for header or data.*/
+	char *rbuf; /* recv buffer for data */
 	
 };
 

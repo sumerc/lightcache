@@ -3,16 +3,24 @@ import struct
 from socket import socket, AF_INET, SOCK_STREAM
 
 class LightCacheClient(socket):
-    	
-    def _make_packet(self, data):
-	request = struct.pack('bbI', 0, 0, len(data))
+    CMD_GET = 0x00
+    CMD_SET = 0x01    
+	
+    def _make_packet(self, data, **kwargs):
+	klen = kwargs.pop("key_length", 0)
+	cmd = kwargs.pop("command", 0)
+	
+	request = struct.pack('bbI', cmd, klen, len(data))
 	request += data
 	return request
 
-    def send_cmd(self, data):	
-	data = self._make_packet(data)	
+    def send_raw_cmd(self, data, **kwargs):	
+	data = self._make_packet(data, **kwargs)	
 	super(LightCacheClient, self).send(data)
 
+    def get(self, key):	
+	self.send_raw_cmd(key, key_length=len(key), command=self.CMD_GET)	
+	
 class LightCacheTestBase(unittest.TestCase):
     
     host = 'localhost'
@@ -25,9 +33,9 @@ class LightCacheTestBase(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_send(self):
+    def test_get(self):
         self.client.connect((self.host, self.port))
-    	self.client.send_cmd("selam")
+    	self.client.get("test_key_1")
 
 if __name__ == '__main__':
     unittest.main()

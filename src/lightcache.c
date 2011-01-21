@@ -1,4 +1,5 @@
 #include "lightcache.h"
+#include "protocol.h"
 
 struct client* 
 make_client(int fd)
@@ -9,7 +10,7 @@ make_client(int fd)
 	cli->fd = fd;
 	cli->state = READ_HEADER;
 	cli->rbuf = NULL;
-	cli->needbytes = sizeof(cli->req_header);
+	cli->rbytes = 0;
 	cli->last_heard = time(NULL);
 	
 	return cli;
@@ -29,15 +30,28 @@ set_client_state(struct client* client, enum client_states state)
 }
 
 void
-dispatch_req(struct client* client)
+dispatch_cmd(struct client* client)
 {
+	uint8_t cmd;
+	
 	assert(client->state == CMD_RECEIVED);
+	
+	cmd = client->req_header.opcode;
+	
+	switch(cmd) {
+		case CMD_GET:
+			dprintf("CMD_GET request for key: %s", client->rbuf);
+			break;
+		case CMD_SET:
+			dprintf("CMD_SET request for key: %s", client->rbuf);
+			break;
+	}
 	
 	return;
 }
 
 int 
-try_read_req(struct client* client)
+try_read_cmd(struct client* client)
 {
 	int nbytes;
 	
@@ -45,31 +59,33 @@ try_read_req(struct client* client)
 	
 	switch(client->state) {		
 		case READ_HEADER:
-			nbytes = read(client->fd, &client->req_header, client->needbytes);
-			client->needbytes -= nbytes;
+			nbytes = read(client->fd, &client->req_header.bytes[client->rbytes], 1);
+			dprintf("%d bytes read", nbytes);
+			client->rbytes += nbytes;
 					            	
-			if (client->needbytes == 0) {			            		
-				client->needbytes = client->req_header.data_length;
-				client->rbuf = (char *)malloc(client->needbytes + 1);		
-				client->rbuf[client->needbytes] = (char)0;
+			if (client->rbytes == sizeof(client->req_header)) {			            		
+				client->rbytes = 0;
+				client->rbuf = (char *)malloc(client->req_header.data_length + 1);		
+				client->rbuf[client->req_header.data_length] = (char)0;
 				set_client_state(client, READ_DATA);
 			}
 			break;			
 			
-		case READ_DATA:
-			assert(client->needbytes != 0);
+		case READ_DATA:			
 			assert(client->rbuf != NULL);
 			            	
-			nbytes = read(client->fd, client->rbuf, client->needbytes);
-        	client->needbytes -= nbytes;
+			nbytes = read(client->fd, &client->rbuf[client->rbytes], 1);
+        	client->rbytes += nbytes;
         	
-        	if (client->needbytes == 0) {			    
+        	dprintf("read data :%d %d", client->req_header.opcode, client->req_header.key_length);
+        	
+        	if (client->rbytes == client->req_header.data_length) {			    
         		assert(strlen(client->rbuf) == client->req_header.data_length);        		
         		
         		set_client_state(client, CMD_RECEIVED);
         		
         		// parse and dispatch the request cmd
-        		dispatch_req(client);
+        		dispatch_cmd(client);
         		
         	}	
         	break;        	
@@ -171,7 +187,7 @@ main(void)
 				
 			    if ( events[n].events & EPOLLIN ) {	
 			    	
-			    	ret = try_read_req(client);
+			    	ret = try_read_cmd(client);
 	            	if (ret == -1) {
 	            		disconnect_client(client);
 	            		continue; // do not check for send events for this client any more.
