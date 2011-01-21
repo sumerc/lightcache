@@ -42,6 +42,7 @@ enum client_states {
     READ_HEADER,  
     READ_DATA,
     CONN_CLOSE,
+    CMD_RECEIVED,
 };
 
 struct client {

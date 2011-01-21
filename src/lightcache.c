@@ -15,6 +15,68 @@ make_client(int fd)
 	return cli;
 }
 
+int 
+disconnect_client(struct client* client)
+{
+	close(client->fd);
+}
+
+int 
+set_client_state(struct client* client, enum client_states state)
+{	
+	client->state = state;
+	return 1;
+}
+
+void
+dispatch_req(struct client* client)
+{
+	assert(client->state == CMD_RECEIVED);
+	
+	return;
+}
+
+int 
+try_read_req(struct client* client)
+{
+	int nbytes;
+	
+	client->last_heard = time(NULL);
+	
+	switch(client->state) {		
+		case READ_HEADER:
+			nbytes = read(client->fd, &client->req_header, client->needbytes);
+			client->needbytes -= nbytes;
+					            	
+			if (client->needbytes == 0) {			            		
+				client->needbytes = client->req_header.data_length;
+				client->rbuf = (char *)malloc(client->needbytes + 1);		
+				client->rbuf[client->needbytes] = (char)0;
+				set_client_state(client, READ_DATA);
+			}
+			break;			
+			
+		case READ_DATA:
+			assert(client->needbytes != 0);
+			assert(client->rbuf != NULL);
+			            	
+			nbytes = read(client->fd, client->rbuf, client->needbytes);
+        	client->needbytes -= nbytes;
+        	
+        	if (client->needbytes == 0) {			    
+        		assert(strlen(client->rbuf) == client->req_header.data_length);        		
+        		
+        		set_client_state(client, CMD_RECEIVED);
+        		
+        		// parse and dispatch the request cmd
+        		dispatch_req(client);
+        		
+        	}	
+        	break;        	
+	} // switch(client->state)
+	return nbytes;
+}
+
 int
 main(void)
 {	
@@ -23,7 +85,7 @@ main(void)
     struct epoll_event ev, events[LIGHTCACHE_EPOLL_MAX_EVENTS];
     struct client *client;
 #endif
-    int slen, nbytes; 
+    int slen, ret; 
     struct sockaddr_in si_me, si_other;
     
     slen=sizeof(si_other);
@@ -109,38 +171,12 @@ main(void)
 				
 			    if ( events[n].events & EPOLLIN ) {	
 			    	
-			    	client->last_heard = time(NULL);		
-			    			    	
-			    	switch (client->state) {
-			            case READ_HEADER:
-			            	dprintf("read_header");
-			            	nbytes = read(client->fd, &client->req_header, sizeof(client->req_header));
-			            	client->needbytes -= nbytes;
-			            	
-			            	if (client->needbytes == 0) {			            		
-			            		client->needbytes = client->req_header.data_length;
-			            		client->rbuf = (char *)malloc(client->needbytes);		
-			            		// todo: terminate rbuf string.	            		
-			            		client->state = READ_DATA;
-			            	}
-			            	
-			            	break;
-			            case READ_DATA:
-			            	dprintf("read_data");
-			            	assert(client->needbytes != 0);
-			            	assert(client->rbuf != NULL);
-			            	
-			            	nbytes = read(client->fd, client->rbuf, client->needbytes);
-			            	client->needbytes -= nbytes;
-			            	
-			            	if (client->needbytes == 0) {			    
-			            		client->state = CONN_CLOSE;
-			            		dprintf("recv_data:%s", client->rbuf);
-			            		close(client->fd);
-			            	}			            			            	
-			            	
-			            	break;
-			    	} // switch client states 
+			    	ret = try_read_req(client);
+	            	if (ret == -1) {
+	            		disconnect_client(client);
+	            		continue; // do not check for send events for this client any more.
+	            	}			            	
+			        
 		        } 
 		
 		        if (events[n].events & EPOLLOUT) {
