@@ -1,11 +1,17 @@
+import time
 import unittest
 import struct
 from socket import socket, AF_INET, SOCK_STREAM
 
 class LightCacheClient(socket):
     CMD_GET = 0x00
-    CMD_SET = 0x01    
+    CMD_SET = 0x01  
+
+    IDLE_TIMEOUT = 2 # in sec  
 	
+    def is_disconnected(self):
+	return (self.recv(1) == "")    
+
     def _make_packet(self, data, **kwargs):
 	klen = kwargs.pop("key_length", 0)
 	cmd = kwargs.pop("command", 0)
@@ -33,9 +39,11 @@ class LightCacheTestBase(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_get(self):
+    def test_idle_timeout(self):
         self.client.connect((self.host, self.port))
-    	self.client.get("test_key_1")
+    	time.sleep(self.IDLE_TIMEOUT)
+	self.assertEqual(self.is_disconnected(), True)
+	    
 
 if __name__ == '__main__':
     unittest.main()
