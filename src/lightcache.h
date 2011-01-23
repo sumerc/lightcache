@@ -37,6 +37,7 @@ typedef enum {
     CMD_RECEIVED,
 }client_states;
 
+typedef struct client client;
 struct client {
 	int fd; 						/* socket fd */
 	time_t last_heard; 				/* last time we heard from the client */
@@ -49,6 +50,9 @@ struct client {
 	unsigned int rbytes; 			/*current index into the receiving buffer, can be either for header or data.*/
 	char *rbuf; 					/* recv buffer for data */
 	
+	int free;
+	client *next;
+	client *prev;
 };
 
 #define LIGHTCACHE_PORT 13131
@@ -57,7 +61,7 @@ struct client {
 #define LIGHTCACHE_LISTEN_BACKLOG 100	// 100 clients can be queued between subsequent accept()
 #define EPOLL_TIMEOUT 1000 // in ms
 
-#define IDLE_TIMEOUT 1 // in secs -- same as memcached
-#define RECV_BUF_SIZE 2048 // same as memcached
+#define IDLE_TIMEOUT 2 // in secs -- same as memcached
+#define PROTOCOL_MAX_DATA_SIZE 2048
 
 #endif

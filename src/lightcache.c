@@ -1,18 +1,38 @@
 #include "lightcache.h"
 #include "protocol.h"
 
+// globals
+static client *clients = NULL; /* linked list head */
+
 struct client* 
 make_client(int fd)
 {
-	struct client* cli;
+	struct client *cli, *item;
 	
-	cli = (struct client*)malloc(sizeof(struct client));
+	cli = NULL;
+	// search for free items first
+	for(item=clients; item!=NULL ;item=item->next) {
+		if (item->free) {
+			cli = item;
+			break;
+		}
+	}
+	
+	// no free item?
+	if (cli == NULL) {
+		cli = (struct client*)malloc(sizeof(struct client));
+		cli->next = clients;
+		if (!clients) {
+			clients = cli;
+		}		
+	}	
 	cli->fd = fd;
 	cli->state = READ_HEADER;
 	cli->rbuf = NULL;
 	cli->rbytes = 0;
 	cli->last_heard = time(NULL);
-	
+	cli->free = 0;
+
 	return cli;
 }
 
@@ -22,6 +42,7 @@ disconnect_client(struct client* client)
 	if (client->rbuf) {
 		free(client->rbuf);
 	}
+	client->free = 1;
 	dprintf("disconnect client called.");
 	close(client->fd);
 }
@@ -53,32 +74,57 @@ dispatch_cmd(struct client* client)
 	return;
 }
 
+void
+disconnect_idle_clients()
+{
+	client * client;
+	
+	client=clients;
+	while( client != NULL && !client->free) {
+		if (time(NULL) - client->last_heard > IDLE_TIMEOUT) {			
+			dprintf("idle client detected.");
+			disconnect_client(client);
+			// todo: move free items closer to head for faster searching for free items in make_client
+		}
+		client=client->next;
+	}
+}
+
 int 
 try_read_cmd(struct client* client)
 {
-	int nbytes;
+	int nbytes, needed;
 	
 	nbytes = -1; // read event called in INVALID_STATE, a possible disconnect
 	client->last_heard = time(NULL);
 	
 	switch(client->state) {		
 		case READ_HEADER:
-			nbytes = read(client->fd, &client->req_header.bytes[client->rbytes], 1);
+			needed = sizeof(client->req_header)-client->rbytes;
+			nbytes = read(client->fd, &client->req_header.bytes[client->rbytes], needed);
 			dprintf("%d bytes read", nbytes);
 			client->rbytes += nbytes;
 					            	
 			if (client->rbytes == sizeof(client->req_header)) {			            		
 				client->rbytes = 0;
+				
+				if (client->req_header.data_length >= PROTOCOL_MAX_DATA_SIZE)	{
+					syslog(LOG_ERR, "request data length exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
+					return -1;
+				}			
+
 				client->rbuf = (char *)malloc(client->req_header.data_length + 1);		
 				client->rbuf[client->req_header.data_length] = (char)0;
 				set_client_state(client, READ_DATA);
 			}
+						
 			break;			
 			
 		case READ_DATA:			
 			assert(client->rbuf != NULL);
 			            	
-			nbytes = read(client->fd, &client->rbuf[client->rbytes], 1);
+			needed = client->req_header.data_length - client->rbytes;
+			nbytes = read(client->fd, &client->rbuf[client->rbytes], needed);
         	client->rbytes += nbytes;
         	
         	dprintf("read data :%d %d", client->req_header.opcode, client->req_header.key_length);
@@ -110,7 +156,7 @@ main(void)
     slen=sizeof(si_other);
 
     openlog("lightcache", LOG_PID, LOG_LOCAL5);
-    log_info("lightcache started.");
+    syslog(LOG_INFO, "lightcache started.");
      
     if ((s=socket(AF_INET, SOCK_STREAM, 0))==-1) {
         log_sys_err("socket make error.");
@@ -156,6 +202,8 @@ main(void)
             continue;
         }
         
+	disconnect_idle_clients();
+
         // process events
         for (n = 0; n < nfds; ++n) {
         	            
@@ -185,11 +233,11 @@ main(void)
 			    	
 			    	ret = try_read_cmd(client);
 			    	dprintf("try_read ret:%d", ret);
-	            	if (ret == -1) {
-	            		perror("read:");
+	            	if (ret == -1 || ret == 0) {
 	            		disconnect_client(client);
 	            		continue; // do not check for send events for this client any more.
-	            	}			            	
+	            	}
+					            	
 			        
 		        } 
 		
@@ -202,6 +250,7 @@ main(void)
 	
    
 err:
+    syslog(LOG_INFO, "lightcache stopped.");
     closelog();
     exit(EXIT_FAILURE);
 }
