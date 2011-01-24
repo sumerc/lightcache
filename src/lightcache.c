@@ -1,8 +1,19 @@
 #include "lightcache.h"
 #include "protocol.h"
 
+// forward declarations
+void set_client_state(struct client* client, client_states state);
+
 // globals
 static client *clients = NULL; /* linked list head */
+static struct settings settings;
+static int epollfd;
+
+void 
+init_settings(void)
+{
+	settings.idle_client_timeout = 2; // in secs -- default same as memcached
+}
 
 struct client* 
 make_client(int fd)
@@ -28,35 +39,38 @@ make_client(int fd)
 	}	
 	cli->fd = fd;
 	cli->state = READ_HEADER;
-	cli->rbuf = NULL;
+	cli->rkey = NULL;
+	cli->rdata = NULL;
 	cli->rbytes = 0;
 	cli->last_heard = time(NULL);
 	cli->free = 0;
-
+	
+	cli->sdata = NULL;
+	cli->sbytes = 0;
+	
 	return cli;
 }
 
 int 
 disconnect_client(struct client* client)
 {
-	if (client->rbuf) {
-		free(client->rbuf);
+	if (client->rkey) {
+		free(client->rkey);
 	}
+	if (client->rdata) {
+		free(client->rdata);
+	}
+	
 	client->free = 1;
 	dprintf("disconnect client called.");
 	close(client->fd);
 }
 
-void 
-set_client_state(struct client* client, client_states state)
-{	
-	client->state = state;
-}
-
 void
-dispatch_cmd(struct client* client)
+execute_cmd(struct client* client)
 {
 	uint8_t cmd;
+	int val;
 	
 	assert(client->state == CMD_RECEIVED);
 	
@@ -64,24 +78,75 @@ dispatch_cmd(struct client* client)
 	
 	switch(cmd) {
 		case CMD_GET:
-			dprintf("CMD_GET request for key: %s", client->rbuf);
+			dprintf("CMD_GET request for key: %s:%s", client->rkey, client->rdata);
 			break;
 		case CMD_SET:
-			dprintf("CMD_SET request for key: %s", client->rbuf);
+			dprintf("CMD_SET request for key: %s:%s", client->rkey, client->rdata);
+			break;
+		case CMD_CHG_SETTING:
+			dprintf("CMD_CHG_SETTING request with data %s, key_length:%d", client->rdata, 
+				client->req_header.key_length);
+			if (strcmp(client->rkey, "idle_client_timeout") == 0){	
+				val = atoi(client->rdata);
+				if (!val) {
+					return; // invalid integer
+				}
+				settings.idle_client_timeout = val;
+			}			
+			break;
+		case CMD_GET_SETTING:
+			if (strcmp(client->rkey, "idle_client_timeout") == 0){
+				client->sdata = malloc(sizeof(uint32_t));
+				sprintf(client->sdata, "%u", settings.idle_client_timeout);
+				client->sbytes = sizeof(uint32_t);
+				set_client_state(client, SEND_DATA);				
+			}
 			break;
 	}
 	
 	return;
 }
 
+void 
+set_client_state(struct client* client, client_states state)
+{	
+	struct epoll_event ev;
+	
+	client->state = state;
+	
+	switch(client->state) {
+		case SEND_DATA:
+			ev.events = EPOLLOUT;
+			ev.data.ptr = client;
+			if (epoll_ctl(epollfd, EPOLL_CTL_MOD, client->fd, &ev) == -1) {
+		        log_sys_err("epoll ctl error.");
+		        disconnect_client(client);
+		        return;
+		    } 		
+		    dprintf("send_data state set for fd:%d", client->fd);              
+			break;
+		case CMD_RECEIVED:
+			execute_cmd(client);
+			break;		
+		case READ_KEY:
+			client->rkey = (char *)malloc(client->req_header.key_length + 1);		
+			client->rkey[client->req_header.key_length] = (char)0;
+			break;
+		case READ_DATA:			
+    		client->rdata = (char *)malloc(client->req_header.data_length + 1);
+    		client->rdata[client->req_header.data_length] = (char)0;				
+			break;
+	}
+}
+
 void
 disconnect_idle_clients()
 {
-	client * client;
+	client *client;
 	
 	client=clients;
-	while( client != NULL && !client->free) {
-		if (time(NULL) - client->last_heard > IDLE_TIMEOUT) {			
+	while( client != NULL && !client->free && !client->sbytes) {
+		if (time(NULL) - client->last_heard > settings.idle_client_timeout) {			
 			dprintf("idle client detected.");
 			disconnect_client(client);
 			// todo: move free items closer to head for faster searching for free items in make_client
@@ -90,53 +155,81 @@ disconnect_idle_clients()
 	}
 }
 
-int 
-try_read_cmd(struct client* client)
+socket_state 
+read_nbytes(client*client, char *bytes, size_t total)
 {
-	int nbytes, needed;
+	int needed, nbytes;
+		
+	needed = total - client->rbytes;
+	nbytes = read(client->fd, &bytes[client->rbytes], needed);	
+	if ((nbytes == 0) || (nbytes == -1)) {
+		return READ_ERR;
+	}	
+	client->rbytes += nbytes;
+	if (client->rbytes == total) {
+		client->rbytes = 0;
+		return READ_COMPLETED;
+	}
+	return NEED_MORE;		
+}
+
+int 
+try_read_request(client* client)
+{
+	socket_state nbytes;
 	
-	nbytes = -1; // read event called in INVALID_STATE, a possible disconnect
+	dprintf("try_read_request called");
+		
 	client->last_heard = time(NULL);
 	
 	switch(client->state) {		
-		case READ_HEADER:
-			needed = sizeof(client->req_header)-client->rbytes;
-			nbytes = read(client->fd, &client->req_header.bytes[client->rbytes], needed);
-			dprintf("%d bytes read", nbytes);
-			client->rbytes += nbytes;
-					            	
-			if (client->rbytes == sizeof(client->req_header)) {			            		
-				client->rbytes = 0;
-				
-				if (client->req_header.data_length >= PROTOCOL_MAX_DATA_SIZE)	{
-					syslog(LOG_ERR, "request data length exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
-					return -1;
-				}			
-
-				client->rbuf = (char *)malloc(client->req_header.data_length + 1);		
-				client->rbuf[client->req_header.data_length] = (char)0;
-				set_client_state(client, READ_DATA);
-			}
-						
-			break;			
+		case READ_HEADER:			
 			
+			nbytes = read_nbytes(client, client->req_header.bytes, sizeof(client->req_header));	
+							            	
+			if (nbytes == READ_COMPLETED) {		
+				
+									
+				if ( (client->req_header.data_length >= PROTOCOL_MAX_DATA_SIZE) || 
+				   (client->req_header.key_length >= PROTOCOL_MAX_KEY_SIZE) ) {
+					syslog(LOG_ERR, "request data or key length exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
+					return READ_ERR;
+				}	
+				
+				// need2 read key?
+				if (client->req_header.key_length == 0) {        			
+        			set_client_state(client, CMD_RECEIVED);
+        		} else {
+					set_client_state(client, READ_KEY);
+				}
+			}						
+			break;			
+		case READ_KEY:
+			assert(client->rkey != NULL);
+			// todo: more asserts
+			
+			nbytes = read_nbytes(client, client->rkey, client->req_header.key_length);
+			
+        	if (nbytes == READ_COMPLETED) {	
+        		
+        		// need2 read data?
+        		if (client->req_header.data_length == 0) {        			
+        			set_client_state(client, CMD_RECEIVED);
+        		} else {        		
+					set_client_state(client, READ_DATA);
+        		}
+        	}		
+			break;
 		case READ_DATA:			
-			assert(client->rbuf != NULL);
-			            	
-			needed = client->req_header.data_length - client->rbytes;
-			nbytes = read(client->fd, &client->rbuf[client->rbytes], needed);
-        	client->rbytes += nbytes;
-        	
-        	dprintf("read data :%d %d", client->req_header.opcode, client->req_header.key_length);
-        	
-        	if (client->rbytes == client->req_header.data_length) {			    
-        		assert(strlen(client->rbuf) == client->req_header.data_length);        		
+			assert(client->rdata != NULL);
+			// todo: more asserts
+			           
+			nbytes = read_nbytes(client, client->rdata, client->req_header.data_length); 
+			
+        	if (nbytes == READ_COMPLETED) {	
         		
         		set_client_state(client, CMD_RECEIVED);
-        		
-        		// parse and dispatch the request cmd
-        		dispatch_cmd(client);
-        		
+        		execute_cmd(client);        		
         	}	
         	break;    	
 	} // switch(client->state)
@@ -145,9 +238,22 @@ try_read_cmd(struct client* client)
 }
 
 int
+try_send_response(client *client)
+{
+	dprintf("send response for fd:%d, data:%s, length:%d", client->fd, client->sdata, client->sbytes);
+	
+	assert(client->state == SEND_DATA);
+	
+	write(client->fd, client->sdata, client->sbytes);	
+	
+	disconnect_client(client);
+	
+}
+
+int
 main(void)
 {	
-    int s, nfds, n, optval, epollfd, conn_sock;    
+    int s, nfds, n, optval, conn_sock;    
     struct epoll_event ev, events[LIGHTCACHE_EPOLL_MAX_EVENTS];
     struct client *client;
     int slen, ret; 
@@ -156,6 +262,8 @@ main(void)
     slen=sizeof(si_other);
 
     //malloc_stats_print(NULL, NULL, NULL);
+    
+    init_settings();
 
     openlog("lightcache", LOG_PID, LOG_LOCAL5);
     syslog(LOG_INFO, "lightcache started.");
@@ -196,7 +304,7 @@ main(void)
     // initialize cache system hash table
     //cache = htcreate(IMG_CACHE_LOGSIZE);
     
-    // server loop
+    // classic server loop
     for (;;) {
         nfds = epoll_wait(epollfd, events, LIGHTCACHE_EPOLL_MAX_EVENTS, EPOLL_TIMEOUT);
         if (nfds == -1) {
@@ -204,7 +312,7 @@ main(void)
             continue;
         }
         
-	disconnect_idle_clients();
+		disconnect_idle_clients();
 
         // process events
         for (n = 0; n < nfds; ++n) {
@@ -216,11 +324,8 @@ main(void)
 	                log_sys_err("socket accept error.");
 	                continue;
 	            }
-	
 	            make_nonblocking(conn_sock);
 	            
-	            dprintf("incoming connection");
-	
 	            ev.events = EPOLLIN;
 	            ev.data.ptr = make_client(conn_sock);		        
 		        if (epoll_ctl(epollfd, EPOLL_CTL_ADD, conn_sock, &ev) == -1) {
@@ -233,18 +338,16 @@ main(void)
 				
 			    if ( events[n].events & EPOLLIN ) {	
 			    	
-			    	ret = try_read_cmd(client);
-			    	dprintf("try_read ret:%d", ret);
-	            	if (ret == -1 || ret == 0) {
-	            		disconnect_client(client);
+			    	if (try_read_request(client) == READ_ERR) {
+			    		disconnect_client(client);
 	            		continue; // do not check for send events for this client any more.
-	            	}
-					            	
-			        
+			    	}
+			    	
 		        } 
 		
 		        if (events[n].events & EPOLLOUT) {
-		            dprintf("out data");
+		            try_send_response(client);
+		            //dprintf("out data");
 		        }
 		    } // incoming connection 		    
         } // process events end     
