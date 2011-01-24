@@ -12,6 +12,8 @@
 #include "assert.h"
 #include "fcntl.h"
 
+#include "jemalloc/jemalloc.h"
+
 #ifdef EPOLL
 #include "sys/epoll.h"
 #endif

@@ -155,6 +155,8 @@ main(void)
     
     slen=sizeof(si_other);
 
+    //malloc_stats_print(NULL, NULL, NULL);
+
     openlog("lightcache", LOG_PID, LOG_LOCAL5);
     syslog(LOG_INFO, "lightcache started.");
      
