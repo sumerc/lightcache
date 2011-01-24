@@ -42,6 +42,15 @@ typedef union {
 	uint8_t bytes[6];
 }req_header;
 
+typedef union {
+	struct {
+		uint8_t opcode;
+		uint8_t key_length;
+		uint32_t data_length;
+	};
+	uint8_t bytes[6];
+}resp_header;
+
 typedef enum {
     READ_HEADER = 0x00,  
     READ_KEY = 0x01,
@@ -73,8 +82,7 @@ struct client {
 	unsigned int sbytes;
 	
 	int free;
-	client *next;
-	client *prev;
+	client *next;	
 };
 
 #define LIGHTCACHE_PORT 13131

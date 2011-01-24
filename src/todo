@@ -1,5 +1,5 @@
 v0.1
 --------
-[-] in need of some protocol message to set some core settings dynamically. This is very useful for testing purposes.
+[+] in need of some protocol message to set some core settings dynamically. This is very useful for testing purposes.
     CHG_SETTING <setting_name> <setting_value>
-
+[-] response structure which should be a linked list and a header in it.
