@@ -15,7 +15,7 @@ class LightCacheClient(socket.socket):
     PROTOCOL_MAX_KEY_SIZE = 250
     PROTOCOL_MAX_DATA_SIZE = 1024 + PROTOCOL_MAX_KEY_SIZE
 
-    RESP_HEADER_SIZE = 5 # in bytes, sync this(xxx)
+    RESP_HEADER_SIZE = 8 # in bytes, sync this(xxx)
     
     def _is_disconnected(self, in_secs=None):
 	if in_secs:
@@ -35,9 +35,9 @@ class LightCacheClient(socket.socket):
 	key = kwargs.pop("key", "")
 	key_len = kwargs.pop("key_length", len(key))
 	data = kwargs.pop("data", "")
-	data_len = kwargs.pop("data_length", len(data))
+	data_len = kwargs.pop("data_length", len(str(data)))
 	request = struct.pack('BBI', cmd, key_len, data_len)
-	request += "%s %s" % (key, data)
+	request += "%s%s" % (key, data)
 	return request
 
     def send_packet(self, **kwargs):	
@@ -46,9 +46,11 @@ class LightCacheClient(socket.socket):
 
     def recv_packet(self):
 	resp = self.recv(self.RESP_HEADER_SIZE)
- 	opcode, data_len = struct.unpack("BI", resp+chr(0)+chr(0)+chr(0))
+ 	opcode, data_len = struct.unpack("BI", resp)
 	resp = self.recv(data_len)
-	print resp
+	print resp	
+	return resp
+	
 
     def send_raw(self, data):
 	self.send(data)    
@@ -58,8 +60,8 @@ class LightCacheClient(socket.socket):
    
     def get_setting(self, key):
 	self.send_packet(key=key, command=self.CMD_GET_SETTING)
-	return self.recv_packet()
-
+	r = struct.unpack("I", self.recv_packet()) 
+	return r[0]
 
 class LightCacheTestBase(unittest.TestCase):
     
@@ -97,7 +99,8 @@ class LightCacheTestBase(unittest.TestCase):
 	self.client.send_packet(data="data_value", key_length=10, command=self.client.CMD_CHG_SETTING, data_length=12)   
     """
     def test_get_setting(self):
-	self.assertEqual(self.client.get_setting("idle_client_timeout"), 2)
+	self.client.chg_setting("idle_client_timeout", 5)
+	self.assertEqual(self.client.get_setting("idle_client_timeout"), 5)
     
 if __name__ == '__main__':
     unittest.main()

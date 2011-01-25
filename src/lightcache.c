@@ -10,6 +10,9 @@ void
 init_settings(void)
 {
 	settings.idle_client_timeout = 2; // in secs -- default same as memcached
+	
+	//dprintf("sizeof resp header:%d", sizeof(req_header));
+	
 }
 
 struct client* 
@@ -32,16 +35,18 @@ make_client(int fd)
 		cli->next = clients;
 		if (!clients) {
 			clients = cli;
-		}		
+		}	
+		
+			
 	}	
 	cli->fd = fd;
 	cli->last_heard = time(NULL);
 	cli->free = 0;
-	cli-> state = READ_HEADER;
+	
 	
 	cli->in = malloc(sizeof(request));
 	cli->out = malloc(sizeof(response));
-		
+	
 	return cli;
 }
 
@@ -50,6 +55,13 @@ disconnect_client(struct client* client)
 {
 	// todo: cleanup request and response objects.
 	
+	if (epoll_ctl(epollfd, EPOLL_CTL_DEL, client->fd, 0) == -1) {
+        perror("epoll_ctl disconnect client");
+        return 0;
+    }
+	
+	client->in->rbytes = 0;
+	client->out->sbytes = 0;
 	client->free = 1;
 	dprintf("disconnect client called.");
 	close(client->fd);
@@ -63,21 +75,12 @@ set_client_state(struct client* client, client_states state)
 	struct epoll_event ev;
 	
 	switch(state) {
-		case READ_HEADER:			
+		case READ_HEADER:	
+			client->in->rbytes = 0;		
 			ev.events = EPOLLIN;
 			ev.data.ptr = client;
-			if (client->state != 0) {
-				if (epoll_ctl(epollfd, EPOLL_CTL_MOD, client->fd, &ev) == -1) {
-			        log_sys_err("epoll ctl error.");
-			        //disconnect_client(client);
-			        return;
-			    }
-			} else {
-				if (epoll_ctl(epollfd, EPOLL_CTL_ADD, client->fd, &ev) == -1) {
-			        log_sys_err("epoll ctl error.");
-			        //disconnect_client(client);
-			        return;
-			    }
+			if (epoll_ctl(epollfd, EPOLL_CTL_MOD, client->fd, &ev) == -1) {
+		        epoll_ctl(epollfd, EPOLL_CTL_ADD, client->fd, &ev);
 			}
 			break;
 		case READ_KEY:
@@ -91,11 +94,11 @@ set_client_state(struct client* client, client_states state)
 		case CMD_RECEIVED:							
 			break;
 		case SEND_HEADER:
+			client->out->sbytes = 0;
 			ev.events = EPOLLOUT;
 			ev.data.ptr = client;
 			if (epoll_ctl(epollfd, EPOLL_CTL_MOD, client->fd, &ev) == -1) {
-		        log_sys_err("epoll ctl error.");
-		        disconnect_client(client);
+		        perror("epoll ctl error.");		        
 		        return;
 		    } 		
 		    dprintf("send_response state set for fd:%d", client->fd);              
@@ -104,6 +107,15 @@ set_client_state(struct client* client, client_states state)
 	
 	client->state = state;
 	
+}
+
+void 
+make_response(client *client, size_t data_length)
+{
+	client->out->sdata = malloc(data_length);
+	memset(client->out->sdata, 0, data_length);
+	client->out->resp_header.data_length = data_length;
+	client->out->resp_header.opcode = client->in->req_header.opcode;
 }
 
 void
@@ -134,19 +146,15 @@ execute_cmd(struct client* client)
 				if (!val) {
 					return; // invalid integer
 				}
-				settings.idle_client_timeout = val;
+				settings.idle_client_timeout = val;				
 			}			
+			set_client_state(client, READ_HEADER);
 			break;
 		case CMD_GET_SETTING:
-			if (strcmp(client->in->rkey, "idle_client_timeout") == 0){
-				
-				client->out->sdata = malloc(sizeof(uint32_t));
-				client->out->resp_header.data_length = sizeof(uint32_t);
-				client->out->resp_header.opcode = client->in->req_header.opcode;
-				sprintf(client->out->sdata, "%x", settings.idle_client_timeout);
-				client->out->sbytes = 0;
-				set_client_state(client, SEND_HEADER);
-								
+			if (strcmp(client->in->rkey, "idle_client_timeout") == 0){					
+				make_response(client, sizeof(uint32_t));		
+				*(uint32_t *)client->out->sdata = settings.idle_client_timeout;
+				set_client_state(client, SEND_HEADER);								
 			}
 			break;
 	}
@@ -177,13 +185,25 @@ read_nbytes(client*client, char *bytes, size_t total)
 		
 	needed = total - client->in->rbytes;
 	
-	dprintf("needed:%d", needed);
+	dprintf("total:%d, rbytes:%d", total, client->in->rbytes);
 	
 	nbytes = read(client->fd, &bytes[client->in->rbytes], needed);	
-	if ((nbytes == 0) || (nbytes == -1)) {
+	
+	if (nbytes == 0) {		
+		perror("socket read");
 		return READ_ERR;
-	}	
+	} else if (nbytes == -1) {
+		if (errno == EWOULDBLOCK || errno == EAGAIN) {
+			return NEED_MORE;
+		}
+	}
+	
+	dprintf("read:%s", &bytes[client->in->rbytes]);
+	
 	client->in->rbytes += nbytes;
+	
+	dprintf("nbytes from read:%d", nbytes);
+	
 	if (client->in->rbytes == total) {
 		client->in->rbytes = 0;
 		return READ_COMPLETED;
@@ -264,8 +284,16 @@ send_nbytes(client*client, char *bytes, size_t total)
 		
 	needed = total - client->out->sbytes;
 	
+	dprintf("sending data:%s, total:%d, sbytes:%d", &bytes[client->out->sbytes], 
+		total, client->out->sbytes);
+	
 	nbytes = write(client->fd, &bytes[client->out->sbytes], needed);	
-	if (nbytes == 0) {
+	
+	if (nbytes == -1) {
+		if (errno == EWOULDBLOCK || errno == EAGAIN) {
+			return NEED_MORE;
+		}
+		perror("socket write");
 		return SEND_ERR;
 	}	
 	client->out->sbytes += nbytes;
@@ -282,9 +310,11 @@ try_send_response(client *client)
 	socket_state ret;
 	
 	switch(client->state) {	
+		
 		case SEND_HEADER:
+		
 			dprintf("send header");
-			ret = send_nbytes(client, client->out->resp_header.bytes, sizeof(response));
+			ret = send_nbytes(client, client->out->resp_header.bytes, sizeof(resp_header));
 			if (ret == SEND_COMPLETED) {
 				if (client->out->resp_header.data_length != 0) {
 					set_client_state(client, SEND_DATA);
@@ -292,13 +322,15 @@ try_send_response(client *client)
 			}
 			break;
 		case SEND_DATA:
-			dprintf("send data %s", client->out->sdata);
+		
+			dprintf("send data %s, len:%d", client->out->sdata, client->out->resp_header.data_length);
 			ret = send_nbytes(client, client->out->sdata, client->out->resp_header.data_length);
 			if (ret == SEND_COMPLETED) {
 				if (client->out->resp_header.data_length != 0) {
+					//disconnect_client(client);
 					set_client_state(client, READ_HEADER);// wait for new commands
 				}
-			}
+			}		
 			break;
 		default:
 			ret = INVALID_STATE; 

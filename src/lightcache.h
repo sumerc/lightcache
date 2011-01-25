@@ -42,7 +42,7 @@ typedef union {
 		uint8_t key_length;
 		uint32_t data_length;
 	};
-	uint8_t bytes[6];
+	uint8_t bytes[8];
 }req_header;
 
 typedef union {
@@ -50,7 +50,7 @@ typedef union {
 		uint8_t opcode;
 		uint32_t data_length;
 	};
-	uint8_t bytes[5];
+	uint8_t bytes[8];
 }resp_header;
 
 typedef struct request request;
