@@ -31,6 +31,8 @@ typedef enum {
     NEED_MORE = 0x00,
     READ_COMPLETED = 0x01,
     READ_ERR = 0x02,
+    SEND_ERR = 0x03,
+    SEND_COMPLETED = 0x04,
 }socket_state;
 
 typedef union {
@@ -45,11 +47,25 @@ typedef union {
 typedef union {
 	struct {
 		uint8_t opcode;
-		uint8_t key_length;
 		uint32_t data_length;
 	};
-	uint8_t bytes[6];
+	uint8_t bytes[5];
 }resp_header;
+
+typedef struct request request;
+struct request {
+	req_header req_header;
+	char *rdata;
+	char *rkey;
+	unsigned int rbytes; /*current read index*/
+};
+
+typedef struct response response;
+struct response {
+	resp_header resp_header;
+	char *sdata;
+	unsigned int sbytes; /*current write index*/
+};
 
 typedef enum {
     READ_HEADER = 0x00,  
@@ -57,7 +73,8 @@ typedef enum {
     READ_DATA = 0x02,
     CONN_CLOSE = 0x03,
     CMD_RECEIVED = 0x04,
-    SEND_DATA = 0x05,
+    SEND_RESPONSE = 0x05,
+    RESPONSE_SENT = 0x06,
 }client_states;
 
 typedef struct client client;
@@ -65,21 +82,13 @@ struct client {
 	int fd; 						/* socket fd */
 	time_t last_heard; 				/* last time we heard from the client */
 	
-	
-	
-	/* protocol handling data */
-	req_header req_header; 			/* header data of the binary protocol */
-	
 	client_states state;
 	
 	/* receive window */
-	unsigned int rbytes; 			/* current index into the receiving buffer, can be either for header or data. */
-	char *rdata; 					/* recv buffer for data */
-	char *rkey;						/* key buffer */
+	request *in; /* head of linked list of request objects */
 	
 	/* send window */
-	char *sdata;
-	unsigned int sbytes;
+	response *out; /* head of linked list of response objects */
 	
 	int free;
 	client *next;	

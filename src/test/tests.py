@@ -14,8 +14,10 @@ class LightCacheClient(socket.socket):
     
     PROTOCOL_MAX_KEY_SIZE = 250
     PROTOCOL_MAX_DATA_SIZE = 1024 + PROTOCOL_MAX_KEY_SIZE
+
+    RESP_HEADER_SIZE = 5 # in bytes, sync this(xxx)
     
-    def is_disconnected(self, in_secs=None):
+    def _is_disconnected(self, in_secs=None):
 	if in_secs:
 	    self.settimeout(in_secs)
 	try:
@@ -24,14 +26,16 @@ class LightCacheClient(socket.socket):
 	    return False
 	except socket.error: # peer disconnect signal
 	    return True
+    
+    def assertDisconnected(self):
+	assert(self._is_disconnected() == True)
 
     def _make_packet(self, **kwargs):
 	cmd = kwargs.pop("command", 0)
 	key = kwargs.pop("key", "")
 	key_len = kwargs.pop("key_length", len(key))
-	data = kwargs.pop("data_length", "")
+	data = kwargs.pop("data", "")
 	data_len = kwargs.pop("data_length", len(data))
-	
 	request = struct.pack('BBI', cmd, key_len, data_len)
 	request += "%s %s" % (key, data)
 	return request
@@ -39,7 +43,15 @@ class LightCacheClient(socket.socket):
     def send_packet(self, **kwargs):	
 	data = self._make_packet(**kwargs)	
 	super(LightCacheClient, self).send(data)
-    
+
+    def recv_packet(self):
+	resp = self.recv(self.RESP_HEADER_SIZE)
+ 	 	
+	print "AAAA"
+	print resp
+	print "BBBB"	
+	return ""
+
     def send_raw(self, data):
 	self.send(data)    
 
@@ -48,7 +60,9 @@ class LightCacheClient(socket.socket):
    
     def get_setting(self, key):
 	self.send_packet(key=key, command=self.CMD_GET_SETTING)
-	return self.recv(1024)
+	return self.recv_packet()
+
+
 class LightCacheTestBase(unittest.TestCase):
     
     host = 'localhost'
@@ -63,27 +77,29 @@ class LightCacheTestBase(unittest.TestCase):
 
     #def test_idle_timeout(self):
     #	self.assertEqual(self.client.is_disconnected(in_secs=self.client.IDLE_TIMEOUT), True)
-    """
+    
     def test_send_overflow_header(self):
 	self.client.send_raw("OVERFLOWHEADER")
-	self.assertEqual(self.client.is_disconnected(), True)
+	self.client.assertDisconnected()
     
     def test_send_overflow_key(self):
 	data = "DENEME"
-	self.client.send_packet(data, key_length=self.client.PROTOCOL_MAX_KEY_SIZE)    
+	self.client.send_packet(data=data, key_length=self.client.PROTOCOL_MAX_KEY_SIZE)    
+	self.client.assertDisconnected()	
 
     def test_send_overflow_data(self):
 	data = "A" *  (self.client.PROTOCOL_MAX_DATA_SIZE+1)
-	self.client.send_packet(data, data_length=1)
+	self.client.send_packet(data=data, data_length=1)
+	self.client.assertDisconnected()
 
     def test_chg_setting(self):
 	self.client.chg_setting("idle_client_timeout", "2")
     
     def test_invalid_packets(self):
-	self.client.send_packet("data_value", key_length=10, command=self.client.CMD_CHG_SETTING, data_length=12)   
-    """
+	self.client.send_packet(data="data_value", key_length=10, command=self.client.CMD_CHG_SETTING, data_length=12)   
+    
     def test_get_setting(self):
-	print self.client.get_setting("idle_client_timeout")
+	self.assertEqual(self.client.get_setting("idle_client_timeout"), 2)
     
 if __name__ == '__main__':
     unittest.main()

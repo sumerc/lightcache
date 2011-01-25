@@ -1,3 +1,0 @@
-v 0.1
------
-[+] jemalloc is a dependency from now on. maybe disable it by a flag later.
