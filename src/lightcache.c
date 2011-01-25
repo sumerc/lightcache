@@ -1,9 +1,6 @@
 #include "lightcache.h"
 #include "protocol.h"
 
-// forward declarations
-void set_client_state(struct client* client, client_states state);
-
 // globals
 static client *clients = NULL; /* linked list head */
 static struct settings settings;
@@ -40,6 +37,7 @@ make_client(int fd)
 	cli->fd = fd;
 	cli->last_heard = time(NULL);
 	cli->free = 0;
+	cli-> state = READ_HEADER;
 	
 	cli->in = malloc(sizeof(request));
 	cli->out = malloc(sizeof(response));
@@ -55,6 +53,57 @@ disconnect_client(struct client* client)
 	client->free = 1;
 	dprintf("disconnect client called.");
 	close(client->fd);
+}
+
+
+
+void 
+set_client_state(struct client* client, client_states state)
+{	
+	struct epoll_event ev;
+	
+	switch(state) {
+		case READ_HEADER:			
+			ev.events = EPOLLIN;
+			ev.data.ptr = client;
+			if (client->state != 0) {
+				if (epoll_ctl(epollfd, EPOLL_CTL_MOD, client->fd, &ev) == -1) {
+			        log_sys_err("epoll ctl error.");
+			        //disconnect_client(client);
+			        return;
+			    }
+			} else {
+				if (epoll_ctl(epollfd, EPOLL_CTL_ADD, client->fd, &ev) == -1) {
+			        log_sys_err("epoll ctl error.");
+			        //disconnect_client(client);
+			        return;
+			    }
+			}
+			break;
+		case READ_KEY:
+			client->in->rkey = (char *)malloc(client->in->req_header.key_length + 1);		
+			client->in->rkey[client->in->req_header.key_length] = (char)0;
+			break;
+		case READ_DATA:			
+    		client->in->rdata = (char *)malloc(client->in->req_header.data_length + 1);
+    		client->in->rdata[client->in->req_header.data_length] = (char)0;				
+			break;
+		case CMD_RECEIVED:							
+			break;
+		case SEND_HEADER:
+			ev.events = EPOLLOUT;
+			ev.data.ptr = client;
+			if (epoll_ctl(epollfd, EPOLL_CTL_MOD, client->fd, &ev) == -1) {
+		        log_sys_err("epoll ctl error.");
+		        disconnect_client(client);
+		        return;
+		    } 		
+		    dprintf("send_response state set for fd:%d", client->fd);              
+			break;								
+	}
+	
+	client->state = state;
+	
 }
 
 void
@@ -96,7 +145,7 @@ execute_cmd(struct client* client)
 				client->out->resp_header.opcode = client->in->req_header.opcode;
 				sprintf(client->out->sdata, "%x", settings.idle_client_timeout);
 				client->out->sbytes = 0;
-				set_client_state(client, SEND_RESPONSE);
+				set_client_state(client, SEND_HEADER);
 								
 			}
 			break;
@@ -105,55 +154,13 @@ execute_cmd(struct client* client)
 	
 }
 
-void 
-set_client_state(struct client* client, client_states state)
-{	
-	struct epoll_event ev;
-	
-	client->state = state;
-	
-	switch(client->state) {
-		case READ_HEADER:			
-			ev.events = EPOLLIN;
-			ev.data.ptr = client;
-			//dprintf("read header state set for fd :%d, %d", client->fd, epollfd);
-			if (epoll_ctl(epollfd, EPOLL_CTL_ADD, client->fd, &ev) == -1) {
-		        log_sys_err("epoll ctl error.");
-		        disconnect_client(client);
-		        return;
-		    }
-			break;
-		case READ_KEY:
-			client->in->rkey = (char *)malloc(client->in->req_header.key_length + 1);		
-			client->in->rkey[client->in->req_header.key_length] = (char)0;
-			break;
-		case READ_DATA:			
-    		client->in->rdata = (char *)malloc(client->in->req_header.data_length + 1);
-    		client->in->rdata[client->in->req_header.data_length] = (char)0;				
-			break;
-		case CMD_RECEIVED:
-			execute_cmd(client);					
-			break;
-		case SEND_RESPONSE:
-			ev.events = EPOLLOUT;
-			ev.data.ptr = client;
-			if (epoll_ctl(epollfd, EPOLL_CTL_MOD, client->fd, &ev) == -1) {
-		        log_sys_err("epoll ctl error.");
-		        disconnect_client(client);
-		        return;
-		    } 		
-		    dprintf("send_response state set for fd:%d", client->fd);              
-			break;								
-	}
-}
-
 void
 disconnect_idle_clients()
 {
 	client *client;
 	
 	client=clients;
-	while( client != NULL && !client->free && !client->out->sbytes) {
+	while( client != NULL && !client->free) {
 		if (time(NULL) - client->last_heard > settings.idle_client_timeout) {			
 			dprintf("idle client detected.");
 			disconnect_client(client);
@@ -166,7 +173,7 @@ disconnect_idle_clients()
 socket_state 
 read_nbytes(client*client, char *bytes, size_t total)
 {
-	int needed, nbytes;
+	unsigned int needed, nbytes;
 		
 	needed = total - client->in->rbytes;
 	
@@ -194,10 +201,6 @@ try_read_request(client* client)
 	
 	client->last_heard = time(NULL);
 	
-	// if a client has something to write, and server states mismatch then
-	// disconnect.
-	ret = READ_ERR; 
-	
 	switch(client->state) {		
 		case READ_HEADER:	
 			ret = read_nbytes(client, client->in->req_header.bytes, sizeof(req_header));
@@ -212,6 +215,7 @@ try_read_request(client* client)
 				// need2 read key?
 				if (client->in->req_header.key_length == 0) {        			
         			set_client_state(client, CMD_RECEIVED);
+        			execute_cmd(client);
         		} else {
 					set_client_state(client, READ_KEY);
 				}
@@ -228,6 +232,7 @@ try_read_request(client* client)
         		// need2 read data?
         		if (client->in->req_header.data_length == 0) {        			
         			set_client_state(client, CMD_RECEIVED);
+        			execute_cmd(client);
         		} else {        		
 					set_client_state(client, READ_DATA);
         		}
@@ -243,7 +248,10 @@ try_read_request(client* client)
         		set_client_state(client, CMD_RECEIVED);
         		execute_cmd(client);        		
         	}	
-        	break;    	
+        	break; 
+        default:
+        	ret = INVALID_STATE; 
+        	break;   	
 	} // switch(client->state)
 	
 	return ret;
@@ -271,15 +279,34 @@ send_nbytes(client*client, char *bytes, size_t total)
 int
 try_send_response(client *client)
 {
-	int nbytes;
+	socket_state ret;
 	
-	assert(client->state == SEND_RESPONSE);
-	
-	nbytes = send_nbytes(client, client->out->sdata, client->out->resp_header.data_length);
-	
-	if (nbytes == SEND_COMPLETED) {
-		set_client_state(client, READ_HEADER); // wait for new requests
+	switch(client->state) {	
+		case SEND_HEADER:
+			dprintf("send header");
+			ret = send_nbytes(client, client->out->resp_header.bytes, sizeof(response));
+			if (ret == SEND_COMPLETED) {
+				if (client->out->resp_header.data_length != 0) {
+					set_client_state(client, SEND_DATA);
+				}
+			}
+			break;
+		case SEND_DATA:
+			dprintf("send data %s", client->out->sdata);
+			ret = send_nbytes(client, client->out->sdata, client->out->resp_header.data_length);
+			if (ret == SEND_COMPLETED) {
+				if (client->out->resp_header.data_length != 0) {
+					set_client_state(client, READ_HEADER);// wait for new commands
+				}
+			}
+			break;
+		default:
+			ret = INVALID_STATE; 
+			break;
 	}
+	
+	return ret;
+	
 }
 
 int
@@ -290,6 +317,7 @@ main(void)
     struct client *client;
     int slen, ret; 
     struct sockaddr_in si_me, si_other;    
+    socket_state sock_state;
     
     slen=sizeof(si_other);
 
@@ -364,16 +392,19 @@ main(void)
 				client = (struct client *)events[n].data.ptr;
 				
 			    if ( events[n].events & EPOLLIN ) {	
-			    	
-			    	if (try_read_request(client) == READ_ERR) {
+			    	sock_state = try_read_request(client);
+			    	if (sock_state == READ_ERR || sock_state == INVALID_STATE) {
 			    		disconnect_client(client);
 	            		continue; // do not check for send events for this client any more.
 			    	}
 			    	
 		        } 		
 		        if (events[n].events & EPOLLOUT) {
-		            try_send_response(client);
-		            
+		            sock_state = try_send_response(client);
+		            if (sock_state == SEND_ERR || sock_state == INVALID_STATE) {
+			    		disconnect_client(client);
+	            		continue; // do not check for send events for this client any more.
+			    	}		            
 		        }
 		    } // incoming connection 		    
         } // process events end     

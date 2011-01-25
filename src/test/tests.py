@@ -46,11 +46,9 @@ class LightCacheClient(socket.socket):
 
     def recv_packet(self):
 	resp = self.recv(self.RESP_HEADER_SIZE)
- 	 	
-	print "AAAA"
+ 	opcode, data_len = struct.unpack("BI", resp+chr(0)+chr(0)+chr(0))
+	resp = self.recv(data_len)
 	print resp
-	print "BBBB"	
-	return ""
 
     def send_raw(self, data):
 	self.send(data)    
@@ -77,7 +75,7 @@ class LightCacheTestBase(unittest.TestCase):
 
     #def test_idle_timeout(self):
     #	self.assertEqual(self.client.is_disconnected(in_secs=self.client.IDLE_TIMEOUT), True)
-    
+    """
     def test_send_overflow_header(self):
 	self.client.send_raw("OVERFLOWHEADER")
 	self.client.assertDisconnected()
@@ -97,7 +95,7 @@ class LightCacheTestBase(unittest.TestCase):
     
     def test_invalid_packets(self):
 	self.client.send_packet(data="data_value", key_length=10, command=self.client.CMD_CHG_SETTING, data_length=12)   
-    
+    """
     def test_get_setting(self):
 	self.assertEqual(self.client.get_setting("idle_client_timeout"), 2)
     

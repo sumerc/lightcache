@@ -33,6 +33,7 @@ typedef enum {
     READ_ERR = 0x02,
     SEND_ERR = 0x03,
     SEND_COMPLETED = 0x04,
+    INVALID_STATE = 0x05,
 }socket_state;
 
 typedef union {
@@ -72,9 +73,9 @@ typedef enum {
     READ_KEY = 0x01,
     READ_DATA = 0x02,
     CONN_CLOSE = 0x03,
-    CMD_RECEIVED = 0x04,
-    SEND_RESPONSE = 0x05,
-    RESPONSE_SENT = 0x06,
+    CMD_RECEIVED = 0x04,    
+    SEND_HEADER = 0x05,
+    SEND_DATA = 0x06,
 }client_states;
 
 typedef struct client client;
