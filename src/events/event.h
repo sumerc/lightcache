@@ -5,8 +5,8 @@
 #define EVENT_H
 
 typedef enum {
-    EVENT_READ = 0x00,  
-    EVENT_WRITE = 0x01,
+    EVENT_READ = 0x01,  
+    EVENT_WRITE = 0x02,
 }event;
 
 

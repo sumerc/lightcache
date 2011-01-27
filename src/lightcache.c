@@ -167,7 +167,7 @@ disconnect_idle_conns()
 	conn *conn;
 	
 	conn=conns;
-	while( conn != NULL && !conn->free) {
+	while( conn != NULL && !conn->free && !conn->listening) {
 		if (time(NULL) - conn->last_heard > settings.idle_conn_timeout) {			
 			dprintf("idle conn detected.");
 			disconnect_conn(conn);
@@ -428,6 +428,7 @@ main(void)
 			if ( events[n].events & EPOLLIN ) {	
 		    	
 		    	if (conn->listening) { // listening socket?
+		    		dprintf("incoming conn");
 				    conn_sock = accept(s, (struct sockaddr *)&si_other, &slen);
 		            if (conn_sock == -1) {
 		                log_sys_err("socket accept error.");

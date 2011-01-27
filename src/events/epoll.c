@@ -36,6 +36,8 @@ event_set(conn *c, int flags)
 	int op;
 	struct epoll_event ev;
 	
+	dprintf("flags:%d, anded:%d", flags, flags & EVENT_READ);
+	
 	ev.events = 0x0;	
 	if (flags & EVENT_READ) {
 		ev.events |= EPOLLIN;	
