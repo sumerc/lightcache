@@ -1,6 +1,5 @@
 #include "lightcache.h"
 
-
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
 
@@ -25,7 +24,7 @@ void
 deamonize(void)
 {
     pid_t pid, sid, parent;
-    int lfp = -1;
+    FILE *dummy;
 
     /* already a daemon */
     if ( getppid() == 1 ) return;
@@ -84,9 +83,9 @@ deamonize(void)
     }
 
     /* Redirect standard files to /dev/null */
-    freopen( "/dev/null", "r", stdin);
-    freopen( "/dev/null", "w", stdout);
-    freopen( "/dev/null", "w", stderr);
+    dummy = freopen( "/dev/null", "r", stdin);
+    dummy = freopen( "/dev/null", "w", stdout);
+    dummy = freopen( "/dev/null", "w", stderr);
 
     /* Tell the parent process that we are A-okay */
     kill( parent, SIGUSR1 );

@@ -36,8 +36,10 @@ class LightCacheClient(socket.socket):
 	key_len = kwargs.pop("key_length", len(key))
 	data = kwargs.pop("data", "")
 	data_len = kwargs.pop("data_length", len(str(data)))
-	request = struct.pack('BBI', cmd, key_len, data_len)
-	request += "%s%s" % (key, data)
+	extra = kwargs.pop("extra", "")
+	extra_len = kwargs.pop("extra_length", len(str(extra)))
+	request = struct.pack('BBII', cmd, key_len, data_len, extra_len)
+	request += "%s%s%s" % (key, data, extra)
 	return request
 
     def send_packet(self, **kwargs):	
@@ -62,6 +64,9 @@ class LightCacheClient(socket.socket):
 	self.send_packet(key=key, command=self.CMD_GET_SETTING)
 	r = struct.unpack("I", self.recv_packet()) 
 	return r[0]
+    
+    def set(self, key, value, timeout):
+	self.send_packet(key=key, data=value, command=self.CMD_SET, extra=timeout)	    
 
 class LightCacheTestBase(unittest.TestCase):
     
@@ -99,8 +104,11 @@ class LightCacheTestBase(unittest.TestCase):
 	self.client.send_packet(data="data_value", key_length=10, command=self.client.CMD_CHG_SETTING, data_length=12)   
     """
     def test_get_setting(self):
-	self.client.chg_setting("idle_client_timeout", 5)
-	self.assertEqual(self.client.get_setting("idle_client_timeout"), 5)
+	self.client.chg_setting("idle_conn_timeout", 5)
+	self.assertEqual(self.client.get_setting("idle_conn_timeout"), 5)
+    
+    def test_set(self):
+	self.client.set("key1", "value1", 11)
     
 if __name__ == '__main__':
     unittest.main()

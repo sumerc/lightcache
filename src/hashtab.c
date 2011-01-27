@@ -2,11 +2,10 @@
 *    Hash Table
 *    Sumer Cip 2010
 */
-
-
 #include "hashtab.h"
-#include "mem.h"
-#include "scsrv.h"
+#include "stdio.h"
+#include "stdlib.h"
+#include "string.h"
 
 // one_at_a_time hashing
 // This is similar to the rotating hash, but it actually mixes the internal state. It takes
@@ -52,18 +51,18 @@ _hgrow(_htab *ht)
                 return 0;
 
             it->free = p->free;
-            yfree(p->key);
-            yfree(p);
+            free(p->key);
+            free(p);
             p = next;
         }
     }
 
-    yfree(ht->_table);
+    free(ht->_table);
     ht->_table = dummy->_table;
     ht->logsize = dummy->logsize;
     ht->realsize = dummy->realsize;
     ht->mask = dummy->mask;
-    yfree(dummy);
+    free(dummy);
     return 1;
 }
 
@@ -73,7 +72,7 @@ htcreate(int logsize)
     int i;
     _htab *ht;
 
-    ht = (_htab *)ymalloc(sizeof(_htab));
+    ht = (_htab *)malloc(sizeof(_htab));
     if (!ht)
         return NULL;
     ht->logsize = logsize;
@@ -81,9 +80,9 @@ htcreate(int logsize)
     ht->mask = HMASK(logsize);
     ht->count = 0;
     ht->freecount = 0;
-    ht->_table = (_hitem **)ymalloc(ht->realsize * sizeof(_hitem *));
+    ht->_table = (_hitem **)malloc(ht->realsize * sizeof(_hitem *));
     if (!ht->_table) {
-        yfree(ht);
+        free(ht);
         return NULL;
     }
 
@@ -105,14 +104,14 @@ htdestroy(_htab *ht)
         p = ht->_table[i];
         while(p) {
             next = p->next;
-            yfree(p->key); // we also create keys.
-            yfree(p);
+            free(p->key); // we also create keys.
+            free(p);
             p = next;
         }
     }
 
-    yfree(ht->_table);
-    yfree(ht);
+    free(ht->_table);
+    free(ht);
 }
 
 
@@ -136,8 +135,8 @@ hadd(_htab *ht, char* key, int klen, void *val)
     if (new) {
         // do we need new allocation for the key?
         if (new->klen >= klen+1) {
-            yfree(new->key); // free previous
-            new->key = (char*)ymalloc(klen+1);
+            free(new->key); // free previous
+            new->key = (char*)malloc(klen+1);
         }
         strncpy(new->key, key, klen+1); // copy the last "0" byte
         new->klen = klen;
@@ -145,10 +144,10 @@ hadd(_htab *ht, char* key, int klen, void *val)
         new->free = 0;
         ht->freecount--;
     } else {
-        new = (_hitem *)ymalloc(sizeof(_hitem));
+        new = (_hitem *)malloc(sizeof(_hitem));
         if (!new)
             return 0;
-        new->key = (char*)ymalloc(klen+1);
+        new->key = (char*)malloc(klen+1);
         strncpy(new->key, key, klen+1);
         new->klen = klen;
         new->val = val;
