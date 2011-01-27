@@ -24,6 +24,12 @@
 
 #define dprintf(fmt, args...) fprintf(stderr, "[+] " fmt "\n", ## args)
 
+typedef struct cached_item cached_item;
+struct cached_item {
+	uint32_t length;
+	void *data;
+};
+
 struct settings {
 	uint32_t idle_conn_timeout;
 	int deamon_mode; /* specify whether to run in deamon mode */
@@ -60,7 +66,6 @@ struct conn {
 };
 
 #define LIGHTCACHE_PORT 13131
-
 #define LIGHTCACHE_LISTEN_BACKLOG 100	// 100 clients can be queued between subsequent accept()
 
 #endif

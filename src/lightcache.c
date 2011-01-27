@@ -13,10 +13,7 @@ static _htab *cache;
 void 
 init_settings(void)
 {
-	settings.idle_conn_timeout = 2; // in secs -- default same as memcached
-	
-	//dprintf("sizeof resp header:%d", sizeof(req_header));
-	
+	settings.idle_conn_timeout = 2; // in secs -- default same as memcached	
 }
 
 struct conn* 
@@ -47,6 +44,7 @@ make_conn(int fd)
 	cli->last_heard = time(NULL);
 	cli->free = 0;
 	cli->active = 0;
+	cli->listening = 0;
 	
 	
 	cli->in = malloc(sizeof(request));
@@ -120,6 +118,8 @@ execute_cmd(struct conn* conn)
 {
 	uint8_t cmd;
 	int val;
+	cached_item *citem;
+	_hitem *tab_item;
 	
 	assert(conn->state == CMD_RECEIVED);
 	
@@ -127,11 +127,30 @@ execute_cmd(struct conn* conn)
 	
 	switch(cmd) {
 		case CMD_GET:
+			
 			dprintf("CMD_GET request for key: %s:%s", conn->in->rkey, conn->in->rdata);
+			tab_item = hfind(cache, conn->in->rkey, conn->in->req_header.key_length);
+			if (!tab_item) {
+				dprintf("key not found:%s", conn->in->rkey);
+				return;
+			}
+			citem = (cached_item *)tab_item->val;			
+			make_response(conn, citem->length);		
+			conn->out->sdata = citem->data;
+			set_conn_state(conn, SEND_HEADER);			
 			break;
 		case CMD_SET:
 			dprintf("CMD_SET request for key: %s:%s:%s", conn->in->rkey, conn->in->rdata, 
 				conn->in->rextra);
+				
+			citem = malloc(sizeof(cached_item));
+			citem->data = conn->in->rdata;
+			citem->length = conn->in->req_header.data_length;
+			
+			hadd(cache, conn->in->rkey, conn->in->req_header.key_length, citem);	
+			
+			set_conn_state(conn, READ_HEADER);
+			
 			break;
 		case CMD_CHG_SETTING:
 			dprintf("CMD_CHG_SETTING request with data %s, key_length:%d", conn->in->rdata, 
@@ -349,20 +368,55 @@ try_send_response(conn *conn)
 	
 }
 
+void 
+event_handler(conn *conn, event ev)
+{
+	int conn_sock, slen;	
+	struct sockaddr_in si_other;   
+	socket_state sock_state;
+	
+	slen = sizeof(si_other);
+	
+	switch(ev) {
+		case EVENT_READ:
+			
+			if (conn->listening) { // listening socket?
+	    		conn_sock = accept(conn->fd, (struct sockaddr *)&si_other, &slen);
+	            if (conn_sock == -1) {
+	                log_sys_err("socket accept error.");
+	                return;
+	            }
+	            make_nonblocking(conn_sock);
+	            conn = make_conn(conn_sock);	        
+		        set_conn_state(conn, READ_HEADER);
+	    	} else {			    	
+		    	sock_state = try_read_request(conn);
+		    	if (sock_state == READ_ERR || sock_state == INVALID_STATE) {
+		    		disconnect_conn(conn);
+            		return; // do not check for send events for this conn any more.
+		    	}
+	    	}
+	    	
+			break;
+		case EVENT_WRITE:
+			sock_state = try_send_response(conn);
+            if (sock_state == SEND_ERR || sock_state == INVALID_STATE) {
+	    		disconnect_conn(conn);
+        		return; // do not check for send events for this conn any more.
+	    	}	
+			break;
+	}
+	return;
+}
+
 int
 main(void)
 {	
-    int s, nfds, n, optval, conn_sock, ret;    
-    struct epoll_event ev, events[10];
+    int s, n, optval, conn_sock, ret;    
+    struct sockaddr_in si_me;
     struct conn *conn;
-    socklen_t slen; 
-    struct sockaddr_in si_me, si_other;    
-    socket_state sock_state;
+    socklen_t slen;      
     
-    int silbeni;
-    
-    slen=sizeof(si_other);
-
     //malloc_stats_print(NULL, NULL, NULL);
     
     init_settings();
@@ -396,11 +450,10 @@ main(void)
     make_nonblocking(s);
     listen(s, LIGHTCACHE_LISTEN_BACKLOG);
     
-    ret = event_init();
+    ret = event_init(event_handler);
     if (!ret) {
         goto err;
     }
-	silbeni = ret;	
     
     conn = make_conn(s);
     conn->listening = 1;  
@@ -413,47 +466,12 @@ main(void)
     // classic server loop
     for (;;) {
     	
-        nfds = epoll_wait(silbeni, events, 10, 1000);
-        if (nfds == -1) {
-            log_sys_err("epoll wait error.");
-            continue;
-        }
+    	event_process();
+        
         
 		disconnect_idle_conns();
 
-        // process events
-        for (n = 0; n < nfds; ++n) {        	            	
-			
-			conn = (struct conn *)events[n].data.ptr;
-			if ( events[n].events & EPOLLIN ) {	
-		    	
-		    	if (conn->listening) { // listening socket?
-		    		dprintf("incoming conn");
-				    conn_sock = accept(s, (struct sockaddr *)&si_other, &slen);
-		            if (conn_sock == -1) {
-		                log_sys_err("socket accept error.");
-		                continue;
-		            }
-		            make_nonblocking(conn_sock);
-		            conn = make_conn(conn_sock);	        
-			        set_conn_state(conn, READ_HEADER);
-		    	} else {			    	
-			    	sock_state = try_read_request(conn);
-			    	if (sock_state == READ_ERR || sock_state == INVALID_STATE) {
-			    		disconnect_conn(conn);
-	            		continue; // do not check for send events for this conn any more.
-			    	}
-		    	}			    	
-	        } 		
-	        if (events[n].events & EPOLLOUT) {
-	            sock_state = try_send_response(conn);
-	            if (sock_state == SEND_ERR || sock_state == INVALID_STATE) {
-		    		disconnect_conn(conn);
-            		continue; // do not check for send events for this conn any more.
-		    	}		            
-	        }
-		    		    
-        } // process events end     
+         
     }  // server loop end
 	
    

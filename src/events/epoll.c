@@ -3,20 +3,22 @@
 #include "../log.h"
 
 // globals
-static int epollfd;
+static int epollfd = 0;
+static void (*event_handler)(conn *c, event ev) = NULL;
 
 // constants
 #define EPOLL_MAX_EVENTS 10
 #define EPOLL_TIMEOUT 1000 // in ms todo: maybe get it from settings?
 
 int 
-event_init(void)
+event_init(void (*ev_handler)(conn *c, event ev))
 {
 	epollfd = epoll_create(EPOLL_MAX_EVENTS);
 	if (epollfd == -1) {
         log_sys_err("epoll create error.");
         return 0;
-    } 
+    }
+    event_handler = ev_handler;
     return  epollfd;    
 }
 
@@ -62,7 +64,34 @@ event_set(conn *c, int flags)
 	return 1;
 }
 
-
+void 
+event_process(void)
+{
+	int nfds, n;
+	struct epoll_event ev, events[EPOLL_MAX_EVENTS];
+	conn *conn;
+	
+	nfds = epoll_wait(epollfd, events, EPOLL_MAX_EVENTS, EPOLL_TIMEOUT);	
+	if (nfds == -1) {
+		log_sys_err("epoll wait error.");
+        return;
+    }
+    
+    // process events
+    for (n = 0; n < nfds; ++n) {        
+		conn = (struct conn *)events[n].data.ptr;
+		
+		if ( events[n].events & EPOLLIN ) {		    	
+	    	event_handler(conn, EVENT_READ);		    	
+        } 		
+        if (events[n].events & EPOLLOUT) {
+        	event_handler(conn, EVENT_WRITE);            	            
+        }
+	    		    
+    } // process events end    
+    
+	//event_handler()
+}
 
 
 

@@ -50,7 +50,6 @@ class LightCacheClient(socket.socket):
 	resp = self.recv(self.RESP_HEADER_SIZE)
  	opcode, data_len = struct.unpack("BI", resp)
 	resp = self.recv(data_len)
-	print resp	
 	return resp
 	
 
@@ -66,7 +65,11 @@ class LightCacheClient(socket.socket):
 	return r[0]
     
     def set(self, key, value, timeout):
-	self.send_packet(key=key, data=value, command=self.CMD_SET, extra=timeout)	    
+	self.send_packet(key=key, data=value, command=self.CMD_SET, extra=timeout)	   
+
+    def get(self, key):
+	self.send_packet(key=key, command=self.CMD_GET) 
+	return self.recv_packet()
 
 class LightCacheTestBase(unittest.TestCase):
     
@@ -81,8 +84,8 @@ class LightCacheTestBase(unittest.TestCase):
 	self.client.close()
 
     #def test_idle_timeout(self):
-    #	self.assertEqual(self.client.is_disconnected(in_secs=self.client.IDLE_TIMEOUT), True)
-    """
+    # 	self.assertEqual(self.client._is_disconnected(in_secs=self.client.IDLE_TIMEOUT), True)
+    
     def test_send_overflow_header(self):
 	self.client.send_raw("OVERFLOWHEADER")
 	self.client.assertDisconnected()
@@ -99,17 +102,22 @@ class LightCacheTestBase(unittest.TestCase):
 
     def test_chg_setting(self):
 	self.client.chg_setting("idle_client_timeout", "2")
-    
+    	
     def test_invalid_packets(self):
 	self.client.send_packet(data="data_value", key_length=10, command=self.client.CMD_CHG_SETTING, data_length=12)   
-    """
+    
     def test_get_setting(self):
 	self.client.chg_setting("idle_conn_timeout", 5)
 	self.assertEqual(self.client.get_setting("idle_conn_timeout"), 5)
     
     def test_set(self):
 	self.client.set("key1", "value1", 11)
-    
+
+    def test_get(self):
+	self.client.set("key2", "value2", 13)
+	self.assertEqual(self.client.get("key2"), "value2")
+    	
+
 if __name__ == '__main__':
     unittest.main()
 
