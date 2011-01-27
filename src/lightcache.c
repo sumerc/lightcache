@@ -5,15 +5,24 @@
 #include "hashtab.h"
 #include "events/event.h"
 
-// globals
-static conn *conns = NULL; /* linked list head */
-static struct settings settings;
-static _htab *cache;
+
+/* globals */
+conn *conns = NULL; /* linked list head */
+struct settings settings;
+struct stats stats;
+_htab *cache = NULL;
 
 void 
 init_settings(void)
 {
 	settings.idle_conn_timeout = 2; // in secs -- default same as memcached	
+	settings.deamon_mode = 0;
+}
+
+void 
+init_stats(void)
+{
+	stats.mem_used = 0;
 }
 
 struct conn* 
@@ -420,7 +429,9 @@ main(void)
     //malloc_stats_print(NULL, NULL, NULL);
     
     init_settings();
-    
+    init_stats();
+    init_mem(&settings, &stats);
+        
     // todo : parse and set arguments to settings here.
 
     openlog("lightcache", LOG_PID, LOG_LOCAL5);

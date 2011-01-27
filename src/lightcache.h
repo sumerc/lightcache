@@ -13,8 +13,6 @@
 
 #include "protocol.h"
 
-#include "jemalloc/jemalloc.h"
-
 #ifdef EPOLL
 #include "sys/epoll.h"
 #endif
@@ -34,6 +32,11 @@ struct settings {
 	uint32_t idle_conn_timeout;
 	int deamon_mode; /* specify whether to run in deamon mode */
 };
+
+struct stats {
+	unsigned int mem_used;
+};
+
 
 typedef enum {
     READ_HEADER = 0x00,  
