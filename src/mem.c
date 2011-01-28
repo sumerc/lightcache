@@ -3,26 +3,27 @@
 #include "jemalloc/jemalloc.h"
 #include "lightcache.h"
 
-struct settings *settings_p = NULL;
-struct stats *stats_p = NULL;
-
-void 
-init_mem(struct settings *settings, struct stats* stats)
-{
-	dprintf("init mem called");
-	settings_p = settings;
-	stats_p = stats;
-	return;
-}
 
 void *
 li_malloc(size_t size)
 {
-	return NULL;
+	void *p;
+	
+	p = malloc(size+sizeof(size_t));	
+	memset(p, 0, size+sizeof(size_t));
+	*(size_t *)p = size;
+	p += sizeof(size_t);	
+	stats.mem_used += size;	
+	return p;
 }
 
 void 
 li_free(void *ptr)
 {
-	return;
+	size_t size;
+	
+	ptr = ptr - sizeof(size_t);
+	size = *(size_t *)ptr;
+	stats.mem_used -= size;	
+	free(ptr);
 }

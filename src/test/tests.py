@@ -8,6 +8,7 @@ class LightCacheClient(socket.socket):
     CMD_SET = 0x01  
     CMD_CHG_SETTING = 0x02
     CMD_GET_SETTING = 0X03
+    CMD_GET_STATS = 0X04
 	
     EVENT_TIMEOUT = 1 # in sec, (used for time critical tests, shall be added to every timing test code)
     IDLE_TIMEOUT = 2 + EVENT_TIMEOUT # in sec  
@@ -52,7 +53,6 @@ class LightCacheClient(socket.socket):
 	resp = self.recv(data_len)
 	return resp
 	
-
     def send_raw(self, data):
 	self.send(data)    
 
@@ -69,6 +69,9 @@ class LightCacheClient(socket.socket):
 
     def get(self, key):
 	self.send_packet(key=key, command=self.CMD_GET) 
+	return self.recv_packet()
+    def get_stats(self):
+	self.send_packet(command=self.CMD_GET_STATS)
 	return self.recv_packet()
 
 class LightCacheTestBase(unittest.TestCase):
@@ -116,7 +119,9 @@ class LightCacheTestBase(unittest.TestCase):
     def test_get(self):
 	self.client.set("key2", "value2", 13)
 	self.assertEqual(self.client.get("key2"), "value2")
-    	
+    
+    def test_get_stats(self):
+	print self.client.get_stats()
 
 if __name__ == '__main__':
     unittest.main()

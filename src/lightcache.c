@@ -6,11 +6,14 @@
 #include "events/event.h"
 
 
-/* globals */
-conn *conns = NULL; /* linked list head */
+/* exported globals */
 struct settings settings;
 struct stats stats;
-_htab *cache = NULL;
+
+/* module globals */
+static conn *conns = NULL; /* linked list head */
+static _htab *cache = NULL;
+
 
 void 
 init_settings(void)
@@ -28,38 +31,36 @@ init_stats(void)
 struct conn* 
 make_conn(int fd)
 {
-	struct conn *cli, *item;
+	struct conn *conn, *item;
 	
-	cli = NULL;
+	conn = NULL;
 	// search for free items first
 	for(item=conns; item!=NULL ;item=item->next) {
 		if (item->free) {
-			cli = item;
+			conn = item;
 			break;
 		}
 	}
 	
 	// no free item?
-	if (cli == NULL) {
-		cli = (struct conn*)malloc(sizeof(struct conn));
-		cli->next = conns;
+	if (conn == NULL) {
+		conn = (struct conn*)li_malloc(sizeof(struct conn));
+		conn->next = conns;
 		if (!conns) {
-			conns = cli;
-		}	
-		
-			
+			conns = conn;
+		}			
 	}	
-	cli->fd = fd;
-	cli->last_heard = time(NULL);
-	cli->free = 0;
-	cli->active = 0;
-	cli->listening = 0;
+	
+	conn->fd = fd;
+	conn->last_heard = time(NULL);
+	conn->active = 0;
+	conn->listening = 0;
 	
 	
-	cli->in = malloc(sizeof(request));
-	cli->out = malloc(sizeof(response));
+	conn->in = (request *)li_malloc(sizeof(request));
+	conn->out = (response *)li_malloc(sizeof(response));
 	
-	return cli;
+	return conn;
 }
 
 int 
@@ -69,11 +70,33 @@ disconnect_conn(struct conn* conn)
 	
 	event_del(conn);
 	
-	conn->in->rbytes = 0;
-	conn->out->sbytes = 0;
-	conn->free = 1;
+	if (conn->in->rkey) {
+		li_free(conn->in->rkey);
+	}
+	if (conn->in->rdata) {
+		li_free(conn->in->rdata);
+	}
+	if (conn->in->rextra) {
+		li_free(conn->in->rextra);
+	}
+	if (conn->free_response_data) {
+		assert(conn->out->sdata);
+		li_free(conn->out->sdata);
+	}	
+	
+	li_free(conn->in);
+	li_free(conn->out);
+
+	// is head?
+	if (conn == conns) {
+		conns = conn->next;
+	}
+	
+	
+	
 	dprintf("disconnect conn called.");
 	close(conn->fd);
+	
 	return 1;
 }
 
@@ -88,15 +111,15 @@ set_conn_state(struct conn* conn, conn_states state)
 			event_set(conn, EVENT_READ);		
 			break;
 		case READ_KEY:
-			conn->in->rkey = (char *)malloc(conn->in->req_header.key_length + 1);		
+			conn->in->rkey = (char *)li_malloc(conn->in->req_header.key_length + 1);		
 			conn->in->rkey[conn->in->req_header.key_length] = (char)0;
 			break;
 		case READ_DATA:			
-    		conn->in->rdata = (char *)malloc(conn->in->req_header.data_length + 1);
+    		conn->in->rdata = (char *)li_malloc(conn->in->req_header.data_length + 1);
     		conn->in->rdata[conn->in->req_header.data_length] = (char)0;				
 			break;
 		case READ_EXTRA:
-			conn->in->rextra = (char *)malloc(conn->in->req_header.extra_length + 1);
+			conn->in->rextra = (char *)li_malloc(conn->in->req_header.extra_length + 1);
 			conn->in->rextra[conn->in->req_header.extra_length] = (char)0;
 			break;
 		case CMD_RECEIVED:							
@@ -116,8 +139,9 @@ set_conn_state(struct conn* conn, conn_states state)
 void 
 make_response(conn *conn, size_t data_length)
 {
-	conn->out->sdata = malloc(data_length);
-	memset(conn->out->sdata, 0, data_length);
+	// todo: more asserts
+	
+	conn->out->sdata = (char *)li_malloc(data_length);
 	conn->out->resp_header.data_length = data_length;
 	conn->out->resp_header.opcode = conn->in->req_header.opcode;
 }
@@ -126,7 +150,7 @@ void
 execute_cmd(struct conn* conn)
 {
 	uint8_t cmd;
-	int val;
+	unsigned int val;	
 	cached_item *citem;
 	_hitem *tab_item;
 	
@@ -144,6 +168,10 @@ execute_cmd(struct conn* conn)
 				return;
 			}
 			citem = (cached_item *)tab_item->val;			
+			if (citem->timeout < time(NULL)) {
+				dprintf("time expired for key:%s", conn->in->rkey);
+				return;
+			}			
 			make_response(conn, citem->length);		
 			conn->out->sdata = citem->data;
 			set_conn_state(conn, SEND_HEADER);			
@@ -152,14 +180,17 @@ execute_cmd(struct conn* conn)
 			dprintf("CMD_SET request for key: %s:%s:%s", conn->in->rkey, conn->in->rdata, 
 				conn->in->rextra);
 				
-			citem = malloc(sizeof(cached_item));
+			citem = (cached_item *)li_malloc(sizeof(cached_item));
 			citem->data = conn->in->rdata;
 			citem->length = conn->in->req_header.data_length;
-			
-			hadd(cache, conn->in->rkey, conn->in->req_header.key_length, citem);	
-			
-			set_conn_state(conn, READ_HEADER);
-			
+			citem->timeout = atoi(conn->in->rextra) * 1000; //sec2msec
+			if (!citem->timeout){
+				dprintf("invalid param in CMD_SET");
+				return;
+			}
+			citem->timeout += time(NULL);
+			hadd(cache, conn->in->rkey, conn->in->req_header.key_length, citem);				
+			set_conn_state(conn, READ_HEADER);			
 			break;
 		case CMD_CHG_SETTING:
 			dprintf("CMD_CHG_SETTING request with data %s, key_length:%d", conn->in->rdata, 
@@ -170,6 +201,7 @@ execute_cmd(struct conn* conn)
 			if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0){	
 				val = atoi(conn->in->rdata);
 				if (!val) {
+					dprintf("invalid param in CMD_CHG_SETTING");
 					return; // invalid integer
 				}
 				settings.idle_conn_timeout = val;				
@@ -177,13 +209,24 @@ execute_cmd(struct conn* conn)
 			set_conn_state(conn, READ_HEADER);
 			break;
 		case CMD_GET_SETTING:
-			//dprintf("CMD_GET request for key: %s:%s", conn->in->rkey, conn->in->rdata);
+			dprintf("CMD_GET_SETTING request for key: %s, data:%s", conn->in->rkey, 
+				conn->in->rdata);
 			if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0){					
 				make_response(conn, sizeof(uint32_t));		
 				*(uint32_t *)conn->out->sdata = settings.idle_conn_timeout;
+				/* data can be freed as it is unrelated with the cache structure.
+				 * */
+				conn->free_response_data = 1; 				
 				set_conn_state(conn, SEND_HEADER);								
 			}
 			break;
+		case CMD_GET_STATS:
+			dprintf("CMD_GET_STATS request");
+			make_response(conn, 250);			
+			sprintf(conn->out->sdata, "Memory used: %u", stats.mem_used);
+			conn->free_response_data = 1; 				
+			set_conn_state(conn, SEND_HEADER);	
+			break;		
 	}
 	return;
 	
@@ -321,8 +364,7 @@ send_nbytes(conn*conn, char *bytes, size_t total)
 		
 	needed = total - conn->out->sbytes;
 	
-	dprintf("send_nbytes called data:%s, total:%d, sbytes:%d", &bytes[conn->out->sbytes], 
-		total, conn->out->sbytes);
+	dprintf("send_nbytes called total:%d, sbytes:%d", total, conn->out->sbytes);
 	
 	nbytes = write(conn->fd, &bytes[conn->out->sbytes], needed);	
 	
@@ -360,7 +402,8 @@ try_send_response(conn *conn)
 			break;
 		case SEND_DATA:
 		
-			dprintf("send data %s, len:%d", conn->out->sdata, conn->out->resp_header.data_length);
+			//dprintf("send data %s, len:%d", conn->out->sdata, 
+			//	conn->out->resp_header.data_length);
 			ret = send_nbytes(conn, conn->out->sdata, conn->out->resp_header.data_length);
 			if (ret == SEND_COMPLETED) {
 				if (conn->out->resp_header.data_length != 0) {					
@@ -430,7 +473,6 @@ main(void)
     
     init_settings();
     init_stats();
-    init_mem(&settings, &stats);
         
     // todo : parse and set arguments to settings here.
 
@@ -440,15 +482,20 @@ main(void)
 	if (settings.deamon_mode) {
 		deamonize();
 	}
-     
+	
+	ret = event_init(event_handler);
+    if (!ret) {
+        goto err;
+    }
+    
+    /* init listening socket */ 
     if ((s=socket(AF_INET, SOCK_STREAM, 0))==-1) {
         log_sys_err("socket make error.");
         goto err;
     }
     optval = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
-
-
+    
     memset((char *) &si_me, 0, sizeof(si_me));
     si_me.sin_family = AF_INET;
     si_me.sin_port = htons(LIGHTCACHE_PORT);
@@ -457,33 +504,19 @@ main(void)
         log_sys_err("socket bind error.");
         goto err;
     }
-
     make_nonblocking(s);
     listen(s, LIGHTCACHE_LISTEN_BACKLOG);
-    
-    ret = event_init(event_handler);
-    if (!ret) {
-        goto err;
-    }
-    
     conn = make_conn(s);
     conn->listening = 1;  
     event_set(conn, EVENT_READ);
     
-    
-    // initialize cache system hash table
+    /* create the in-memory hash table */
     cache = htcreate(4); // todo: read from cmdline args
     
-    // classic server loop
     for (;;) {
-    	
     	event_process();
-        
-        
 		disconnect_idle_conns();
-
-         
-    }  // server loop end
+    }
 	
    
 err:

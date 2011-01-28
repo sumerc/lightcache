@@ -24,8 +24,9 @@
 
 typedef struct cached_item cached_item;
 struct cached_item {
-	uint32_t length;
-	void *data;
+	unsigned int length;
+	time_t timeout;
+	void *data; 
 };
 
 struct settings {
@@ -34,7 +35,7 @@ struct settings {
 };
 
 struct stats {
-	unsigned int mem_used;
+	size_t mem_used;
 };
 
 
@@ -64,7 +65,7 @@ struct conn {
 	/* send window */
 	response *out; /* head of linked list of response objects */
 	
-	int free;
+	int free_response_data; /* indicates if it is legal to free the response data. */
 	conn *next;	
 };
 
@@ -72,3 +73,6 @@ struct conn {
 #define LIGHTCACHE_LISTEN_BACKLOG 100	// 100 clients can be queued between subsequent accept()
 
 #endif
+
+extern struct settings settings;
+extern struct stats stats;
