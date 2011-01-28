@@ -22,6 +22,9 @@ li_free(void *ptr)
 {
 	size_t size;
 	
+	if (!ptr)
+		return; 
+	
 	ptr = ptr - sizeof(size_t);
 	size = *(size_t *)ptr;
 	stats.mem_used -= size;	

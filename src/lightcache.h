@@ -30,7 +30,7 @@ struct cached_item {
 };
 
 struct settings {
-	uint32_t idle_conn_timeout;
+	unsigned int idle_conn_timeout;
 	int deamon_mode; /* specify whether to run in deamon mode */
 };
 
@@ -65,6 +65,7 @@ struct conn {
 	/* send window */
 	response *out; /* head of linked list of response objects */
 	
+	int free;
 	int free_response_data; /* indicates if it is legal to free the response data. */
 	conn *next;	
 };

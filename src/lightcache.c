@@ -45,18 +45,17 @@ make_conn(int fd)
 	// no free item?
 	if (conn == NULL) {
 		conn = (struct conn*)li_malloc(sizeof(struct conn));
-		conn->next = conns;
-		if (!conns) {
-			conns = conn;
-		}			
+		conn->next = conns;		
+		conns = conn;
 	}	
 	
 	conn->fd = fd;
 	conn->last_heard = time(NULL);
 	conn->active = 0;
 	conn->listening = 0;
-	
-	
+	conn->free_response_data = 0;
+	conn->free = 0;
+			
 	conn->in = (request *)li_malloc(sizeof(request));
 	conn->out = (response *)li_malloc(sizeof(response));
 	
@@ -70,15 +69,11 @@ disconnect_conn(struct conn* conn)
 	
 	event_del(conn);
 	
-	if (conn->in->rkey) {
-		li_free(conn->in->rkey);
-	}
-	if (conn->in->rdata) {
-		li_free(conn->in->rdata);
-	}
-	if (conn->in->rextra) {
-		li_free(conn->in->rextra);
-	}
+	
+	li_free(conn->in->rkey);	
+	//li_free(conn->in->rdata); todo: cache points to this sometimes.
+	li_free(conn->in->rextra);
+	
 	if (conn->free_response_data) {
 		assert(conn->out->sdata);
 		li_free(conn->out->sdata);
@@ -86,14 +81,8 @@ disconnect_conn(struct conn* conn)
 	
 	li_free(conn->in);
 	li_free(conn->out);
-
-	// is head?
-	if (conn == conns) {
-		conns = conn->next;
-	}
 	
-	
-	
+	conn->free = 1;		
 	dprintf("disconnect conn called.");
 	close(conn->fd);
 	
@@ -161,7 +150,7 @@ execute_cmd(struct conn* conn)
 	switch(cmd) {
 		case CMD_GET:
 			
-			dprintf("CMD_GET request for key: %s:%s", conn->in->rkey, conn->in->rdata);
+			dprintf("CMD_GET request for key: %s", conn->in->rkey);
 			tab_item = hfind(cache, conn->in->rkey, conn->in->req_header.key_length);
 			if (!tab_item) {
 				dprintf("key not found:%s", conn->in->rkey);
@@ -173,7 +162,13 @@ execute_cmd(struct conn* conn)
 				return;
 			}			
 			make_response(conn, citem->length);		
+			
+			dprintf("SENDING VAL FOR GET(1):%s", conn->out->sdata);
+			
 			conn->out->sdata = citem->data;
+			
+			dprintf("SENDING VAL FOR GET(2):%s", conn->out->sdata);
+			
 			set_conn_state(conn, SEND_HEADER);			
 			break;
 		case CMD_SET:
@@ -189,7 +184,7 @@ execute_cmd(struct conn* conn)
 				return;
 			}
 			citem->timeout += time(NULL);
-			hadd(cache, conn->in->rkey, conn->in->req_header.key_length, citem);				
+			val = hadd(cache, conn->in->rkey, conn->in->req_header.key_length, citem);				
 			set_conn_state(conn, READ_HEADER);			
 			break;
 		case CMD_CHG_SETTING:
@@ -212,8 +207,8 @@ execute_cmd(struct conn* conn)
 			dprintf("CMD_GET_SETTING request for key: %s, data:%s", conn->in->rkey, 
 				conn->in->rdata);
 			if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0){					
-				make_response(conn, sizeof(uint32_t));		
-				*(uint32_t *)conn->out->sdata = settings.idle_conn_timeout;
+				make_response(conn, sizeof(unsigned int));		
+				*(unsigned int *)conn->out->sdata = settings.idle_conn_timeout;
 				/* data can be freed as it is unrelated with the cache structure.
 				 * */
 				conn->free_response_data = 1; 				
@@ -233,18 +228,19 @@ execute_cmd(struct conn* conn)
 }
 
 void
-disconnect_idle_conns()
+disconnect_idle_conns(void)
 {
-	conn *conn;
+	conn *conn, *next;
 	
 	conn=conns;
 	while( conn != NULL && !conn->free && !conn->listening) {
+		next = conn->next;
 		if (time(NULL) - conn->last_heard > settings.idle_conn_timeout) {			
-			dprintf("idle conn detected.");
+			dprintf("idle conn detected. idle timeout:%u", settings.idle_conn_timeout);
 			disconnect_conn(conn);
 			// todo: move free items closer to head for faster searching for free items in make_conn
 		}
-		conn=conn->next;
+		conn=next;
 	}
 }
 

@@ -125,8 +125,9 @@ hadd(_htab *ht, char* key, int klen, void *val)
     p = ht->_table[h];
     new = NULL;
     while(p) {
-        if ( (strcmp(p->key, key)==0) && (!p->free))
-            return 0;
+        if ( (strcmp(p->key, key)==0) && (!p->free)) {
+        	return 0;
+        }
         if (p->free)
             new = p;
         p = p->next;
