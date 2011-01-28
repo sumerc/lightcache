@@ -10,7 +10,7 @@ typedef enum {
     SEND_ERR = 0x03,
     SEND_COMPLETED = 0x04,
     INVALID_STATE = 0x05,
-}socket_state;
+} socket_state;
 
 int make_nonblocking(int sock);
 

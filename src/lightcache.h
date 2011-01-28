@@ -24,50 +24,50 @@
 
 typedef struct cached_item cached_item;
 struct cached_item {
-	unsigned int length;
-	time_t timeout;
-	void *data; 
+    unsigned int length;
+    time_t timeout;
+    void *data;
 };
 
 struct settings {
-	unsigned int idle_conn_timeout;
-	int deamon_mode; /* specify whether to run in deamon mode */
+    unsigned int idle_conn_timeout;
+    int deamon_mode; /* specify whether to run in deamon mode */
 };
 
 struct stats {
-	size_t mem_used;
+    size_t mem_used;
 };
 
 
 typedef enum {
-    READ_HEADER = 0x00,  
+    READ_HEADER = 0x00,
     READ_KEY = 0x01,
     READ_DATA = 0x02,
     CONN_CLOSE = 0x03,
-    CMD_RECEIVED = 0x04,    
+    CMD_RECEIVED = 0x04,
     SEND_HEADER = 0x05,
     SEND_DATA = 0x06,
     READ_EXTRA = 0x07,
-}conn_states;
+} conn_states;
 
 typedef struct conn conn;
 struct conn {
-	int fd; 						/* socket fd */
-	int listening;					/* listening socket? */
-	int active;					    /* active in the event instance? */
-	time_t last_heard; 				/* last time we heard from the client */
-	
-	conn_states state;
-	
-	/* receive window */
-	request *in; /* head of linked list of request objects */
-	
-	/* send window */
-	response *out; /* head of linked list of response objects */
-	
-	int free;
-	int free_response_data; /* indicates if it is legal to free the response data. */
-	conn *next;	
+    int fd; 						/* socket fd */
+    int listening;					/* listening socket? */
+    int active;					    /* active in the event instance? */
+    time_t last_heard; 				/* last time we heard from the client */
+
+    conn_states state;
+
+    /* receive window */
+    request *in; /* head of linked list of request objects */
+
+    /* send window */
+    response *out; /* head of linked list of response objects */
+
+    int free;
+    int free_response_data; /* indicates if it is legal to free the response data. */
+    conn *next;
 };
 
 #define LIGHTCACHE_PORT 13131
