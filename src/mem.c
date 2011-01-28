@@ -22,8 +22,9 @@ li_free(void *ptr)
 {
 	size_t size;
 	
-	if (!ptr)
-		return; 
+	if (!ptr) {
+		return;
+	} 
 	
 	ptr = ptr - sizeof(size_t);
 	size = *(size_t *)ptr;

@@ -6,6 +6,16 @@
 #define PROTOCOL_MAX_KEY_SIZE 250 // in bytes --
 #define PROTOCOL_MAX_DATA_SIZE 1024 + PROTOCOL_MAX_KEY_SIZE // in bytes -- same as memcached
 
+#define ITEM_XINCREF(x) (x.ref_count = 1);
+#define ITEM_XDECREF(x) (x.ref_count = 0);
+
+/* an item with reference count */
+typedef struct item item;
+struct item {
+	char *data;
+	unsigned int ref_count;
+};
+
 typedef union {
 	struct {
 		uint8_t opcode;
@@ -27,7 +37,7 @@ typedef union {
 typedef struct request request;
 struct request {
 	req_header req_header;
-	char *rdata;
+	item rdata;
 	char *rkey;
 	char *rextra;
 	unsigned int rbytes; /*current read index*/
@@ -36,7 +46,7 @@ struct request {
 typedef struct response response;
 struct response {
 	resp_header resp_header;
-	char *sdata;
+	item sdata;
 	unsigned int sbytes; /*current write index*/
 };
 

@@ -4,5 +4,5 @@ v0.1
     CHG_SETTING <setting_name> <setting_value>
 [+] jemalloc is a dependency from now on. maybe disable it by a flag later.
 [*] response structure which should be a linked list and a header in it.
-[-] STATS command.
-[-] TEST idle_client working with SET_SETTING in tests.
+[+] STATS command.
+[+] TEST idle_client working with SET_SETTING in tests.

@@ -65,19 +65,18 @@ make_conn(int fd)
 int 
 disconnect_conn(struct conn* conn)
 {
-	// todo: cleanup request and response objects.
-	
 	event_del(conn);
 	
-	
-	li_free(conn->in->rkey);	
-	//li_free(conn->in->rdata); todo: cache points to this sometimes.
+
+	li_free(conn->in->rkey);
 	li_free(conn->in->rextra);
-	
-	if (conn->free_response_data) {
-		assert(conn->out->sdata);
-		li_free(conn->out->sdata);
+
+	if (conn->in->rdata.ref_count == 0) {
+		li_free(conn->in->rdata.data);
 	}	
+	if (conn->out->sdata.ref_count == 0) {
+		li_free(conn->out->sdata.data);
+	}
 	
 	li_free(conn->in);
 	li_free(conn->out);
@@ -104,8 +103,8 @@ set_conn_state(struct conn* conn, conn_states state)
 			conn->in->rkey[conn->in->req_header.key_length] = (char)0;
 			break;
 		case READ_DATA:			
-    		conn->in->rdata = (char *)li_malloc(conn->in->req_header.data_length + 1);
-    		conn->in->rdata[conn->in->req_header.data_length] = (char)0;				
+    		conn->in->rdata.data = (char *)li_malloc(conn->in->req_header.data_length + 1);
+    		conn->in->rdata.data[conn->in->req_header.data_length] = (char)0;				
 			break;
 		case READ_EXTRA:
 			conn->in->rextra = (char *)li_malloc(conn->in->req_header.extra_length + 1);
@@ -130,7 +129,7 @@ make_response(conn *conn, size_t data_length)
 {
 	// todo: more asserts
 	
-	conn->out->sdata = (char *)li_malloc(data_length);
+	conn->out->sdata.data = (char *)li_malloc(data_length);
 	conn->out->resp_header.data_length = data_length;
 	conn->out->resp_header.opcode = conn->in->req_header.opcode;
 }
@@ -140,6 +139,7 @@ execute_cmd(struct conn* conn)
 {
 	uint8_t cmd;
 	unsigned int val;	
+	int ret;
 	cached_item *citem;
 	_hitem *tab_item;
 	
@@ -159,42 +159,49 @@ execute_cmd(struct conn* conn)
 			citem = (cached_item *)tab_item->val;			
 			if (citem->timeout < time(NULL)) {
 				dprintf("time expired for key:%s", conn->in->rkey);
+				hfree(cache, tab_item);
 				return;
 			}			
 			make_response(conn, citem->length);		
-			
-			dprintf("SENDING VAL FOR GET(1):%s", conn->out->sdata);
-			
-			conn->out->sdata = citem->data;
-			
-			dprintf("SENDING VAL FOR GET(2):%s", conn->out->sdata);
-			
+			conn->out->sdata.data = citem->data;
+			ITEM_XINCREF(conn->out->sdata);
 			set_conn_state(conn, SEND_HEADER);			
 			break;
+			
 		case CMD_SET:
-			dprintf("CMD_SET request for key: %s:%s:%s", conn->in->rkey, conn->in->rdata, 
+			dprintf("CMD_SET request for key: %s:%s:%s", conn->in->rkey, conn->in->rdata.data, 
 				conn->in->rextra);
-				
-			citem = (cached_item *)li_malloc(sizeof(cached_item));
-			citem->data = conn->in->rdata;
-			citem->length = conn->in->req_header.data_length;
-			citem->timeout = atoi(conn->in->rextra) * 1000; //sec2msec
-			if (!citem->timeout){
+			
+			val = atoi(conn->in->rextra) * 1000; //sec2msec
+			if (!val){
 				dprintf("invalid param in CMD_SET");
 				return;
 			}
-			citem->timeout += time(NULL);
-			val = hadd(cache, conn->in->rkey, conn->in->req_header.key_length, citem);				
+			
+			/* create the cache item */
+			citem = (cached_item *)li_malloc(sizeof(cached_item));
+			citem->data = conn->in->rdata.data;
+			citem->length = conn->in->req_header.data_length;
+			citem->timeout = val + time(NULL);			
+			
+			/* add to cache */
+			ret = hadd(cache, conn->in->rkey, conn->in->req_header.key_length, citem);	
+			if (!ret) { // already have it? then force-update
+				tab_item = hfind(cache, conn->in->rkey, conn->in->req_header.key_length);	
+				assert(tab_item != NULL);
+				tab_item->val = citem;
+			}			
+			ITEM_XINCREF(conn->in->rdata);			
 			set_conn_state(conn, READ_HEADER);			
 			break;
 		case CMD_CHG_SETTING:
-			dprintf("CMD_CHG_SETTING request with data %s, key_length:%d", conn->in->rdata, 
-				conn->in->req_header.key_length);
-			if (!conn->in->rdata) {
+			dprintf("CMD_CHG_SETTING request with data %s, key_length:%d",
+				conn->in->rdata.data, conn->in->req_header.key_length);
+			if (!conn->in->rdata.data) {
 				break;
 			}
 			if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0){	
-				val = atoi(conn->in->rdata);
+				val = atoi(conn->in->rdata.data);
 				if (!val) {
 					dprintf("invalid param in CMD_CHG_SETTING");
 					return; // invalid integer
@@ -205,21 +212,17 @@ execute_cmd(struct conn* conn)
 			break;
 		case CMD_GET_SETTING:
 			dprintf("CMD_GET_SETTING request for key: %s, data:%s", conn->in->rkey, 
-				conn->in->rdata);
+				conn->in->rdata.data);
 			if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0){					
 				make_response(conn, sizeof(unsigned int));		
-				*(unsigned int *)conn->out->sdata = settings.idle_conn_timeout;
-				/* data can be freed as it is unrelated with the cache structure.
-				 * */
-				conn->free_response_data = 1; 				
+				*(unsigned int *)conn->out->sdata.data = settings.idle_conn_timeout;
 				set_conn_state(conn, SEND_HEADER);								
 			}
 			break;
 		case CMD_GET_STATS:
 			dprintf("CMD_GET_STATS request");
 			make_response(conn, 250);			
-			sprintf(conn->out->sdata, "Memory used: %u", stats.mem_used);
-			conn->free_response_data = 1; 				
+			sprintf(conn->out->sdata.data, "Memory used: %u", stats.mem_used);
 			set_conn_state(conn, SEND_HEADER);	
 			break;		
 	}
@@ -324,10 +327,10 @@ try_read_request(conn* conn)
         	}		
 			break;
 		case READ_DATA:			
-			assert(conn->in->rdata != NULL);
+			assert(conn->in->rdata.data != NULL);
 			// todo: more asserts
 			           
-			ret = read_nbytes(conn, conn->in->rdata, conn->in->req_header.data_length); 
+			ret = read_nbytes(conn, conn->in->rdata.data, conn->in->req_header.data_length); 
 			
         	if (ret == READ_COMPLETED) {	  
         		if (conn->in->req_header.extra_length) { // do we have extra data?
@@ -398,9 +401,9 @@ try_send_response(conn *conn)
 			break;
 		case SEND_DATA:
 		
-			//dprintf("send data %s, len:%d", conn->out->sdata, 
+			//dprintf("send data %s, len:%d", conn->out->sdata.data, 
 			//	conn->out->resp_header.data_length);
-			ret = send_nbytes(conn, conn->out->sdata, conn->out->resp_header.data_length);
+			ret = send_nbytes(conn, conn->out->sdata.data, conn->out->resp_header.data_length);
 			if (ret == SEND_COMPLETED) {
 				if (conn->out->resp_header.data_length != 0) {					
 					set_conn_state(conn, READ_HEADER);// wait for new commands

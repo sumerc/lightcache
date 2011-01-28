@@ -6,6 +6,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
+#include "lightcache.h"
 
 // one_at_a_time hashing
 // This is similar to the rotating hash, but it actually mixes the internal state. It takes
@@ -125,7 +126,7 @@ hadd(_htab *ht, char* key, int klen, void *val)
     p = ht->_table[h];
     new = NULL;
     while(p) {
-        if ( (strcmp(p->key, key)==0) && (!p->free)) {
+        if ( (strcmp(p->key, key)==0) && (!p->free)) {        	
         	return 0;
         }
         if (p->free)
