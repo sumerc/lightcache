@@ -6,3 +6,9 @@ v0.1
 [*] response structure which should be a linked list and a header in it.
 [+] STATS command.
 [+] TEST idle_client working with SET_SETTING in tests.
+[-] More and more and more and more tests.
+[-] some kind of freelist for basic structures. (exponantially growing)
+[-] exclude log.c
+[-] GET_MANY after all of above is working.
+[-] kqueue integration.
+[-] more tests & more tests.

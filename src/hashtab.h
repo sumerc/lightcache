@@ -1,6 +1,9 @@
 /*
 *    An Adaptive Hash Table
 *    Sumer Cip 2010
+* 
+* 	 v0.2 -- fix & optimization on hset()
+*    v0.3 -- demand_mem() function for hashtable
 */
 
 #ifndef HASHTAB_H
@@ -9,7 +12,13 @@
 #define HSIZE(n) (1<<n)
 #define HMASK(n) (HSIZE(n)-1)
 #define SWAP(a, b) (((a) ^= (b)), ((b) ^= (a)), ((a) ^= (b)))
-#define HLOADFACTOR 0.1
+#define HLOADFACTOR 0.75
+
+typedef enum {
+    HSUCCESS = 0x01,
+    HERROR = 0x02,
+    HEXISTS = 0x03, // item already exists while adding
+} hresult;
 
 struct _hitem {
     char* key;
@@ -31,8 +40,8 @@ typedef struct {
 
 _htab *htcreate(int logsize);
 void htdestroy(_htab *ht);
-_hitem *hfind(_htab *ht, char *key, int klen);
-int hadd(_htab *ht, char *key, int klen, void *val);
+_hitem *hget(_htab *ht, char *key, int klen);
+hresult hset(_htab *ht, char *key, int klen, void *val);
 void henum(_htab *ht, int (*fn) (_hitem *item, void *arg), void *arg, int enum_free);
 int hcount(_htab *ht);
 void hfree(_htab *ht, _hitem *item);

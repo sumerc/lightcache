@@ -6,7 +6,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
-#include "lightcache.h"
+#include "mem.h"
 
 // one_at_a_time hashing
 // This is similar to the rotating hash, but it actually mixes the internal state. It takes
@@ -39,31 +39,33 @@ _hgrow(_htab *ht)
     dprintf("hgrow called growing to:%d", ht->logsize+1);
 
     dummy = htcreate(ht->logsize+1);
-    if (!dummy)
+    if (!dummy) {
         return 0;
+    }
     for(i=0; i<ht->realsize; i++) {
         p = ht->_table[i];
         while(p) {
             next = p->next;
-            if (!hadd(dummy, p->key, p->klen, p->val))
+            if (hset(dummy, p->key, p->klen, p->val) != HSUCCESS) {
                 return 0;
-            it = hfind(dummy, p->key, p->klen);
-            if (!it)
+            }	
+            it = hget(dummy, p->key, p->klen);
+            if (!it) {
                 return 0;
-
+            }
             it->free = p->free;
-            free(p->key);
-            free(p);
+            li_free(p->key);
+            li_free(p);
             p = next;
         }
     }
 
-    free(ht->_table);
+    li_free(ht->_table);
     ht->_table = dummy->_table;
     ht->logsize = dummy->logsize;
     ht->realsize = dummy->realsize;
     ht->mask = dummy->mask;
-    free(dummy);
+    li_free(dummy);
     return 1;
 }
 
@@ -73,7 +75,7 @@ htcreate(int logsize)
     int i;
     _htab *ht;
 
-    ht = (_htab *)malloc(sizeof(_htab));
+    ht = (_htab *)li_malloc(sizeof(_htab));
     if (!ht)
         return NULL;
     ht->logsize = logsize;
@@ -81,9 +83,9 @@ htcreate(int logsize)
     ht->mask = HMASK(logsize);
     ht->count = 0;
     ht->freecount = 0;
-    ht->_table = (_hitem **)malloc(ht->realsize * sizeof(_hitem *));
+    ht->_table = (_hitem **)li_malloc(ht->realsize * sizeof(_hitem *));
     if (!ht->_table) {
-        free(ht);
+        li_free(ht);
         return NULL;
     }
 
@@ -105,19 +107,19 @@ htdestroy(_htab *ht)
         p = ht->_table[i];
         while(p) {
             next = p->next;
-            free(p->key); // we also create keys.
-            free(p);
+            li_free(p->key); // we also create keys.
+            li_free(p);
             p = next;
         }
     }
 
-    free(ht->_table);
-    free(ht);
+    li_free(ht->_table);
+    li_free(ht);
 }
 
 
-int
-hadd(_htab *ht, char* key, int klen, void *val)
+hresult
+hset(_htab *ht, char* key, int klen, void *val)
 {
     unsigned int h;
     _hitem *new, *p;
@@ -127,7 +129,7 @@ hadd(_htab *ht, char* key, int klen, void *val)
     new = NULL;
     while(p) {
         if ( (strcmp(p->key, key)==0) && (!p->free)) {
-            return 0;
+            return HEXISTS;
         }
         if (p->free)
             new = p;
@@ -137,8 +139,11 @@ hadd(_htab *ht, char* key, int klen, void *val)
     if (new) {
         // do we need new allocation for the key?
         if (new->klen >= klen+1) {
-            free(new->key); // free previous
-            new->key = (char*)malloc(klen+1);
+            li_free(new->key); // free previous
+            new->key = (char*)li_malloc(klen+1);
+            if (!new->key) {
+            	return HERROR;
+            }
         }
         strncpy(new->key, key, klen+1); // copy the last "0" byte
         new->klen = klen;
@@ -146,10 +151,14 @@ hadd(_htab *ht, char* key, int klen, void *val)
         new->free = 0;
         ht->freecount--;
     } else {
-        new = (_hitem *)malloc(sizeof(_hitem));
-        if (!new)
-            return 0;
-        new->key = (char*)malloc(klen+1);
+        new = (_hitem *)li_malloc(sizeof(_hitem));
+        if (!new) {
+        	return HERROR;
+        }
+        new->key = (char*)li_malloc(klen+1);
+        if (!new->key) {
+        	return HERROR;
+        }
         strncpy(new->key, key, klen+1);
         new->klen = klen;
         new->val = val;
@@ -160,22 +169,25 @@ hadd(_htab *ht, char* key, int klen, void *val)
     }
     // need resizing?
     if (((ht->count - ht->freecount) / (double)ht->realsize) >= HLOADFACTOR) {
-        if (!_hgrow(ht))
-            return 0;
+        if (!_hgrow(ht)) {
+        	return HERROR;
+        }
     }
-    return 1;
+    return HSUCCESS;
 }
 
 _hitem *
-hfind(_htab *ht, char *key, int klen)
+hget(_htab *ht, char *key, int klen)
 {
     _hitem *p;
 
     p = ht->_table[HHASH(ht, key, klen)];
     while(p) {
-        if ((strcmp(p->key, key)==0) && (!p->free)) {
-            return p;
-        }
+    	if (!p->free) {
+	        if (strcmp(p->key, key)==0) {
+	            return p;
+	        }
+    	}
         p = p->next;
     }
     return NULL;

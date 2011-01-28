@@ -30,8 +30,9 @@ struct cached_item {
 };
 
 struct settings {
-    unsigned int idle_conn_timeout;
+    unsigned int idle_conn_timeout; /* timeout in ms that idle connections will be disconnected */
     int deamon_mode; /* specify whether to run in deamon mode */
+    unsigned int mem_avail; /*in MB max. memory this lightcache instance is allowed to use */
 };
 
 struct stats {

@@ -20,6 +20,7 @@ init_settings(void)
 {
     settings.idle_conn_timeout = 2; // in secs -- default same as memcached
     settings.deamon_mode = 0;
+    settings.mem_avail = 64; // in MB -- default same as memcached
 }
 
 void
@@ -44,6 +45,9 @@ make_conn(int fd) {
     // no free item?
     if (conn == NULL) {
         conn = (struct conn*)li_malloc(sizeof(struct conn));
+        if (!conn) {
+        	return NULL;
+        }
         conn->next = conns;
         conns = conn;
     }
@@ -56,8 +60,13 @@ make_conn(int fd) {
     conn->free = 0;
 
     conn->in = (request *)li_malloc(sizeof(request));
+    if (!conn->in) {
+        return NULL;
+    }
     conn->out = (response *)li_malloc(sizeof(response));
-
+	if (!conn->out) {
+        return NULL;
+    }
     return conn;
 }
 
@@ -99,14 +108,26 @@ set_conn_state(struct conn* conn, conn_states state)
         break;
     case READ_KEY:
         conn->in->rkey = (char *)li_malloc(conn->in->req_header.key_length + 1);
+        if (!conn->in->rkey) {
+        	disconnect_conn(conn);
+        	return;
+        }
         conn->in->rkey[conn->in->req_header.key_length] = (char)0;
         break;
     case READ_DATA:
         conn->in->rdata.data = (char *)li_malloc(conn->in->req_header.data_length + 1);
+        if (!conn->in->rdata.data) {
+        	disconnect_conn(conn);
+        	return;
+        }
         conn->in->rdata.data[conn->in->req_header.data_length] = (char)0;
         break;
     case READ_EXTRA:
         conn->in->rextra = (char *)li_malloc(conn->in->req_header.extra_length + 1);
+        if (!conn->in->rextra) {
+        	disconnect_conn(conn);
+        	return;
+        }
         conn->in->rextra[conn->in->req_header.extra_length] = (char)0;
         break;
     case CMD_RECEIVED:
@@ -129,6 +150,10 @@ make_response(conn *conn, size_t data_length)
     // todo: more asserts
 
     conn->out->sdata.data = (char *)li_malloc(data_length);
+    if (!conn->out->sdata.data) {
+        	disconnect_conn(conn);
+        	return;
+    }
     conn->out->resp_header.data_length = data_length;
     conn->out->resp_header.opcode = conn->in->req_header.opcode;
 }
@@ -136,9 +161,9 @@ make_response(conn *conn, size_t data_length)
 void
 execute_cmd(struct conn* conn)
 {
+	hresult ret;
     uint8_t cmd;
     unsigned int val;
-    int ret;
     cached_item *citem;
     _hitem *tab_item;
 
@@ -150,7 +175,7 @@ execute_cmd(struct conn* conn)
     case CMD_GET:
 
         dprintf("CMD_GET request for key: %s", conn->in->rkey);
-        tab_item = hfind(cache, conn->in->rkey, conn->in->req_header.key_length);
+        tab_item = hget(cache, conn->in->rkey, conn->in->req_header.key_length);
         if (!tab_item) {
             dprintf("key not found:%s", conn->in->rkey);
             return;
@@ -179,14 +204,18 @@ execute_cmd(struct conn* conn)
 
         /* create the cache item */
         citem = (cached_item *)li_malloc(sizeof(cached_item));
+        if (!citem) {
+        	disconnect_conn(conn);
+        	return;
+    	}
         citem->data = conn->in->rdata.data;
         citem->length = conn->in->req_header.data_length;
         citem->timeout = val + time(NULL);
 
         /* add to cache */
-        ret = hadd(cache, conn->in->rkey, conn->in->req_header.key_length, citem);
-        if (!ret) { // already have it? then force-update
-            tab_item = hfind(cache, conn->in->rkey, conn->in->req_header.key_length);
+        ret = hset(cache, conn->in->rkey, conn->in->req_header.key_length, citem);
+        if (ret == HEXISTS) { // already have it? then force-update
+            tab_item = hget(cache, conn->in->rkey, conn->in->req_header.key_length);
             assert(tab_item != NULL);
             tab_item->val = citem;
         }
@@ -389,8 +418,7 @@ try_send_response(conn *conn)
     switch(conn->state) {
 
     case SEND_HEADER:
-
-        dprintf("send header");
+        
         ret = send_nbytes(conn, (char *)conn->out->resp_header.bytes, sizeof(resp_header));
         if (ret == SEND_COMPLETED) {
             if (conn->out->resp_header.data_length != 0) {
@@ -429,7 +457,6 @@ event_handler(conn *conn, event ev)
 
     switch(ev) {
     case EVENT_READ:
-
         if (conn->listening) { // listening socket?
             conn_sock = accept(conn->fd, (struct sockaddr *)&si_other, &slen);
             if (conn_sock == -1) {
@@ -438,6 +465,10 @@ event_handler(conn *conn, event ev)
             }
             make_nonblocking(conn_sock);
             conn = make_conn(conn_sock);
+            if (!conn) {
+            	close(conn_sock);
+            	return;
+            }
             set_conn_state(conn, READ_HEADER);
         } else {
             sock_state = try_read_request(conn);
@@ -505,6 +536,10 @@ main(void)
     make_nonblocking(s);
     listen(s, LIGHTCACHE_LISTEN_BACKLOG);
     conn = make_conn(s);
+    if (!conn) {
+    	goto err;
+    }
+    
     conn->listening = 1;
     event_set(conn, EVENT_READ);
 
