@@ -55,7 +55,7 @@ typedef struct conn conn;
 struct conn {
     int fd; 						/* socket fd */
     int listening;					/* listening socket? */
-    int active;					    /* active in the event instance? */
+    int active;					    /* conn have active events on the I/O interface */
     time_t last_heard; 				/* last time we heard from the client */
 
     conn_states state;

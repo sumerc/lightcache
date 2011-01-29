@@ -70,21 +70,33 @@ make_conn(int fd) {
     return conn;
 }
 
-int
-disconnect_conn(struct conn* conn)
+/* There may be subsequent requests per connection, this function
+ * frees the associated resources of the request.
+ * */
+static void
+free_request_resources(conn* conn)
 {
-    event_del(conn);
-
-
-    li_free(conn->in->rkey);
+	li_free(conn->in->rkey);
+	conn->in->rkey = NULL;
     li_free(conn->in->rextra);
-
+	conn->in->rextra = NULL;
+	
     if (conn->in->rdata.ref_count == 0) {
         li_free(conn->in->rdata.data);
+        conn->in->rdata.data = NULL;
     }
     if (conn->out->sdata.ref_count == 0) {
         li_free(conn->out->sdata.data);
-    }
+        conn->out->sdata.data = NULL;
+    }	
+}
+
+static int
+disconnect_conn(conn* conn)
+{
+    event_del(conn);
+    
+	free_request_resources(conn);
 
     li_free(conn->in);
     li_free(conn->out);
@@ -103,6 +115,10 @@ set_conn_state(struct conn* conn, conn_states state)
 {
     switch(state) {
     case READ_HEADER:
+    
+    	/* free previous request allocations if we have any */
+    	free_request_resources(conn); 
+    	
         conn->in->rbytes = 0;
         event_set(conn, EVENT_READ);
         break;
@@ -216,7 +232,12 @@ execute_cmd(struct conn* conn)
         ret = hset(cache, conn->in->rkey, conn->in->req_header.key_length, citem);
         if (ret == HEXISTS) { // already have it? then force-update
             tab_item = hget(cache, conn->in->rkey, conn->in->req_header.key_length);
-            assert(tab_item != NULL);
+            assert(tab_item != NULL);     
+                   
+            // free the previous item
+            li_free( ((cached_item *)tab_item->val)->data );
+            li_free(tab_item->val);
+            
             tab_item->val = citem;
         }
         ITEM_XINCREF(conn->in->rdata);
@@ -250,7 +271,7 @@ execute_cmd(struct conn* conn)
     case CMD_GET_STATS:
         dprintf("CMD_GET_STATS request");
         make_response(conn, 250);
-        sprintf(conn->out->sdata.data, "Memory used: %u", stats.mem_used);
+        sprintf(conn->out->sdata.data, "mem_used:%u\r\n", stats.mem_used);
         set_conn_state(conn, SEND_HEADER);
         break;
     }
