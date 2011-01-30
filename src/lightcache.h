@@ -22,13 +22,6 @@
 
 #define dprintf(fmt, args...) fprintf(stderr, "[+] " fmt "\n", ## args)
 
-typedef struct cached_item cached_item;
-struct cached_item {
-    unsigned int length;
-    time_t timeout;
-    void *data;
-};
-
 struct settings {
     unsigned int idle_conn_timeout; /* timeout in ms that idle connections will be disconnected */
     int deamon_mode; /* specify whether to run in deamon mode */
@@ -66,8 +59,7 @@ struct conn {
     /* send window */
     response *out; /* head of linked list of response objects */
 
-    int free;
-    int free_response_data; /* indicates if it is legal to free the response data. */
+    int free; /* recycle connection structure */
     conn *next;
 };
 
