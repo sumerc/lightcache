@@ -187,7 +187,7 @@ make_response(conn *conn, size_t data_length)
     if (!conn->out->sdata) {
         	disconnect_conn(conn);
         	return;
-    }
+    }    
     conn->out->resp_header.data_length = data_length;
     conn->out->resp_header.opcode = conn->in->req_header.opcode;
 }
@@ -332,12 +332,12 @@ read_nbytes(conn*conn, char *bytes, size_t total)
 
     nbytes = read(conn->fd, &bytes[conn->in->rbytes], needed);
 
-    if (nbytes == 0) {
-        log_sys_err("socket read");
+    if (nbytes == 0) {        
+        syslog(LOG_ERR, "%s (%s)", "socket read error.", strerror(errno));
         return READ_ERR;
     } else if (nbytes == -1) {
-        if (errno == EWOULDBLOCK || errno == EAGAIN) {
-            log_sys_err("socket read EWOUDLBLOCK, EAGAIN:)");
+        if (errno == EWOULDBLOCK || errno == EAGAIN) {     
+        	dprintf("socket read EWOUDLBLOCK, EAGAIN.");       
             return NEED_MORE;
         }
     }
@@ -445,7 +445,7 @@ send_nbytes(conn*conn, char *bytes, size_t total)
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
             return NEED_MORE;
         }
-        log_sys_err("socket write");
+        syslog(LOG_ERR, "%s (%s)", "socket write error.", strerror(errno));
         return SEND_ERR;
     }
     conn->out->sbytes += nbytes;
@@ -506,7 +506,7 @@ event_handler(conn *conn, event ev)
         if (conn->listening) { // listening socket?
             conn_sock = accept(conn->fd, (struct sockaddr *)&si_other, &slen);
             if (conn_sock == -1) {
-                log_sys_err("socket accept error.");
+            	syslog(LOG_ERR, "%s (%s)", "socket accept  error.", strerror(errno)); 
                 return;
             }
             make_nonblocking(conn_sock);
@@ -565,7 +565,7 @@ main(void)
 
     /* init listening socket */
     if ((s=socket(AF_INET, SOCK_STREAM, 0))==-1) {
-        log_sys_err("socket make error.");
+    	syslog(LOG_ERR, "%s (%s)", "socket make error.", strerror(errno)); 
         goto err;
     }
     optval = 1;
@@ -576,7 +576,7 @@ main(void)
     si_me.sin_port = htons(LIGHTCACHE_PORT);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
     if (bind(s, (struct sockaddr *)&si_me, sizeof(si_me))==-1) {
-        log_sys_err("socket bind error.");
+    	syslog(LOG_ERR, "%s (%s)", "socket bind error.", strerror(errno)); 
         goto err;
     }
     make_nonblocking(s);

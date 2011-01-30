@@ -21,6 +21,7 @@
 #define LIGHTCACHE_H
 
 #define dprintf(fmt, args...) fprintf(stderr, "[+] " fmt "\n", ## args)
+//#define sys_log_err(s) syslog(LOG_ERR, "%s (%s)", s, strerror(errno));
 
 struct settings {
     unsigned int idle_conn_timeout; /* timeout in ms that idle connections will be disconnected */

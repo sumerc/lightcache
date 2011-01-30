@@ -6,12 +6,12 @@ v0.1
 [*] response structure which should be a linked list and a header in it.
 [+] STATS command.
 [+] TEST idle_client working with SET_SETTING in tests.
-[-] check if valgrind is able to detect offbyone errors buffer overruns? if not
-	check for buffer overrruns.
-[-] implement unix domain sockets.
-[-] More and more and more and more tests.
+[+] YES IT IS ABLE TO.check if valgrind is able to detect offbyone errors buffer overruns? if not
+	check for buffer overrruns. 
+[+] exclude log.c.
 [-] some kind of freelist for basic structures. (exponantially growing)
-[-] exclude log.c
+[-] More and more and more and more tests.
 [-] GET_MANY after all of above is working.
+[-] implement unix domain sockets.
 [-] kqueue integration.
 [-] more tests & more tests.
