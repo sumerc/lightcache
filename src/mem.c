@@ -10,8 +10,8 @@ li_malloc(size_t size)
     void *p;
     
     if (size + stats.mem_used > (settings.mem_avail * 1024 * 1024 )) {
-    	syslog(LOG_ERR, "No memory available![%u MB]", settings.mem_avail);
-    	dprintf("No MEMORY available!");
+    	//syslog(LOG_ERR, "No memory available![%u MB]", settings.mem_avail);
+    	dprintf("No MEMORY available! %u, %u, %u", settings.mem_avail, stats.mem_used, size);
     	return NULL;
     }
 

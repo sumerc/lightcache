@@ -81,11 +81,14 @@ free_request(request *req)
 	}
 		
 	if (req->can_free) {
-		dprintf("request FREED.[%p]", req);
+		dprintf("FREEING request data.[%p]", req);
 		li_free(req->rkey);
+		req->rkey = NULL;
 		li_free(req->rdata);
+		req->rdata = NULL;
 		li_free(req->rextra);
-		li_free(req);
+		req->rextra = NULL;
+		flput(request_trash, req);
 	}	
 }
 
@@ -98,10 +101,42 @@ free_response(response *resp)
 	}
 	
 	if (resp->can_free) {
-		dprintf("response FREED.[%p]", resp);
+		dprintf("FREEING response data.[%p]", resp);
 		li_free(resp->sdata);
+		resp->sdata = NULL;
 	}
-	li_free(resp);
+	//li_free(resp);
+	flput(response_trash, resp);
+}
+
+
+static int
+init_resources(conn *conn)
+{
+	/* free previous request allocations if we have any */  
+	free_request(conn->in); 
+	free_response(conn->out);
+	
+	/* get req/resp resources from associated freelists */
+	conn->in = (request *)flget(request_trash);
+    if (!conn->in) {
+    	return 0;
+    }
+    conn->out = (response *)flget(response_trash);
+	if (!conn->out) {		
+        return 0;
+    }	
+    
+    /* init defaults */
+    memset(&conn->in->req_header, 0, sizeof(req_header));
+    memset(&conn->out->resp_header, 0, sizeof(resp_header));
+    conn->in->can_free = 1; 
+    conn->out->can_free = 1;
+    conn->in->rbytes = 0; 
+    conn->out->sbytes = 0;
+    
+    
+    return 1;
 }
 
 static int
@@ -113,7 +148,7 @@ disconnect_conn(conn* conn)
     
 	free_request(conn->in);
 	free_response(conn->out);
-    
+	
     conn->free = 1;
     close(conn->fd);
 
@@ -127,26 +162,13 @@ set_conn_state(struct conn* conn, conn_states state)
 {
     switch(state) {
     case READ_HEADER:
-    
-    	/* free previous request allocations if we have any */  
-    	free_request(conn->in); 
-    	free_response(conn->out);
-    	conn->in = (request *)li_malloc(sizeof(request));
-	    if (!conn->in) {
-	    	disconnect_conn(conn);
-	        return;
-	    }
-	    conn->out = (response *)li_malloc(sizeof(response));
-		if (!conn->out) {
-			disconnect_conn(conn);
-	        return;
-	    }	    
-	    conn->in->can_free = 1; /*default*/
-	    conn->out->can_free = 1; /*default*/
-	    
-	    dprintf("READ_HEADER state, request pointer:%p", conn->in);    	
     	
-        conn->in->rbytes = 0;
+    	if (!init_resources(conn)) {
+    		disconnect_conn(conn);
+    		return;
+    	}
+    	
+    	conn->in->rbytes = 0;
         event_set(conn, EVENT_READ);
         break;
     case READ_KEY:
@@ -187,18 +209,20 @@ set_conn_state(struct conn* conn, conn_states state)
 
 }
 
-void
-make_response(conn *conn, size_t data_length)
+static int
+prepare_response(conn *conn, size_t data_length)
 {
     // todo: more asserts
 
     conn->out->sdata = (char *)li_malloc(data_length);
     if (!conn->out->sdata) {
-        	disconnect_conn(conn);
-        	return;
+        disconnect_conn(conn);
+        return 0;
     }    
     conn->out->resp_header.data_length = data_length;
     conn->out->resp_header.opcode = conn->in->req_header.opcode;
+    
+    return 1;
 }
 
 void
@@ -242,6 +266,9 @@ execute_cmd(struct conn* conn)
     	conn->out->resp_header.opcode = conn->in->req_header.opcode;
         conn->out->sdata = cached_req->rdata;
         conn->out->can_free = 0;
+        
+        dprintf("sending GET data:%u", conn->out->resp_header.data_length);
+        
         set_conn_state(conn, SEND_HEADER);
         break;
 
@@ -298,14 +325,18 @@ execute_cmd(struct conn* conn)
         dprintf("CMD_GET_SETTING request for key: %s, data:%s", conn->in->rkey,
                 conn->in->rdata);
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
-            make_response(conn, sizeof(unsigned int));
+            if (!prepare_response(conn, sizeof(unsigned int))) {
+            	return;
+            }
             *(unsigned int *)conn->out->sdata = settings.idle_conn_timeout;
             set_conn_state(conn, SEND_HEADER);
         }
         break;
     case CMD_GET_STATS:
         dprintf("CMD_GET_STATS request");
-        make_response(conn, 250);
+        if (!prepare_response(conn, 250)) {
+        	return;
+        }
         sprintf(conn->out->sdata, "mem_used:%u\r\n", stats.mem_used);
         set_conn_state(conn, SEND_HEADER);
         break;
@@ -380,7 +411,8 @@ try_read_request(conn* conn)
             if ( (conn->in->req_header.data_length >= PROTOCOL_MAX_DATA_SIZE) ||
                     (conn->in->req_header.key_length >= PROTOCOL_MAX_KEY_SIZE) ||
                     (conn->in->req_header.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
-                syslog(LOG_ERR, "request data or key length exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
+                //syslog(LOG_ERR, "request data or key length exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
+                dprintf("request data or key length exceeded maximum allowed");
                 return READ_ERR;
             }
 
@@ -473,8 +505,7 @@ try_send_response(conn *conn)
 
     switch(conn->state) {
 
-    case SEND_HEADER:
-        
+    case SEND_HEADER:        
         ret = send_nbytes(conn, (char *)conn->out->resp_header.bytes, sizeof(resp_header));
         if (ret == SEND_COMPLETED) {
             if (conn->out->resp_header.data_length != 0) {
@@ -483,7 +514,6 @@ try_send_response(conn *conn)
         }
         break;
     case SEND_DATA:
-
         //dprintf("send data %s, len:%d", conn->out->sdata,
         //	conn->out->resp_header.data_length);
         ret = send_nbytes(conn, conn->out->sdata, conn->out->resp_header.data_length);
@@ -561,6 +591,8 @@ main(void)
     init_stats();
 	
 	init_freelists();
+	
+	dprintf("stats:%u", stats.mem_used);
 	
     // todo : parse and set arguments to settings here.
 

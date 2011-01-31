@@ -35,14 +35,17 @@ class ProtocolTests(LightCacheTestBase):
     def test_set(self):
 	self.client.set("key1", "value1", 11)
     
-    def test_get(self):
-	self.client.set("key2", "value2", 13)
-	self.assertEqual(self.client.get("key2"), "value2")
-    
     def test_get_stats(self):
 	stats = self._stats2dict(self.client.get_stats())
 	self.assertTrue(stats.has_key("mem_used"))
 
+    
+    
+    def test_get(self):
+	self.client.set("key2", "value2", 13)
+	self.assertEqual(self.client.get("key2"), "value2")
+    
+    
 if __name__ == '__main__':
     unittest.main()
 
