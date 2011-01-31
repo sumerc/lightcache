@@ -36,6 +36,7 @@ void
 init_stats(void)
 {
     stats.mem_used = 0;
+    stats.mem_request_count = 0;
 }
 
 struct conn*
@@ -128,13 +129,10 @@ init_resources(conn *conn)
     }	
     
     /* init defaults */
-    memset(&conn->in->req_header, 0, sizeof(req_header));
-    memset(&conn->out->resp_header, 0, sizeof(resp_header));
     conn->in->can_free = 1; 
     conn->out->can_free = 1;
     conn->in->rbytes = 0; 
     conn->out->sbytes = 0;
-    
     
     return 1;
 }
@@ -309,15 +307,23 @@ execute_cmd(struct conn* conn)
         dprintf("CMD_CHG_SETTING request with data %s, key_length:%d",
                 conn->in->rdata, conn->in->req_header.key_length);
         if (!conn->in->rdata) {
+        	dprintf("(null) data param in CMD_CHG_SETTING");
             break;
         }
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             val = atoi(conn->in->rdata);
             if (!val) {
-                dprintf("invalid param in CMD_CHG_SETTING");
-                return; // invalid integer
+                dprintf("invalid integer param in CMD_CHG_SETTING");
+                return;
             }
             settings.idle_conn_timeout = val;
+        } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
+        	val = atoi(conn->in->rdata);
+            if (!val) {
+                dprintf("invalid integer param in CMD_CHG_SETTING");
+                return; 
+            }
+            settings.mem_avail = val;
         }
         set_conn_state(conn, READ_HEADER);
         break;
@@ -366,11 +372,10 @@ socket_state
 read_nbytes(conn*conn, char *bytes, size_t total)
 {
     unsigned int needed, nbytes;
-
+	
+	dprintf("read_nbytes called.");
+	
     needed = total - conn->in->rbytes;
-
-    dprintf("read_nbytes called total:%d, rbytes:%d", total, conn->in->rbytes);
-
     nbytes = read(conn->fd, &bytes[conn->in->rbytes], needed);
 
     if (nbytes == 0) {        
@@ -476,13 +481,12 @@ socket_state
 send_nbytes(conn*conn, char *bytes, size_t total)
 {
     int needed, nbytes;
+    
+    dprintf("send_nbytes called.");
 
     needed = total - conn->out->sbytes;
-
-    dprintf("send_nbytes called total:%d, sbytes:%d", total, conn->out->sbytes);
-
     nbytes = write(conn->fd, &bytes[conn->out->sbytes], needed);
-
+	
     if (nbytes == -1) {
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
             return NEED_MORE;

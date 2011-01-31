@@ -31,8 +31,8 @@ struct settings {
 
 struct stats {
     size_t mem_used;
+    unsigned int mem_request_count; /* number of times mem is demanded from OS */
 };
-
 
 typedef enum {
     READ_HEADER = 0x00,
@@ -52,13 +52,10 @@ struct conn {
     int active;					    /* conn have active events on the I/O interface */
     time_t last_heard; 				/* last time we heard from the client */
 
-    conn_states state;
+    conn_states state; /* state of the connection READ_KEY, READ_HEADER.etc...*/
 
-    /* receive window */
-    request *in; /* head of linked list of request objects */
-
-    /* send window */
-    response *out; /* head of linked list of response objects */
+    request *in;
+    response *out;
 
     int free; /* recycle connection structure */
     conn *next;
