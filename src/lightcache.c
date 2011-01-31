@@ -3,6 +3,7 @@
 #include "deamon.h"
 #include "socket.h"
 #include "hashtab.h"
+#include "freelist.h"
 #include "events/event.h"
 
 
@@ -13,7 +14,15 @@ struct stats stats;
 /* module globals */
 static conn *conns = NULL; /* linked list head */
 static _htab *cache = NULL;
+static freelist *response_trash; /* freelist to create response object(s) from. */
+static freelist *request_trash;
 
+void 
+init_freelists(void)
+{
+	response_trash = flcreate(sizeof(response), 1);
+	request_trash = flcreate(sizeof(request), 1);
+}
 
 void
 init_settings(void)
@@ -91,8 +100,8 @@ free_response(response *resp)
 	if (resp->can_free) {
 		dprintf("response FREED.[%p]", resp);
 		li_free(resp->sdata);
-		li_free(resp);
 	}
+	li_free(resp);
 }
 
 static int
@@ -229,7 +238,8 @@ execute_cmd(struct conn* conn)
             hfree(cache, tab_item); // recycle tab_item 
             return;
         }
-        make_response(conn, cached_req->req_header.data_length);
+        conn->out->resp_header.data_length = cached_req->req_header.data_length;
+    	conn->out->resp_header.opcode = conn->in->req_header.opcode;
         conn->out->sdata = cached_req->rdata;
         conn->out->can_free = 0;
         set_conn_state(conn, SEND_HEADER);
@@ -545,10 +555,13 @@ main(void)
     socklen_t slen;
 
     //malloc_stats_print(NULL, NULL, NULL);
-
-    init_settings();
+    /* should be initialized before any mem operation.
+     * */
+	init_settings(); 
     init_stats();
-
+	
+	init_freelists();
+	
     // todo : parse and set arguments to settings here.
 
     openlog("lightcache", LOG_PID, LOG_LOCAL5);
