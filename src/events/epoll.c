@@ -49,7 +49,6 @@ event_set(conn *c, int flags)
         ev.events |= EPOLLOUT;
     }
 
-
     if (!c->active) {
         op = EPOLL_CTL_ADD;
         c->active = 1;
@@ -90,8 +89,6 @@ event_process(void)
         }
 
     } // process events end
-
-    //event_handler()
 }
 
 

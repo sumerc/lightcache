@@ -26,7 +26,7 @@
 struct settings {
     unsigned int idle_conn_timeout; /* timeout in ms that idle connections will be disconnected */
     int deamon_mode; /* specify whether to run in deamon mode */
-    unsigned int mem_avail; /*in MB max. memory this lightcache instance is allowed to use */
+    unsigned int mem_avail; /*in bytes. max. memory this lightcache instance is allowed to use */
 };
 
 struct stats {
@@ -38,7 +38,7 @@ typedef enum {
     READ_HEADER = 0x00,
     READ_KEY = 0x01,
     READ_DATA = 0x02,
-    CONN_CLOSE = 0x03,
+    CONN_CLOSED = 0x03,
     CMD_RECEIVED = 0x04,
     SEND_HEADER = 0x05,
     SEND_DATA = 0x06,

@@ -9,7 +9,7 @@ v0.1
 [+] YES IT IS ABLE TO.check if valgrind is able to detect offbyone errors buffer overruns? if not
 	check for buffer overrruns. 
 [+] exclude log.c.
-[-] some kind of freelist for basic structures. (exponantially growing)
+[+] some kind of freelist for basic structures. (exponantially growing)
 [-] More and more and more and more tests.
 [-] GET_MANY after all of above is working.
 [-] implement unix domain sockets.

@@ -5,7 +5,10 @@
 #include "hashtab.h"
 #include "freelist.h"
 #include "events/event.h"
+#include "unistd.h"
 
+/* forward declarations */
+void set_conn_state(struct conn* conn, conn_states state);
 
 /* exported globals */
 struct settings settings;
@@ -28,8 +31,8 @@ void
 init_settings(void)
 {
     settings.idle_conn_timeout = 2; // in secs -- default same as memcached
-    settings.deamon_mode = 0;
-    settings.mem_avail = 64; // in MB -- default same as memcached
+    settings.deamon_mode = 1;
+    settings.mem_avail = 64 * 1024 * 1024; // in bytes -- 64 mb -- default same as memcached
 }
 
 void
@@ -137,7 +140,7 @@ init_resources(conn *conn)
     return 1;
 }
 
-static int
+static void
 disconnect_conn(conn* conn)
 {
 	dprintf("disconnect conn called.");
@@ -147,10 +150,10 @@ disconnect_conn(conn* conn)
 	free_request(conn->in);
 	free_response(conn->out);
 	
-    conn->free = 1;
+    conn->free = 1;    
     close(conn->fd);
-
-    return 1;
+	
+	set_conn_state(conn, CONN_CLOSED);    
 }
 
 
@@ -211,7 +214,8 @@ static int
 prepare_response(conn *conn, size_t data_length)
 {
     // todo: more asserts
-
+    assert(conn->out != NULL);
+	
     conn->out->sdata = (char *)li_malloc(data_length);
     if (!conn->out->sdata) {
         disconnect_conn(conn);
@@ -377,7 +381,6 @@ read_nbytes(conn*conn, char *bytes, size_t total)
 	
     needed = total - conn->in->rbytes;
     nbytes = read(conn->fd, &bytes[conn->in->rbytes], needed);
-
     if (nbytes == 0) {        
         syslog(LOG_ERR, "%s (%s)", "socket read error.", strerror(errno));
         return READ_ERR;
@@ -401,22 +404,17 @@ try_read_request(conn* conn)
 {
     socket_state ret;
 
-    dprintf("try_read_request called with state:%d", conn->state);
-
     conn->last_heard = time(NULL);
-
+    
     switch(conn->state) {
     case READ_HEADER:
 
-        dprintf("req_header size:%d", sizeof(req_header));
-
         ret = read_nbytes(conn, (char *)conn->in->req_header.bytes, sizeof(req_header));
-
         if (ret == READ_COMPLETED) {
             if ( (conn->in->req_header.data_length >= PROTOCOL_MAX_DATA_SIZE) ||
-                    (conn->in->req_header.key_length >= PROTOCOL_MAX_KEY_SIZE) ||
-                    (conn->in->req_header.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
-                //syslog(LOG_ERR, "request data or key length exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
+                 (conn->in->req_header.key_length >= PROTOCOL_MAX_KEY_SIZE) ||
+                 (conn->in->req_header.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
+                syslog(LOG_ERR, "request data or key length exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
                 dprintf("request data or key length exceeded maximum allowed");
                 return READ_ERR;
             }
@@ -431,8 +429,9 @@ try_read_request(conn* conn)
         }
         break;
     case READ_KEY:
-        assert(conn->in->rkey != NULL);
-        // todo: more asserts
+    	assert(conn->in);
+        assert(conn->in->rkey);
+        assert(conn->in->req_header.key_length);
 
         ret = read_nbytes(conn, conn->in->rkey, conn->in->req_header.key_length);
 
@@ -448,9 +447,10 @@ try_read_request(conn* conn)
         }
         break;
     case READ_DATA:
-        assert(conn->in->rdata != NULL); /* assert rdata malloc'd */
-        // todo: more asserts
-
+    	assert(conn->in);
+    	assert(conn->in->rdata);
+    	assert(conn->in->req_header.data_length);
+        
         ret = read_nbytes(conn, conn->in->rdata, conn->in->req_header.data_length);
 
         if (ret == READ_COMPLETED) {
@@ -470,6 +470,7 @@ try_read_request(conn* conn)
         }
         break;
     default:
+    	dprintf("Invalid state in try_read_request");
         ret = INVALID_STATE;
         break;
     } // switch(conn->state)
@@ -486,7 +487,6 @@ send_nbytes(conn*conn, char *bytes, size_t total)
 
     needed = total - conn->out->sbytes;
     nbytes = write(conn->fd, &bytes[conn->out->sbytes], needed);
-	
     if (nbytes == -1) {
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
             return NEED_MORE;
@@ -518,8 +518,6 @@ try_send_response(conn *conn)
         }
         break;
     case SEND_DATA:
-        //dprintf("send data %s, len:%d", conn->out->sdata,
-        //	conn->out->resp_header.data_length);
         ret = send_nbytes(conn, conn->out->sdata, conn->out->resp_header.data_length);
         if (ret == SEND_COMPLETED) {
             if (conn->out->resp_header.data_length != 0) {
@@ -542,7 +540,14 @@ event_handler(conn *conn, event ev)
     int conn_sock, slen;
     struct sockaddr_in si_other;
     socket_state sock_state;
-
+	
+	/* check if connection is closed, this may happen where a READ and WRITE
+	 * event is awaiting for an fd in one cycle. Just noop for this situation.*/
+	if (conn->state == CONN_CLOSED) {
+		dprintf("Connection is closed in the previous event of the cycle.");
+		return;
+	}
+	
     slen = sizeof(si_other);
 
     switch(ev) {
@@ -564,7 +569,7 @@ event_handler(conn *conn, event ev)
             sock_state = try_read_request(conn);
             if (sock_state == READ_ERR || sock_state == INVALID_STATE) {
                 disconnect_conn(conn);
-                return; // do not check for send events for this conn any more.
+                return;
             }
         }
 
@@ -573,26 +578,38 @@ event_handler(conn *conn, event ev)
         sock_state = try_send_response(conn);
         if (sock_state == SEND_ERR || sock_state == INVALID_STATE) {
             disconnect_conn(conn);
-            return; // do not check for send events for this conn any more.
+            return;
         }
         break;
     }
     return;
 }
 
-int
-main(void)
+int 
+main(int argc, char **argv)
 {
-    int s, n, optval, conn_sock, ret;
+    int s, n, optval, conn_sock, ret, c;
     struct sockaddr_in si_me;
     struct conn *conn;
     socklen_t slen;
-
-    //malloc_stats_print(NULL, NULL, NULL);
-    /* should be initialized before any mem operation.
-     * */
+	
 	init_settings(); 
-    init_stats();
+    
+	/* get cmd line args */
+	while (-1 != (c = getopt(argc, argv, "m: d:"
+	))) {
+		switch (c) {
+        case 'm':
+        	settings.mem_avail = ((unsigned int)atoi(optarg)) * 1024 * 1024;
+        	break;
+		case 'd':
+        	settings.deamon_mode = atoi(optarg);
+        	break;
+		}
+	}
+
+    
+	init_stats();
 	
 	init_freelists();
 	

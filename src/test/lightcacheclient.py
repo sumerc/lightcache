@@ -51,8 +51,6 @@ class LightCacheClient(socket.socket):
 	resp = self.recv(data_len)
 	return resp
 
-
-
     def send_raw(self, data):
 	self.send(data)    
 
