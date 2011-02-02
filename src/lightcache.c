@@ -213,7 +213,6 @@ set_conn_state(struct conn* conn, conn_states state)
 static int
 prepare_response(conn *conn, size_t data_length)
 {
-    // todo: more asserts
     assert(conn->out != NULL);
 	
     conn->out->sdata = (char *)li_malloc(data_length);

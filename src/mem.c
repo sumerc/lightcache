@@ -1,8 +1,11 @@
 
 #include "mem.h"
-#include "jemalloc/jemalloc.h"
 #include "lightcache.h"
 #include "syslog.h"
+
+#ifdef JEMALLOC
+#include "jemalloc/jemalloc.h"
+#endif
 
 void *
 li_malloc(size_t size)
