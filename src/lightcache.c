@@ -402,8 +402,6 @@ int
 try_read_request(conn* conn)
 {
     socket_state ret;
-
-    conn->last_heard = time(NULL);
     
     switch(conn->state) {
     case READ_HEADER:
@@ -547,6 +545,8 @@ event_handler(conn *conn, event ev)
 		return;
 	}
 	
+	conn->last_heard = time(NULL);
+	
     slen = sizeof(si_other);
 
     switch(ev) {
@@ -584,6 +584,16 @@ event_handler(conn *conn, event ev)
     return;
 }
 
+/* Demands for memory that is freed but used. This may be an expired cached request
+ * or a freed connection, or in freelist items. This function will be called when
+ * application memory usage reaches a certain ratio of the total available mem. The 
+ * logic is to use every chance to respond to SET requests properly. 
+ * */
+void 
+collect_unused_memory(void)
+{
+}
+
 int 
 main(int argc, char **argv)
 {
@@ -591,6 +601,7 @@ main(int argc, char **argv)
     struct sockaddr_in si_me;
     struct conn *conn;
     socklen_t slen;
+    time_t ctime, ptime;
 	
 	init_settings(); 
     
@@ -658,8 +669,22 @@ main(int argc, char **argv)
     cache = htcreate(4); // todo: read from cmdline args
 
     for (;;) {
+    	
+    	ctime = time(NULL);
+    	
         event_process();
-        disconnect_idle_conns();
+        
+        if (ctime-ptime > LIGHTCACHE_TIMEDRUN_INVOKE_INTERVAL) { // invoke per-sec
+        	
+        	disconnect_idle_conns();
+        	
+        	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD) {
+        		collect_unused_memory();
+        	}
+        	
+        }
+        
+        ptime = ctime;
     }
 
 

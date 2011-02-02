@@ -51,18 +51,21 @@ struct conn {
     int listening;					/* listening socket? */
     int active;					    /* conn have active events on the I/O interface */
     time_t last_heard; 				/* last time we heard from the client */
-
-    conn_states state; /* state of the connection READ_KEY, READ_HEADER.etc...*/
-
-    request *in;
-    response *out;
-
-    int free; /* recycle connection structure */
-    conn *next;
+    conn_states state; 				/* state of the connection READ_KEY, READ_HEADER.etc...*/
+    request *in;					/* request instance */
+    response *out;					/* response instance */
+	int free; 						/* recycle connection structure */
+    conn *next;						/* next connection in the linked-list of the connections */
 };
 
 #define LIGHTCACHE_PORT 13131
-#define LIGHTCACHE_LISTEN_BACKLOG 100	// 100 clients can be queued between subsequent accept()
+#define LIGHTCACHE_LISTEN_BACKLOG 100
+/*the ratio threshold that garbage collect functions will start demanding memory.
+ * */
+#define LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD 75
+/* in ms. The timed procedures will be invoked at this interval. Like garbage collection...etc..
+ * */
+#define LIGHTCACHE_TIMEDRUN_INVOKE_INTERVAL 1*1000
 
 #endif
 
