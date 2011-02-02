@@ -63,9 +63,9 @@ struct conn {
 /*the ratio threshold that garbage collect functions will start demanding memory.
  * */
 #define LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD 75
-/* in ms. The timed procedures will be invoked at this interval. Like garbage collection...etc..
+/* in sec. The timed procedures will be invoked at this interval. Like garbage collection...etc..
  * */
-#define LIGHTCACHE_TIMEDRUN_INVOKE_INTERVAL 1*1000
+#define LIGHTCACHE_TIMEDRUN_INVOKE_INTERVAL 1
 
 #endif
 

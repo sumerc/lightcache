@@ -36,6 +36,13 @@ init_settings(void)
 }
 
 void
+init_log(void)
+{
+	openlog("lightcache", LOG_PID, LOG_LOCAL5);
+    syslog(LOG_INFO, "lightcache started.");
+}
+
+void
 init_stats(void)
 {
     stats.mem_used = 0;
@@ -86,14 +93,14 @@ free_request(request *req)
 		
 	if (req->can_free) {
 		dprintf("FREEING request data.[%p]", req);
-		li_free(req->rkey);
+		li_free(req->rkey);		
+		li_free(req->rdata);		
+		li_free(req->rextra);	
 		req->rkey = NULL;
-		li_free(req->rdata);
 		req->rdata = NULL;
-		li_free(req->rextra);
-		req->rextra = NULL;
+		req->rextra = NULL;	
 		flput(request_trash, req);
-	}	
+	}
 }
 
 static void
@@ -104,12 +111,16 @@ free_response(response *resp)
 		return;
 	}
 	
-	if (resp->can_free) {
+	if (resp->can_free && resp->sdata) {
 		dprintf("FREEING response data.[%p]", resp);
-		li_free(resp->sdata);
-		resp->sdata = NULL;
+		li_free(resp->sdata);		
 	}
-	//li_free(resp);
+	
+	/* can lose reference to mem, otherwise, later freelist usage of the same resp 
+	 * object may lead to invalid deletion of this data.
+	 * */
+	resp->sdata = NULL;
+	
 	flput(response_trash, resp);
 }
 
@@ -117,6 +128,7 @@ free_response(response *resp)
 static int
 init_resources(conn *conn)
 {
+	
 	/* free previous request allocations if we have any */  
 	free_request(conn->in); 
 	free_response(conn->out);
@@ -253,12 +265,14 @@ execute_cmd(struct conn* conn)
         }
         cached_req = (request *)tab_item->val;
         /* check timeout expire */
-        val = atoi(cached_req->rextra) * 1000;
+        val = atoi(cached_req->rextra);
         assert( val != 0);/* CMD_SET already does this validation but re-check*/
         
-        if (val + cached_req->received < time(NULL)) {
+        //dprintf("KEY timeout:%d, received:%d, elapsed:%d ", val, 
+        //	cached_req->received, (time(NULL)-cached_req->received) ); 
+        if ( (time(NULL)-cached_req->received) > val) {
             dprintf("time expired for key:%s", conn->in->rkey);
-            cached_req->can_free = 0;
+            cached_req->can_free = 1;
             free_request(cached_req);
             hfree(cache, tab_item); // recycle tab_item 
             return;
@@ -268,13 +282,13 @@ execute_cmd(struct conn* conn)
         conn->out->sdata = cached_req->rdata;
         conn->out->can_free = 0;
         
-        dprintf("sending GET data:%u", conn->out->resp_header.data_length);
+        dprintf("sending GET data:%s", conn->out->sdata);
         
         set_conn_state(conn, SEND_HEADER);
         break;
 
     case CMD_SET:
-        dprintf("CMD_SET request for key: %s:%s:%s", conn->in->rkey, conn->in->rdata,
+        dprintf("CMD_SET request for key, data, extra: %s, %s, %s", conn->in->rkey, conn->in->rdata,
                 conn->in->rextra);
         
 		/* validate params */
@@ -617,23 +631,18 @@ main(int argc, char **argv)
         	break;
 		}
 	}
-
-    
+	
 	init_stats();
 	
 	init_freelists();
 	
-	dprintf("stats:%u", stats.mem_used);
+	init_log();
 	
-    // todo : parse and set arguments to settings here.
-
-    openlog("lightcache", LOG_PID, LOG_LOCAL5);
-    syslog(LOG_INFO, "lightcache started.");
-
     if (settings.deamon_mode) {
-        deamonize();
+    	;
+        //deamonize();
     }
-
+	
     ret = event_init(event_handler);
     if (!ret) {
         goto err;
@@ -674,7 +683,7 @@ main(int argc, char **argv)
     	
         event_process();
         
-        if (ctime-ptime > LIGHTCACHE_TIMEDRUN_INVOKE_INTERVAL) { // invoke per-sec
+        //if (ctime-ptime > LIGHTCACHE_TIMEDRUN_INVOKE_INTERVAL) { // invoke per-sec
         	
         	disconnect_idle_conns();
         	
@@ -682,7 +691,7 @@ main(int argc, char **argv)
         		collect_unused_memory();
         	}
         	
-        }
+	    //}
         
         ptime = ctime;
     }

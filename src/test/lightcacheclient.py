@@ -66,8 +66,12 @@ class LightCacheClient(socket.socket):
 	self.send_packet(key=key, data=value, command=self.CMD_SET, extra=timeout)	   
 
     def get(self, key):
-	self.send_packet(key=key, command=self.CMD_GET) 
-	return self.recv_packet()
+	try:
+	    self.send_packet(key=key, command=self.CMD_GET) 
+	    return self.recv_packet()
+        except:
+	    return None
+
     def get_stats(self):
 	self.send_packet(command=self.CMD_GET_STATS)
 	return self.recv_packet()

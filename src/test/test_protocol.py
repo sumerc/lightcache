@@ -1,3 +1,4 @@
+import time
 import unittest
 from testbase import LightCacheTestBase
 
@@ -38,14 +39,22 @@ class ProtocolTests(LightCacheTestBase):
     def test_get_stats(self):
 	stats = self._stats2dict(self.client.get_stats())
 	self.assertTrue(stats.has_key("mem_used"))
-
-    
     
     def test_get(self):
 	self.client.set("key2", "value2", 13)
 	self.assertEqual(self.client.get("key2"), "value2")
     
-    
+    def test_get_update_same_key(self):
+	self.client.set("key", "value", 5)
+	self.assertEqual(self.client.get("key"), "value")
+	self.client.set("key", "value2", 5)
+	self.assertEqual(self.client.get("key"), "value2")	
+	
+    def test_get_with_timeout(self):
+	self.client.set("key2", "value3", 1)
+	time.sleep(2)
+	self.assertEqual(self.client.get("key2"), None)  
+    	
 if __name__ == '__main__':
     unittest.main()
 
