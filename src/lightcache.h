@@ -11,7 +11,6 @@
 #include "assert.h"
 #include "fcntl.h"
 
-#include "protocol.h"
 
 #ifdef EPOLL
 #include "sys/epoll.h"
@@ -19,6 +18,8 @@
 
 #ifndef LIGHTCACHE_H
 #define LIGHTCACHE_H
+
+#include "protocol.h"
 
 #define dprintf(fmt, args...) fprintf(stderr, "[+] " fmt "\n", ## args)
 //#define sys_log_err(s) syslog(LOG_ERR, "%s (%s)", s, strerror(errno));

@@ -6,6 +6,7 @@
 #include "freelist.h"
 #include "events/event.h"
 #include "unistd.h"
+#include "mem.h"
 
 /* forward declarations */
 void set_conn_state(struct conn* conn, conn_states state);
@@ -275,6 +276,7 @@ execute_cmd(struct conn* conn)
             cached_req->can_free = 1;
             free_request(cached_req);
             hfree(cache, tab_item); // recycle tab_item 
+            disconnect_conn(conn);
             return;
         }
         conn->out->resp_header.data_length = cached_req->req_header.data_length;
@@ -305,7 +307,9 @@ execute_cmd(struct conn* conn)
             dprintf("invalid timeout param in CMD_SET");
             return;
         }
-
+		
+		dprintf("SET key with timeout:%d", val);
+		
         /* add to cache */
         ret = hset(cache, conn->in->rkey, conn->in->req_header.key_length, conn->in);
         if (ret == HEXISTS) { // key exists? then force-update the data
@@ -335,12 +339,12 @@ execute_cmd(struct conn* conn)
             }
             settings.idle_conn_timeout = val;
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
-        	val = atoi(conn->in->rdata);
+        	val = atoi(conn->in->rdata); // in MB
             if (!val) {
                 dprintf("invalid integer param in CMD_CHG_SETTING");
                 return; 
             }
-            settings.mem_avail = val;
+            settings.mem_avail = val * 1024 * 1024; 
         }
         set_conn_state(conn, READ_HEADER);
         break;
@@ -352,6 +356,12 @@ execute_cmd(struct conn* conn)
             	return;
             }
             *(unsigned int *)conn->out->sdata = settings.idle_conn_timeout;
+            set_conn_state(conn, SEND_HEADER);
+        } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
+            if (!prepare_response(conn, sizeof(unsigned int))) {
+            	return;
+            }
+            *(unsigned int *)conn->out->sdata = settings.mem_avail / 1024 / 1024;
             set_conn_state(conn, SEND_HEADER);
         }
         break;
@@ -674,26 +684,36 @@ main(int argc, char **argv)
     conn->listening = 1;
     event_set(conn, EVENT_READ);
 
-    /* create the in-memory hash table */
-    cache = htcreate(4); // todo: read from cmdline args
-
+    /* create the in-memory hash table. Constant is not important here. 
+     * Hash table is an exponantially growing as more and more items being 
+     * added.
+     * */
+    cache = htcreate(4);
+    if (!cache) {
+    	goto err;
+    }
+	
+	ptime = 0;
     for (;;) {
     	
     	ctime = time(NULL);
     	
         event_process();
         
-        //if (ctime-ptime > LIGHTCACHE_TIMEDRUN_INVOKE_INTERVAL) { // invoke per-sec
+        //dprintf("cycle elapsed:%d", ctime-ptime);
+        
+        if (ctime-ptime > LIGHTCACHE_TIMEDRUN_INVOKE_INTERVAL) { // invoke per-sec
         	
         	disconnect_idle_conns();
         	
         	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD) {
         		collect_unused_memory();
-        	}
+        	}        	
         	
-	    //}
+        	ptime = ctime;
+	    }
         
-        ptime = ctime;
+        
     }
 
 

@@ -3,7 +3,7 @@ import unittest
 from testbase import LightCacheTestBase
 
 class ProtocolTests(LightCacheTestBase):
-    
+
     def test_idle_timeout(self):
 	self.client.chg_setting("idle_conn_timeout", 2)
      	self.assertTrue(self.client._is_disconnected(in_secs=4))
@@ -32,6 +32,8 @@ class ProtocolTests(LightCacheTestBase):
     def test_get_setting(self):
 	self.client.chg_setting("idle_conn_timeout", 5)
 	self.assertEqual(self.client.get_setting("idle_conn_timeout"), 5)
+	self.client.chg_setting("mem_avail", 65)
+	self.assertEqual(self.client.get_setting("mem_avail"), 65)
     
     def test_set(self):
 	self.client.set("key1", "value1", 11)
@@ -51,10 +53,17 @@ class ProtocolTests(LightCacheTestBase):
 	self.assertEqual(self.client.get("key"), "value2")	
 	
     def test_get_with_timeout(self):
-	self.client.set("key2", "value3", 1)
+	self.client.set("key2", "value3", 2)
+	time.sleep(1)
+	self.assertEqual(self.client.get("key2"), "value3")
 	time.sleep(2)
-	self.assertEqual(self.client.get("key2"), None)  
-    	
+	self.assertEqual(self.client.get("key2"), None)  # key expired
+    
+    def test_get_invalid_timeout(self):
+	self.client.set("key5", "value5", 1010100101010101010101001)
+	print self.client.get("key5")
+	
+    
 if __name__ == '__main__':
     unittest.main()
 

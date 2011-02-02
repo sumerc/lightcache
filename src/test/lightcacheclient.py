@@ -46,10 +46,13 @@ class LightCacheClient(socket.socket):
 	super(LightCacheClient, self).send(data)
 
     def recv_packet(self):
-	resp = self.recv(self.RESP_HEADER_SIZE)
- 	opcode, data_len = struct.unpack("BI", resp)
-	resp = self.recv(data_len)
-	return resp
+    	try:
+	    resp = self.recv(self.RESP_HEADER_SIZE)
+ 	    opcode, data_len = struct.unpack("BI", resp)
+	    resp = self.recv(data_len)
+	    return resp
+	except:
+	    return None
 
     def send_raw(self, data):
 	self.send(data)    
@@ -57,20 +60,18 @@ class LightCacheClient(socket.socket):
     def chg_setting(self, key, value):
 	self.send_packet(key=key, data=value, command=self.CMD_CHG_SETTING)	
    
-    def get_setting(self, key):
+    def get_setting(self, key):	
 	self.send_packet(key=key, command=self.CMD_GET_SETTING)
 	r = struct.unpack("I", self.recv_packet()) 
 	return r[0]
-    
+            
     def set(self, key, value, timeout):
 	self.send_packet(key=key, data=value, command=self.CMD_SET, extra=timeout)	   
 
-    def get(self, key):
-	try:
-	    self.send_packet(key=key, command=self.CMD_GET) 
-	    return self.recv_packet()
-        except:
-	    return None
+    def get(self, key):	
+	self.send_packet(key=key, command=self.CMD_GET) 
+	return self.recv_packet()
+        
 
     def get_stats(self):
 	self.send_packet(command=self.CMD_GET_STATS)

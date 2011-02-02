@@ -10,7 +10,10 @@ v0.1
 	check for buffer overrruns. 
 [+] exclude log.c.
 [+] some kind of freelist for basic structures. (exponantially growing)
-[-] More and more and more and more tests.
+[-] move the headers off from lightcache.h
+[-] use HHASH algorithm same as memcached. Bob Jenkins is the expert there:)
+[-] send invalid integers for GET, CHG_SETTING, get(...) functions shall return None on error.
+	server generally disconnects in invalid situations.
 [-] GET_MANY after all of above is working.
 [-] implement unix domain sockets.
 [-] kqueue integration.
