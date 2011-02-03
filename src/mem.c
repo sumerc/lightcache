@@ -1,7 +1,5 @@
 
 #include "mem.h"
-#include "lightcache.h"
-#include "syslog.h"
 
 #ifdef JEMALLOC
 #include "jemalloc/jemalloc.h"

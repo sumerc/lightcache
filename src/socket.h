@@ -1,3 +1,4 @@
+#include "lightcache.h"
 
 #ifndef SOCKET_H
 #define SOCKET_H

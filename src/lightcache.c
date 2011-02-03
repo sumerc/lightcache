@@ -5,7 +5,6 @@
 #include "hashtab.h"
 #include "freelist.h"
 #include "events/event.h"
-#include "unistd.h"
 #include "mem.h"
 
 /* forward declarations */
@@ -558,7 +557,8 @@ try_send_response(conn *conn)
 void
 event_handler(conn *conn, event ev)
 {
-    int conn_sock, slen;
+    int conn_sock;
+    unsigned int slen;
     struct sockaddr_in si_other;
     socket_state sock_state;
 	
@@ -621,10 +621,9 @@ collect_unused_memory(void)
 int 
 main(int argc, char **argv)
 {
-    int s, n, optval, conn_sock, ret, c;
+    int s, optval, ret, c;
     struct sockaddr_in si_me;
     struct conn *conn;
-    socklen_t slen;
     time_t ctime, ptime;
 	
 	init_settings(); 

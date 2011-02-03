@@ -3,9 +3,6 @@
 *    Sumer Cip 2010
 */
 #include "hashtab.h"
-#include "stdio.h"
-#include "stdlib.h"
-#include "string.h"
 #include "mem.h"
 
 // one_at_a_time hashing

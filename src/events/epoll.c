@@ -1,6 +1,5 @@
 
 #include "event.h"
-#include "syslog.h"
 
 // globals
 static int epollfd = 0;
@@ -68,7 +67,7 @@ void
 event_process(void)
 {
     int nfds, n;
-    struct epoll_event ev, events[EPOLL_MAX_EVENTS];
+    struct epoll_event events[EPOLL_MAX_EVENTS];
     conn *conn;
 
     nfds = epoll_wait(epollfd, events, EPOLL_MAX_EVENTS, EPOLL_TIMEOUT);
