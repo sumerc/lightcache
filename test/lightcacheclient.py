@@ -67,7 +67,7 @@ class LightCacheClient(socket.socket):
 	self.send_packet(key=key, data=value, command=self.CMD_CHG_SETTING)	
    
     def get_setting(self, key):	
-	self.send_packet(key=key, command=self.CMD_GET_SETTING)
+	self.send_packet(key=key, command=self.CMD_GET_SETTING)	
 	r = struct.unpack("I", self.recv_packet())
 	r = socket.ntohl(r[0])
 	return r
@@ -83,3 +83,5 @@ class LightCacheClient(socket.socket):
     def get_stats(self):
 	self.send_packet(command=self.CMD_GET_STATS)
 	return self.recv_packet()
+
+

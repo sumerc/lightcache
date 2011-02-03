@@ -333,19 +333,18 @@ execute_cmd(struct conn* conn)
             dprintf("(null) data param in CMD_CHG_SETTING");
             break;
         }
+        /* Although the settings coming from the network is usually integral types, 
+         * endianness is not a problem as we do not directly use native integral types 
+         * at the client side. atoi() will happily convert the string to the integral 
+         * type in the correct endianness.
+         * */
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
-            val = ntohl(atoi(conn->in->rdata));
-            if (!val) {
-                dprintf("invalid integer param in CMD_CHG_SETTING");
-                return;
-            }
+            val = atoi(conn->in->rdata);
+            dprintf("SET idle conn timeout :%u", val);   
             settings.idle_conn_timeout = val;
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
-            val = ntohl(atoi(conn->in->rdata)); // in MB
-            if (!val) {
-                dprintf("invalid integer param in CMD_CHG_SETTING");
-                return;
-            }
+            val = atoi(conn->in->rdata); // in MB    
+            dprintf("SET mem avail :%u", val);        
             settings.mem_avail = val * 1024 * 1024;
         }
         set_conn_state(conn, READ_HEADER);
@@ -357,13 +356,14 @@ execute_cmd(struct conn* conn)
             if (!prepare_response(conn, sizeof(unsigned int), 1)) {
                 return;
             }
-            // TODO: if 64 bit htonl does not work?
+            // TODO: if 64 bit htonl does not work? : htonll()
             *(unsigned int *)conn->out->sdata = htonl(settings.idle_conn_timeout);
             set_conn_state(conn, SEND_HEADER);
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
             if (!prepare_response(conn, sizeof(unsigned int), 1)) {
                 return;
             }
+            // TODO: if 64 bit htonl does not work? : htonll()
             *(unsigned int *)conn->out->sdata = htonl(settings.mem_avail / 1024 / 1024);
             set_conn_state(conn, SEND_HEADER);
         }
@@ -541,15 +541,15 @@ try_send_response(conn *conn)
     case SEND_HEADER:
         ret = send_nbytes(conn, (char *)conn->out->resp_header.bytes, sizeof(resp_header));
         if (ret == SEND_COMPLETED) {
-            if (conn->out->resp_header.data_length != 0) {
+            if (ntohl(conn->out->resp_header.data_length) != 0) {
                 set_conn_state(conn, SEND_DATA);
             }
         }
         break;
     case SEND_DATA:
-        ret = send_nbytes(conn, conn->out->sdata, conn->out->resp_header.data_length);
+        ret = send_nbytes(conn, conn->out->sdata, ntohl(conn->out->resp_header.data_length));
         if (ret == SEND_COMPLETED) {
-            if (conn->out->resp_header.data_length != 0) {
+            if (ntohl(conn->out->resp_header.data_length) != 0) {
                 set_conn_state(conn, READ_HEADER);// wait for new commands
             }
         }

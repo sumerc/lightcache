@@ -3,7 +3,7 @@ import unittest
 from testbase import LightCacheTestBase
 
 class ProtocolTests(LightCacheTestBase):
-
+    
     def test_idle_timeout(self):
 	self.client.chg_setting("idle_conn_timeout", 2)
      	self.assertTrue(self.client._is_disconnected(in_secs=4))
@@ -28,12 +28,6 @@ class ProtocolTests(LightCacheTestBase):
     def test_invalid_packets(self):
 	self.client.send_packet(data="data_value", key_length=10, 
 		command=self.client.CMD_CHG_SETTING, data_length=12)   
-    
-    def test_get_setting(self):
-	self.client.chg_setting("idle_conn_timeout", 5)
-	self.assertEqual(self.client.get_setting("idle_conn_timeout"), 5)
-	self.client.chg_setting("mem_avail", 65)
-	self.assertEqual(self.client.get_setting("mem_avail"), 65)
     
     def test_set(self):
 	self.client.set("key1", "value1", 11)
@@ -62,6 +56,12 @@ class ProtocolTests(LightCacheTestBase):
     def test_get_invalid_timeout(self):
 	self.client.set("key5", "value5", 5000000)
 	print self.client.get("key5")
+    
+    def test_get_setting(self):
+	self.client.chg_setting("idle_conn_timeout", 5)
+	self.assertEqual(self.client.get_setting("idle_conn_timeout"), 5)
+	self.client.chg_setting("mem_avail", 65)
+	self.assertEqual(self.client.get_setting("mem_avail"), 65)
 	
     
 if __name__ == '__main__':
