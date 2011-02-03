@@ -9,7 +9,7 @@
 typedef union {
     struct {
         uint8_t opcode;
-        uint8_t key_length;
+        uint8_t key_length; 
         uint32_t data_length;
         uint32_t extra_length;
     };

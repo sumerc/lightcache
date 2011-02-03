@@ -60,7 +60,7 @@ class ProtocolTests(LightCacheTestBase):
 	self.assertEqual(self.client.get("key2"), None)  # key expired
     
     def test_get_invalid_timeout(self):
-	self.client.set("key5", "value5", 1010100101010101010101001)
+	self.client.set("key5", "value5", 5000000)
 	print self.client.get("key5")
 	
     

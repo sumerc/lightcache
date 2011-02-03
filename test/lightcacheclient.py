@@ -37,6 +37,11 @@ class LightCacheClient(socket.socket):
 	data_len = kwargs.pop("data_length", len(str(data)))
 	extra = kwargs.pop("extra", "")
 	extra_len = kwargs.pop("extra_length", len(str(extra)))
+	
+	# data/extra lengths are 32 bit UINTs. Convert them with ntohl
+	data_len = socket.htonl(data_len)
+	extra_len = socket.htonl(extra_len)
+
 	request = struct.pack('BBII', cmd, key_len, data_len, extra_len)
 	request += "%s%s%s" % (key, data, extra)
 	return request

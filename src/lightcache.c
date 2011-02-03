@@ -307,7 +307,7 @@ execute_cmd(struct conn* conn)
             return;
         }
 
-        dprintf("SET key with timeout:%d", val);
+        dprintf("SET key with timeout:%u", val);
 
         /* add to cache */
         ret = hset(cache, conn->in->rkey, conn->in->req_header.key_length, conn->in);
@@ -431,6 +431,11 @@ try_read_request(conn* conn)
 
         ret = read_nbytes(conn, (char *)conn->in->req_header.bytes, sizeof(req_header));
         if (ret == READ_COMPLETED) {
+        	
+        	/* convert network2host byte ordering before using in our code. */    
+        	conn->in->req_header.data_length = ntohl(conn->in->req_header.data_length);        	
+        	conn->in->req_header.extra_length = ntohl(conn->in->req_header.extra_length);
+        	
             if ( (conn->in->req_header.data_length >= PROTOCOL_MAX_DATA_SIZE) ||
                     (conn->in->req_header.key_length >= PROTOCOL_MAX_KEY_SIZE) ||
                     (conn->in->req_header.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
