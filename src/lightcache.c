@@ -223,16 +223,18 @@ set_conn_state(struct conn* conn, conn_states state)
 }
 
 static int
-prepare_response(conn *conn, size_t data_length)
+prepare_response(conn *conn, size_t data_length, int alloc_mem)
 {
     assert(conn->out != NULL);
-
-    conn->out->sdata = (char *)li_malloc(data_length);
-    if (!conn->out->sdata) {
-        disconnect_conn(conn);
-        return 0;
-    }
-    conn->out->resp_header.data_length = data_length;
+	
+	if (alloc_mem) {
+	    conn->out->sdata = (char *)li_malloc(data_length);
+	    if (!conn->out->sdata) {
+	        disconnect_conn(conn);
+	        return 0;
+	    }
+	}
+    conn->out->resp_header.data_length = htonl(data_length);
     conn->out->resp_header.opcode = conn->in->req_header.opcode;
 
     return 1;
@@ -278,8 +280,9 @@ execute_cmd(struct conn* conn)
             disconnect_conn(conn);
             return;
         }
-        conn->out->resp_header.data_length = cached_req->req_header.data_length;
-        conn->out->resp_header.opcode = conn->in->req_header.opcode;
+        if (!prepare_response(conn, cached_req->req_header.data_length, 0)) { // do not alloc mem
+            return;
+        }        
         conn->out->sdata = cached_req->rdata;
         conn->out->can_free = 0;
 
@@ -301,7 +304,7 @@ execute_cmd(struct conn* conn)
             dprintf("invalid data param in CMD_SET");
             return;
         }
-        val = atoi(conn->in->rextra) * 1000; //sec2msec
+        val = ntohl(atoi(conn->in->rextra)) * 1000; //sec2msec
         if (!val) {
             dprintf("invalid timeout param in CMD_SET");
             return;
@@ -331,14 +334,14 @@ execute_cmd(struct conn* conn)
             break;
         }
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
-            val = atoi(conn->in->rdata);
+            val = ntohl(atoi(conn->in->rdata));
             if (!val) {
                 dprintf("invalid integer param in CMD_CHG_SETTING");
                 return;
             }
             settings.idle_conn_timeout = val;
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
-            val = atoi(conn->in->rdata); // in MB
+            val = ntohl(atoi(conn->in->rdata)); // in MB
             if (!val) {
                 dprintf("invalid integer param in CMD_CHG_SETTING");
                 return;
@@ -351,22 +354,23 @@ execute_cmd(struct conn* conn)
         dprintf("CMD_GET_SETTING request for key: %s, data:%s", conn->in->rkey,
                 conn->in->rdata);
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
-            if (!prepare_response(conn, sizeof(unsigned int))) {
+            if (!prepare_response(conn, sizeof(unsigned int), 1)) {
                 return;
             }
-            *(unsigned int *)conn->out->sdata = settings.idle_conn_timeout;
+            // TODO: if 64 bit htonl does not work?
+            *(unsigned int *)conn->out->sdata = htonl(settings.idle_conn_timeout);
             set_conn_state(conn, SEND_HEADER);
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
-            if (!prepare_response(conn, sizeof(unsigned int))) {
+            if (!prepare_response(conn, sizeof(unsigned int), 1)) {
                 return;
             }
-            *(unsigned int *)conn->out->sdata = settings.mem_avail / 1024 / 1024;
+            *(unsigned int *)conn->out->sdata = htonl(settings.mem_avail / 1024 / 1024);
             set_conn_state(conn, SEND_HEADER);
         }
         break;
     case CMD_GET_STATS:
         dprintf("CMD_GET_STATS request");
-        if (!prepare_response(conn, 250)) {
+        if (!prepare_response(conn, 250, 1)) {
             return;
         }
         sprintf(conn->out->sdata, "mem_used:%u\r\n", stats.mem_used);

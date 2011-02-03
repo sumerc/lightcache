@@ -54,6 +54,7 @@ class LightCacheClient(socket.socket):
     	try:
 	    resp = self.recv(self.RESP_HEADER_SIZE)
  	    opcode, data_len = struct.unpack("BI", resp)
+	    data_len = socket.ntohl(data_len)
 	    resp = self.recv(data_len)
 	    return resp
 	except:
@@ -67,8 +68,9 @@ class LightCacheClient(socket.socket):
    
     def get_setting(self, key):	
 	self.send_packet(key=key, command=self.CMD_GET_SETTING)
-	r = struct.unpack("I", self.recv_packet()) 
-	return r[0]
+	r = struct.unpack("I", self.recv_packet())
+	r = socket.ntohl(r[0])
+	return r
             
     def set(self, key, value, timeout):
 	self.send_packet(key=key, data=value, command=self.CMD_SET, extra=timeout)	   
