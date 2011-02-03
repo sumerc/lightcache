@@ -15,7 +15,9 @@
 #ifndef LIGHTCACHE_H
 #define LIGHTCACHE_H
 
+#ifdef DEBUG
 #define dprintf(fmt, args...) fprintf(stderr, "[+] " fmt "\n", ## args)
+#endif
 
 struct settings {
     unsigned int idle_conn_timeout; /* timeout in ms that idle connections will be disconnected */
