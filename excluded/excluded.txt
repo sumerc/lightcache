@@ -1,5 +1,0 @@
-//syslog(LOG_INFO, "Received packet from %s:%d\nData: %s\n\n", 
-
-	//	     inet_ntoa( ((_cdata *)param)->saddr.sin_addr), ntohs(((_cdata *)param)->saddr.sin_port), ((_cdata *)param)->cmd);
-	
-	

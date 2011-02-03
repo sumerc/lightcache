@@ -1,2 +1,8 @@
 glob:*pyc
 glob:src/lightcache
+glob:.cdtproject
+glob:.cproject
+glob:.project
+glob:.pydevproject
+
+

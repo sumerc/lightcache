@@ -8,7 +8,7 @@ _flgrow(freelist *flp)
 {
     int i, newsize;
     void **old;
-    
+
     dprintf("flgrow called.");
 
     old = flp->items;
@@ -30,9 +30,9 @@ _flgrow(freelist *flp)
     for(i=flp->size; i<newsize; i++)
         flp->items[i] = old[i-flp->size];
 
-    li_free(old);    
+    li_free(old);
     flp->head = flp->size-1;
-    flp->size = newsize;    
+    flp->size = newsize;
     return 1;
 }
 
@@ -43,12 +43,12 @@ flcreate(int chunksize, int size)
     freelist *flp;
 
     flp = (freelist *)li_malloc(sizeof(freelist));
-    if (!flp) {     	   
+    if (!flp) {
         return NULL;
     }
     flp->items = li_malloc(size * sizeof(void *));
     if (!flp->items) {
-        li_free(flp);        
+        li_free(flp);
         return NULL;
     }
 

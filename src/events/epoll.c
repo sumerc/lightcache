@@ -14,7 +14,7 @@ event_init(void (*ev_handler)(conn *c, event ev))
 {
     epollfd = epoll_create(EPOLL_MAX_EVENTS);
     if (epollfd == -1) {
-    	syslog(LOG_ERR, "%s (%s)", "epoll create error.", strerror(errno));
+        syslog(LOG_ERR, "%s (%s)", "epoll create error.", strerror(errno));
         return 0;
     }
     event_handler = ev_handler;
@@ -25,7 +25,7 @@ int
 event_del(conn *conn)
 {
     if (epoll_ctl(epollfd, EPOLL_CTL_DEL, conn->fd, 0) == -1) {
-    	syslog(LOG_ERR, "%s (%s)", "epoll_ctl disconnect conn.", strerror(errno));        
+        syslog(LOG_ERR, "%s (%s)", "epoll_ctl disconnect conn.", strerror(errno));
         return 0;
     }
     return 1;
@@ -56,8 +56,8 @@ event_set(conn *c, int flags)
     }
 
     ev.data.ptr = c;
-    if (epoll_ctl(epollfd, op, c->fd, &ev) == -1) {        
-        syslog(LOG_ERR, "%s (%s)", "epoll_ctl_mod connection error.", strerror(errno));  
+    if (epoll_ctl(epollfd, op, c->fd, &ev) == -1) {
+        syslog(LOG_ERR, "%s (%s)", "epoll_ctl_mod connection error.", strerror(errno));
         return 0;
     }
     return 1;
@@ -71,8 +71,8 @@ event_process(void)
     conn *conn;
 
     nfds = epoll_wait(epollfd, events, EPOLL_MAX_EVENTS, EPOLL_TIMEOUT);
-    if (nfds == -1) {        
-        syslog(LOG_ERR, "%s (%s)", "epoll wait error.", strerror(errno)); 
+    if (nfds == -1) {
+        syslog(LOG_ERR, "%s (%s)", "epoll wait error.", strerror(errno));
         return;
     }
 

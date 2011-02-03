@@ -1,7 +1,7 @@
 /*
 *    An Adaptive Hash Table
 *    Sumer Cip 2010
-* 
+*
 * 	 v0.2 -- fix & optimization on hset()
 *    v0.3 -- demand_mem() function for hashtable
 */

@@ -20,11 +20,11 @@ static _htab *cache = NULL;
 static freelist *response_trash; /* freelist to create response object(s) from. */
 static freelist *request_trash;
 
-void 
+void
 init_freelists(void)
 {
-	response_trash = flcreate(sizeof(response), 1);
-	request_trash = flcreate(sizeof(request), 1);
+    response_trash = flcreate(sizeof(response), 1);
+    request_trash = flcreate(sizeof(request), 1);
 }
 
 void
@@ -38,7 +38,7 @@ init_settings(void)
 void
 init_log(void)
 {
-	openlog("lightcache", LOG_PID, LOG_LOCAL5);
+    openlog("lightcache", LOG_PID, LOG_LOCAL5);
     syslog(LOG_INFO, "lightcache started.");
 }
 
@@ -66,7 +66,7 @@ make_conn(int fd) {
     if (conn == NULL) {
         conn = (struct conn*)li_malloc(sizeof(struct conn));
         if (!conn) {
-        	return NULL;
+            return NULL;
         }
         conn->next = conns;
         conns = conn;
@@ -75,97 +75,97 @@ make_conn(int fd) {
     conn->fd = fd;
     conn->last_heard = time(NULL);
     conn->active = 0;
-    conn->listening = 0;    
+    conn->listening = 0;
     conn->free = 0;
     conn->in = NULL;
     conn->out = NULL;
-    
+
     return conn;
 }
 
 static void
 free_request(request *req)
 {
-	
-	if (!req) {
-		return;
-	}
-		
-	if (req->can_free) {
-		dprintf("FREEING request data.[%p]", req);
-		li_free(req->rkey);		
-		li_free(req->rdata);		
-		li_free(req->rextra);	
-		req->rkey = NULL;
-		req->rdata = NULL;
-		req->rextra = NULL;	
-		flput(request_trash, req);
-	}
+
+    if (!req) {
+        return;
+    }
+
+    if (req->can_free) {
+        dprintf("FREEING request data.[%p]", req);
+        li_free(req->rkey);
+        li_free(req->rdata);
+        li_free(req->rextra);
+        req->rkey = NULL;
+        req->rdata = NULL;
+        req->rextra = NULL;
+        flput(request_trash, req);
+    }
 }
 
 static void
 free_response(response *resp)
-{	
-	
-	if (!resp) {
-		return;
-	}
-	
-	if (resp->can_free && resp->sdata) {
-		dprintf("FREEING response data.[%p]", resp);
-		li_free(resp->sdata);		
-	}
-	
-	/* can lose reference to mem, otherwise, later freelist usage of the same resp 
-	 * object may lead to invalid deletion of this data.
-	 * */
-	resp->sdata = NULL;
-	
-	flput(response_trash, resp);
+{
+
+    if (!resp) {
+        return;
+    }
+
+    if (resp->can_free && resp->sdata) {
+        dprintf("FREEING response data.[%p]", resp);
+        li_free(resp->sdata);
+    }
+
+    /* can lose reference to mem, otherwise, later freelist usage of the same resp
+     * object may lead to invalid deletion of this data.
+     * */
+    resp->sdata = NULL;
+
+    flput(response_trash, resp);
 }
 
 
 static int
 init_resources(conn *conn)
 {
-	
-	/* free previous request allocations if we have any */  
-	free_request(conn->in); 
-	free_response(conn->out);
-	
-	/* get req/resp resources from associated freelists */
-	conn->in = (request *)flget(request_trash);
+
+    /* free previous request allocations if we have any */
+    free_request(conn->in);
+    free_response(conn->out);
+
+    /* get req/resp resources from associated freelists */
+    conn->in = (request *)flget(request_trash);
     if (!conn->in) {
-    	return 0;
+        return 0;
     }
     conn->out = (response *)flget(response_trash);
-	if (!conn->out) {		
+    if (!conn->out) {
         return 0;
-    }	
-    
+    }
+
     /* init defaults */
-    conn->in->can_free = 1; 
+    conn->in->can_free = 1;
     conn->out->can_free = 1;
-    conn->in->rbytes = 0; 
+    conn->in->rbytes = 0;
     conn->out->sbytes = 0;
-    
+
     return 1;
 }
 
 static void
 disconnect_conn(conn* conn)
 {
-	dprintf("disconnect conn called.");
-	
+    dprintf("disconnect conn called.");
+
     event_del(conn);
-    
-	free_request(conn->in);
-	free_response(conn->out);
-	
-    conn->free = 1;    
+
+    free_request(conn->in);
+    free_response(conn->out);
+
+    conn->free = 1;
     close(conn->fd);
-	
-	set_conn_state(conn, CONN_CLOSED);    
+
+    set_conn_state(conn, CONN_CLOSED);
 }
 
 
@@ -175,36 +175,36 @@ set_conn_state(struct conn* conn, conn_states state)
 {
     switch(state) {
     case READ_HEADER:
-    	
-    	if (!init_resources(conn)) {
-    		disconnect_conn(conn);
-    		return;
-    	}
-    	
-    	conn->in->rbytes = 0;
+
+        if (!init_resources(conn)) {
+            disconnect_conn(conn);
+            return;
+        }
+
+        conn->in->rbytes = 0;
         event_set(conn, EVENT_READ);
         break;
     case READ_KEY:
         conn->in->rkey = (char *)li_malloc(conn->in->req_header.key_length + 1);
         if (!conn->in->rkey) {
-        	disconnect_conn(conn);
-        	return;
+            disconnect_conn(conn);
+            return;
         }
         conn->in->rkey[conn->in->req_header.key_length] = (char)0;
         break;
     case READ_DATA:
         conn->in->rdata = (char *)li_malloc(conn->in->req_header.data_length + 1);
         if (!conn->in->rdata) {
-        	disconnect_conn(conn);
-        	return;
+            disconnect_conn(conn);
+            return;
         }
         conn->in->rdata[conn->in->req_header.data_length] = (char)0;
         break;
     case READ_EXTRA:
         conn->in->rextra = (char *)li_malloc(conn->in->req_header.extra_length + 1);
         if (!conn->in->rextra) {
-        	disconnect_conn(conn);
-        	return;
+            disconnect_conn(conn);
+            return;
         }
         conn->in->rextra[conn->in->req_header.extra_length] = (char)0;
         break;
@@ -226,29 +226,29 @@ static int
 prepare_response(conn *conn, size_t data_length)
 {
     assert(conn->out != NULL);
-	
+
     conn->out->sdata = (char *)li_malloc(data_length);
     if (!conn->out->sdata) {
         disconnect_conn(conn);
         return 0;
-    }    
+    }
     conn->out->resp_header.data_length = data_length;
     conn->out->resp_header.opcode = conn->in->req_header.opcode;
-    
+
     return 1;
 }
 
 void
 execute_cmd(struct conn* conn)
 {
-	hresult ret;
+    hresult ret;
     uint8_t cmd;
     unsigned int val;
     request *cached_req;
     _hitem *tab_item;
 
     assert(conn->state == CMD_RECEIVED);
-    
+
     /* here, the complete request is received from the connection */
     conn->in->received = time(NULL);
 
@@ -267,38 +267,38 @@ execute_cmd(struct conn* conn)
         /* check timeout expire */
         val = atoi(cached_req->rextra);
         assert( val != 0);/* CMD_SET already does this validation but re-check*/
-        
-        //dprintf("KEY timeout:%d, received:%d, elapsed:%d ", val, 
-        //	cached_req->received, (time(NULL)-cached_req->received) ); 
+
+        //dprintf("KEY timeout:%d, received:%d, elapsed:%d ", val,
+        //	cached_req->received, (time(NULL)-cached_req->received) );
         if ( (time(NULL)-cached_req->received) > val) {
             dprintf("time expired for key:%s", conn->in->rkey);
             cached_req->can_free = 1;
             free_request(cached_req);
-            hfree(cache, tab_item); // recycle tab_item 
+            hfree(cache, tab_item); // recycle tab_item
             disconnect_conn(conn);
             return;
         }
         conn->out->resp_header.data_length = cached_req->req_header.data_length;
-    	conn->out->resp_header.opcode = conn->in->req_header.opcode;
+        conn->out->resp_header.opcode = conn->in->req_header.opcode;
         conn->out->sdata = cached_req->rdata;
         conn->out->can_free = 0;
-        
+
         dprintf("sending GET data:%s", conn->out->sdata);
-        
+
         set_conn_state(conn, SEND_HEADER);
         break;
 
     case CMD_SET:
         dprintf("CMD_SET request for key, data, extra: %s, %s, %s", conn->in->rkey, conn->in->rdata,
                 conn->in->rextra);
-        
-		/* validate params */
-		if (!conn->in->rkey) {
-			dprintf("invalid key param in CMD_SET");
+
+        /* validate params */
+        if (!conn->in->rkey) {
+            dprintf("invalid key param in CMD_SET");
             return;
         }
         if (!conn->in->rdata) {
-        	dprintf("invalid data param in CMD_SET");
+            dprintf("invalid data param in CMD_SET");
             return;
         }
         val = atoi(conn->in->rextra) * 1000; //sec2msec
@@ -306,15 +306,15 @@ execute_cmd(struct conn* conn)
             dprintf("invalid timeout param in CMD_SET");
             return;
         }
-		
-		dprintf("SET key with timeout:%d", val);
-		
+
+        dprintf("SET key with timeout:%d", val);
+
         /* add to cache */
         ret = hset(cache, conn->in->rkey, conn->in->req_header.key_length, conn->in);
         if (ret == HEXISTS) { // key exists? then force-update the data
             tab_item = hget(cache, conn->in->rkey, conn->in->req_header.key_length);
-            assert(tab_item != NULL);     
-            
+            assert(tab_item != NULL);
+
             cached_req = (request *)tab_item->val;
             cached_req->can_free = 1;
             free_request(cached_req);
@@ -327,7 +327,7 @@ execute_cmd(struct conn* conn)
         dprintf("CMD_CHG_SETTING request with data %s, key_length:%d",
                 conn->in->rdata, conn->in->req_header.key_length);
         if (!conn->in->rdata) {
-        	dprintf("(null) data param in CMD_CHG_SETTING");
+            dprintf("(null) data param in CMD_CHG_SETTING");
             break;
         }
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
@@ -338,12 +338,12 @@ execute_cmd(struct conn* conn)
             }
             settings.idle_conn_timeout = val;
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
-        	val = atoi(conn->in->rdata); // in MB
+            val = atoi(conn->in->rdata); // in MB
             if (!val) {
                 dprintf("invalid integer param in CMD_CHG_SETTING");
-                return; 
+                return;
             }
-            settings.mem_avail = val * 1024 * 1024; 
+            settings.mem_avail = val * 1024 * 1024;
         }
         set_conn_state(conn, READ_HEADER);
         break;
@@ -352,13 +352,13 @@ execute_cmd(struct conn* conn)
                 conn->in->rdata);
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!prepare_response(conn, sizeof(unsigned int))) {
-            	return;
+                return;
             }
             *(unsigned int *)conn->out->sdata = settings.idle_conn_timeout;
             set_conn_state(conn, SEND_HEADER);
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
             if (!prepare_response(conn, sizeof(unsigned int))) {
-            	return;
+                return;
             }
             *(unsigned int *)conn->out->sdata = settings.mem_avail / 1024 / 1024;
             set_conn_state(conn, SEND_HEADER);
@@ -367,7 +367,7 @@ execute_cmd(struct conn* conn)
     case CMD_GET_STATS:
         dprintf("CMD_GET_STATS request");
         if (!prepare_response(conn, 250)) {
-        	return;
+            return;
         }
         sprintf(conn->out->sdata, "mem_used:%u\r\n", stats.mem_used);
         set_conn_state(conn, SEND_HEADER);
@@ -398,17 +398,17 @@ socket_state
 read_nbytes(conn*conn, char *bytes, size_t total)
 {
     unsigned int needed, nbytes;
-	
-	dprintf("read_nbytes called.");
-	
+
+    dprintf("read_nbytes called.");
+
     needed = total - conn->in->rbytes;
     nbytes = read(conn->fd, &bytes[conn->in->rbytes], needed);
-    if (nbytes == 0) {        
+    if (nbytes == 0) {
         syslog(LOG_ERR, "%s (%s)", "socket read error.", strerror(errno));
         return READ_ERR;
     } else if (nbytes == -1) {
-        if (errno == EWOULDBLOCK || errno == EAGAIN) {     
-        	dprintf("socket read EWOUDLBLOCK, EAGAIN.");       
+        if (errno == EWOULDBLOCK || errno == EAGAIN) {
+            dprintf("socket read EWOUDLBLOCK, EAGAIN.");
             return NEED_MORE;
         }
     }
@@ -425,15 +425,15 @@ int
 try_read_request(conn* conn)
 {
     socket_state ret;
-    
+
     switch(conn->state) {
     case READ_HEADER:
 
         ret = read_nbytes(conn, (char *)conn->in->req_header.bytes, sizeof(req_header));
         if (ret == READ_COMPLETED) {
             if ( (conn->in->req_header.data_length >= PROTOCOL_MAX_DATA_SIZE) ||
-                 (conn->in->req_header.key_length >= PROTOCOL_MAX_KEY_SIZE) ||
-                 (conn->in->req_header.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
+                    (conn->in->req_header.key_length >= PROTOCOL_MAX_KEY_SIZE) ||
+                    (conn->in->req_header.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
                 syslog(LOG_ERR, "request data or key length exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
                 dprintf("request data or key length exceeded maximum allowed");
                 return READ_ERR;
@@ -449,7 +449,7 @@ try_read_request(conn* conn)
         }
         break;
     case READ_KEY:
-    	assert(conn->in);
+        assert(conn->in);
         assert(conn->in->rkey);
         assert(conn->in->req_header.key_length);
 
@@ -467,10 +467,10 @@ try_read_request(conn* conn)
         }
         break;
     case READ_DATA:
-    	assert(conn->in);
-    	assert(conn->in->rdata);
-    	assert(conn->in->req_header.data_length);
-        
+        assert(conn->in);
+        assert(conn->in->rdata);
+        assert(conn->in->req_header.data_length);
+
         ret = read_nbytes(conn, conn->in->rdata, conn->in->req_header.data_length);
 
         if (ret == READ_COMPLETED) {
@@ -490,7 +490,7 @@ try_read_request(conn* conn)
         }
         break;
     default:
-    	dprintf("Invalid state in try_read_request");
+        dprintf("Invalid state in try_read_request");
         ret = INVALID_STATE;
         break;
     } // switch(conn->state)
@@ -502,7 +502,7 @@ socket_state
 send_nbytes(conn*conn, char *bytes, size_t total)
 {
     int needed, nbytes;
-    
+
     dprintf("send_nbytes called.");
 
     needed = total - conn->out->sbytes;
@@ -529,7 +529,7 @@ try_send_response(conn *conn)
 
     switch(conn->state) {
 
-    case SEND_HEADER:        
+    case SEND_HEADER:
         ret = send_nbytes(conn, (char *)conn->out->resp_header.bytes, sizeof(resp_header));
         if (ret == SEND_COMPLETED) {
             if (conn->out->resp_header.data_length != 0) {
@@ -561,16 +561,16 @@ event_handler(conn *conn, event ev)
     unsigned int slen;
     struct sockaddr_in si_other;
     socket_state sock_state;
-	
-	/* check if connection is closed, this may happen where a READ and WRITE
-	 * event is awaiting for an fd in one cycle. Just noop for this situation.*/
-	if (conn->state == CONN_CLOSED) {
-		dprintf("Connection is closed in the previous event of the cycle.");
-		return;
-	}
-	
-	conn->last_heard = time(NULL);
-	
+
+    /* check if connection is closed, this may happen where a READ and WRITE
+     * event is awaiting for an fd in one cycle. Just noop for this situation.*/
+    if (conn->state == CONN_CLOSED) {
+        dprintf("Connection is closed in the previous event of the cycle.");
+        return;
+    }
+
+    conn->last_heard = time(NULL);
+
     slen = sizeof(si_other);
 
     switch(ev) {
@@ -578,14 +578,14 @@ event_handler(conn *conn, event ev)
         if (conn->listening) { // listening socket?
             conn_sock = accept(conn->fd, (struct sockaddr *)&si_other, &slen);
             if (conn_sock == -1) {
-            	syslog(LOG_ERR, "%s (%s)", "socket accept  error.", strerror(errno)); 
+                syslog(LOG_ERR, "%s (%s)", "socket accept  error.", strerror(errno));
                 return;
             }
             make_nonblocking(conn_sock);
             conn = make_conn(conn_sock);
             if (!conn) {
-            	close(conn_sock);
-            	return;
+                close(conn_sock);
+                return;
             }
             set_conn_state(conn, READ_HEADER);
         } else {
@@ -610,48 +610,48 @@ event_handler(conn *conn, event ev)
 
 /* Demands for memory that is freed but used. This may be an expired cached request
  * or a freed connection, or in freelist items. This function will be called when
- * application memory usage reaches a certain ratio of the total available mem. The 
- * logic is to use every chance to respond to SET requests properly. 
+ * application memory usage reaches a certain ratio of the total available mem. The
+ * logic is to use every chance to respond to SET requests properly.
  * */
-void 
+void
 collect_unused_memory(void)
 {
 }
 
-int 
+int
 main(int argc, char **argv)
 {
     int s, optval, ret, c;
     struct sockaddr_in si_me;
     struct conn *conn;
     time_t ctime, ptime;
-	
-	init_settings(); 
-    
-	/* get cmd line args */
-	while (-1 != (c = getopt(argc, argv, "m: d:"
-	))) {
-		switch (c) {
+
+    init_settings();
+
+    /* get cmd line args */
+    while (-1 != (c = getopt(argc, argv, "m: d:"
+                            ))) {
+        switch (c) {
         case 'm':
-        	settings.mem_avail = ((unsigned int)atoi(optarg)) * 1024 * 1024;
-        	break;
-		case 'd':
-        	settings.deamon_mode = atoi(optarg);
-        	break;
-		}
-	}
-	
-	init_stats();
-	
-	init_freelists();
-	
-	init_log();
-	
+            settings.mem_avail = ((unsigned int)atoi(optarg)) * 1024 * 1024;
+            break;
+        case 'd':
+            settings.deamon_mode = atoi(optarg);
+            break;
+        }
+    }
+
+    init_stats();
+
+    init_freelists();
+
+    init_log();
+
     if (settings.deamon_mode) {
-    	;
+        ;
         //deamonize();
     }
-	
+
     ret = event_init(event_handler);
     if (!ret) {
         goto err;
@@ -659,7 +659,7 @@ main(int argc, char **argv)
 
     /* init listening socket */
     if ((s=socket(AF_INET, SOCK_STREAM, 0))==-1) {
-    	syslog(LOG_ERR, "%s (%s)", "socket make error.", strerror(errno)); 
+        syslog(LOG_ERR, "%s (%s)", "socket make error.", strerror(errno));
         goto err;
     }
     optval = 1;
@@ -670,49 +670,49 @@ main(int argc, char **argv)
     si_me.sin_port = htons(LIGHTCACHE_PORT);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
     if (bind(s, (struct sockaddr *)&si_me, sizeof(si_me))==-1) {
-    	syslog(LOG_ERR, "%s (%s)", "socket bind error.", strerror(errno)); 
+        syslog(LOG_ERR, "%s (%s)", "socket bind error.", strerror(errno));
         goto err;
     }
     make_nonblocking(s);
     listen(s, LIGHTCACHE_LISTEN_BACKLOG);
     conn = make_conn(s);
     if (!conn) {
-    	goto err;
+        goto err;
     }
-    
+
     conn->listening = 1;
     event_set(conn, EVENT_READ);
 
-    /* create the in-memory hash table. Constant is not important here. 
-     * Hash table is an exponantially growing as more and more items being 
+    /* create the in-memory hash table. Constant is not important here.
+     * Hash table is an exponantially growing as more and more items being
      * added.
      * */
     cache = htcreate(4);
     if (!cache) {
-    	goto err;
+        goto err;
     }
-	
-	ptime = 0;
+
+    ptime = 0;
     for (;;) {
-    	
-    	ctime = time(NULL);
-    	
+
+        ctime = time(NULL);
+
         event_process();
-        
+
         //dprintf("cycle elapsed:%d", ctime-ptime);
-        
+
         if (ctime-ptime > LIGHTCACHE_TIMEDRUN_INVOKE_INTERVAL) { // invoke per-sec
-        	
-        	disconnect_idle_conns();
-        	
-        	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD) {
-        		collect_unused_memory();
-        	}        	
-        	
-        	ptime = ctime;
-	    }
-        
-        
+
+            disconnect_idle_conns();
+
+            if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD) {
+                collect_unused_memory();
+            }
+
+            ptime = ctime;
+        }
+
+
     }
 
 

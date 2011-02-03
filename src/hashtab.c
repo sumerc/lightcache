@@ -45,7 +45,7 @@ _hgrow(_htab *ht)
             next = p->next;
             if (hset(dummy, p->key, p->klen, p->val) != HSUCCESS) {
                 return 0;
-            }	
+            }
             it = hget(dummy, p->key, p->klen);
             if (!it) {
                 return 0;
@@ -139,7 +139,7 @@ hset(_htab *ht, char* key, int klen, void *val)
             li_free(new->key); // free previous
             new->key = (char*)li_malloc(klen+1);
             if (!new->key) {
-            	return HERROR;
+                return HERROR;
             }
         }
         strncpy(new->key, key, klen+1); // copy the last "0" byte
@@ -150,11 +150,11 @@ hset(_htab *ht, char* key, int klen, void *val)
     } else {
         new = (_hitem *)li_malloc(sizeof(_hitem));
         if (!new) {
-        	return HERROR;
+            return HERROR;
         }
         new->key = (char*)li_malloc(klen+1);
         if (!new->key) {
-        	return HERROR;
+            return HERROR;
         }
         strncpy(new->key, key, klen+1);
         new->klen = klen;
@@ -167,7 +167,7 @@ hset(_htab *ht, char* key, int klen, void *val)
     // need resizing?
     if (((ht->count - ht->freecount) / (double)ht->realsize) >= HLOADFACTOR) {
         if (!_hgrow(ht)) {
-        	return HERROR;
+            return HERROR;
         }
     }
     return HSUCCESS;
@@ -180,11 +180,11 @@ hget(_htab *ht, char *key, int klen)
 
     p = ht->_table[HHASH(ht, key, klen)];
     while(p) {
-    	if (!p->free) {
-	        if (strcmp(p->key, key)==0) {
-	            return p;
-	        }
-    	}
+        if (!p->free) {
+            if (strcmp(p->key, key)==0) {
+                return p;
+            }
+        }
         p = p->next;
     }
     return NULL;

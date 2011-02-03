@@ -71,7 +71,7 @@ struct conn {
     conn_states state; 				/* state of the connection READ_KEY, READ_HEADER.etc...*/
     request *in;					/* request instance */
     response *out;					/* response instance */
-	int free; 						/* recycle connection structure */
+    int free; 						/* recycle connection structure */
     conn *next;						/* next connection in the linked-list of the connections */
 };
 
