@@ -48,6 +48,24 @@ init_stats(void)
     stats.mem_used = 0;
     stats.mem_request_count = 0;
 }
+/*Also, while the man page for ntohl says it takes a uint32_t argument, the actual definition 
+ * in the header files takes an unsigned long, and maps to the appropriate NXSwap... function, 
+ * taking a long. So, on a 64-bit architecture, ntohl will swap 64-bit longs. Of course, you 
+ * probably want behaviour that's the same on 32-bit and 64-bit systems...
+ * */
+int
+atoul(char *s, unsigned long int *ret) {
+	
+	*ret = strtoul(s, NULL, 10);
+	/* overflowed unsigned long? */
+    if (*ret == ULONG_MAX) {
+        if (errno == ERANGE) {
+        	errno = 0;
+        	return 0;
+        } 
+    }
+    return 1;	
+}
 
 struct conn*
 make_conn(int fd) {
@@ -245,7 +263,7 @@ execute_cmd(struct conn* conn)
 {
     hresult ret;
     uint8_t cmd;
-    unsigned int val;
+    unsigned long int val;
     request *cached_req;
     _hitem *tab_item;
 
@@ -304,13 +322,20 @@ execute_cmd(struct conn* conn)
             dprintf("invalid data param in CMD_SET");
             return;
         }
-        val = ntohl(atoi(conn->in->rextra)) * 1000; //sec2msec
+        
+        if (!atoul(conn->in->rextra, &val)) {
+        	dprintf("invalid timeout param in CMD_SET");
+        	disconnect_conn(conn);
+        	return;        	
+        }        
+        val = ntohl(val) * 1000; //sec2msec
         if (!val) {
             dprintf("invalid timeout param in CMD_SET");
+            disconnect_conn(conn);
             return;
         }
 
-        dprintf("SET key with timeout:%u", val);
+        dprintf("SET key with timeout:%lu", val);
 
         /* add to cache */
         ret = hset(cache, conn->in->rkey, conn->in->req_header.key_length, conn->in);
@@ -339,12 +364,20 @@ execute_cmd(struct conn* conn)
          * type in the correct endianness.
          * */
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
-            val = atoi(conn->in->rdata);
-            dprintf("SET idle conn timeout :%u", val);   
+        	if (!atoul(conn->in->rdata, &val)) {
+	        	dprintf("idle conn timeout param not in range.");
+	        	disconnect_conn(conn);
+	        	return;        	
+	        }
+            dprintf("SET idle conn timeout :%lu", val);   
             settings.idle_conn_timeout = val;
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
-            val = atoi(conn->in->rdata); // in MB    
-            dprintf("SET mem avail :%u", val);        
+            if (!atoul(conn->in->rdata, &val)) {
+	        	dprintf("mem avail param not in range.");
+	        	disconnect_conn(conn);
+	        	return;        	
+	        }          
+            dprintf("SET mem avail :%lu", val);        
             settings.mem_avail = val * 1024 * 1024;
         }
         set_conn_state(conn, READ_HEADER);
@@ -390,7 +423,7 @@ disconnect_idle_conns(void)
     while( conn != NULL && !conn->free && !conn->listening) {
         next = conn->next;
         if (time(NULL) - conn->last_heard > settings.idle_conn_timeout) {
-            dprintf("idle conn detected. idle timeout:%u", settings.idle_conn_timeout);
+            dprintf("idle conn detected. idle timeout:%lu", settings.idle_conn_timeout);
             disconnect_conn(conn);
             // todo: move free items closer to head for faster searching for free items in make_conn
         }

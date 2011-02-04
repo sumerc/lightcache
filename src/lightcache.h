@@ -11,6 +11,7 @@
 #include "fcntl.h"
 #include "unistd.h"
 #include "sys/stat.h"
+#include "limits.h"
 
 #ifndef LIGHTCACHE_H
 #define LIGHTCACHE_H
@@ -21,8 +22,8 @@
 
 struct settings {    
     int deamon_mode; /* specify whether to run in deamon mode */
-    unsigned int mem_avail; /*in bytes. max. memory this lightcache instance is allowed to use */
-    unsigned int idle_conn_timeout; /* timeout in ms that idle connections will be disconnected */
+    unsigned long int mem_avail; /*in bytes. max. memory this lightcache instance is allowed to use */
+    unsigned long int idle_conn_timeout; /* timeout in ms that idle connections will be disconnected */
 };
 
 struct stats {
