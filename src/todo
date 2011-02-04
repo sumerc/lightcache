@@ -11,13 +11,13 @@ v0.1
 [+] exclude log.c.
 [+] some kind of freelist for basic structures. (exponantially growing)
 [+] move the headers to lightcache.h
-[-] network byte ordering for response/request objects and python tests also should include endianness.
+[+] network byte ordering for response/request objects and python tests also should include endianness.
 	python struct module directly writes integers without respect to the endianness. use htonl() before
 	sending and nhtonl() after receiving data for integers. Strings, obviously are same. 8-bit integers
 	are agreed to be the smallest byte size on C, so endianness do not affect these, obviously.
+[+] prepare_response should accept a param with allocate_bytes for allocating the sdata array.
 [-] Program received signal SIGFPE, Arithmetic exception. disable this. 
 	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD)	
-[-] prepare_response should accept a param with allocate_bytes for allocating the sdata array.
 [-] use HHASH algorithm same as memcached. Bob Jenkins is the expert there:)
 [-] req per sec/sent per sec stats, and total sent/received stats.
 [-] send invalid integers for GET, CHG_SETTING, get(...) functions shall return None on error.

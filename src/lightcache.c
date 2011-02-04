@@ -388,16 +388,14 @@ execute_cmd(struct conn* conn)
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!prepare_response(conn, sizeof(unsigned int), 1)) {
                 return;
-            }
-            // TODO: if 64 bit htonl does not work? : htonll()
-            *(unsigned int *)conn->out->sdata = htonl(settings.idle_conn_timeout);
+            }            
+            *(unsigned long int *)conn->out->sdata = htonl(settings.idle_conn_timeout);
             set_conn_state(conn, SEND_HEADER);
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
-            if (!prepare_response(conn, sizeof(unsigned int), 1)) {
+            if (!prepare_response(conn, sizeof(unsigned long int), 1)) {
                 return;
             }
-            // TODO: if 64 bit htonl does not work? : htonll()
-            *(unsigned int *)conn->out->sdata = htonl(settings.mem_avail / 1024 / 1024);
+            *(unsigned long int *)conn->out->sdata = htonl(settings.mem_avail / 1024 / 1024);
             set_conn_state(conn, SEND_HEADER);
         }
         break;
