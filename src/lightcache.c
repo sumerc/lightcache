@@ -665,6 +665,8 @@ main(int argc, char **argv)
     struct sockaddr_in si_me;
     struct conn *conn;
     time_t ctime, ptime;
+    
+    dprintf("max long:%lu", ULONG_MAX);
 
     init_settings();
 

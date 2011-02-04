@@ -16,6 +16,8 @@ v0.1
 	sending and nhtonl() after receiving data for integers. Strings, obviously are same. 8-bit integers
 	are agreed to be the smallest byte size on C, so endianness do not affect these, obviously.
 [+] prepare_response should accept a param with allocate_bytes for allocating the sdata array.
+[-] AFAIU, memcache uses strtoull() and ntohll() for 64 bit and strtoul() and ntohl() for 32 bit integers.
+	so, just decide which to use.
 [-] Program received signal SIGFPE, Arithmetic exception. disable this. 
 	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD)	
 [-] use HHASH algorithm same as memcached. Bob Jenkins is the expert there:)
