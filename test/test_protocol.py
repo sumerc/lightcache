@@ -21,10 +21,7 @@ class ProtocolTests(LightCacheTestBase):
 	data = "A" *  (self.client.PROTOCOL_MAX_DATA_SIZE+1)
 	self.client.send_packet(data=data, data_length=1)
 	self.client.assertDisconnected()
-
-    def test_chg_setting(self):
-	self.client.chg_setting("idle_client_timeout", "2")
-    	
+	
     def test_invalid_packets(self):
 	self.client.send_packet(data="data_value", key_length=10, 
 		command=self.client.CMD_CHG_SETTING, data_length=12)   
@@ -61,19 +58,29 @@ class ProtocolTests(LightCacheTestBase):
 	self.client.set("key5", "value5", "invalid_value")
 	self.assertEqual(self.client.get("key5"), None)
 
-    def test_chg_setting_overflowed(self):
-	pass
-    def test_chg_setting_invalid(self):
-	pass
-    def test_chg_setting_64bit_value(self):
-	pass    
     def test_get_setting(self):
 	self.client.chg_setting("idle_conn_timeout", 5)
 	self.assertEqual(self.client.get_setting("idle_conn_timeout"), 5)
 	self.client.chg_setting("mem_avail", 65)
 	self.assertEqual(self.client.get_setting("mem_avail"), 65)
 	
+    def test_chg_setting(self):
+	self.client.chg_setting("idle_conn_timeout", 2)
+	self.assertEqual(self.client.get_setting("idle_conn_timeout"), 2)
+    	
     
+    def test_chg_setting_64bit_value(self):
+        self.client.chg_setting("idle_conn_timeout", 0x1234567890)
+        self.assertEqual(self.client.get_setting("idle_conn_timeout"), 0x1234567890)
+        self.client.chg_setting("idle_conn_timeout", 2) # rollback
+        self.assertEqual(self.client.get_setting("idle_conn_timeout"), 2)
+    def test_chg_setting_invalid(self):
+        self.client.chg_setting("idle_conn_timeout", "invalid_value")
+        self.client.assertDisconnected()
+
+    def test_chg_setting_overflowed(self):
+        self.client.chg_setting("idle_conn_timeout", 2222222222222222222222222222222)
+        self.client.assertDisconnected() 
 if __name__ == '__main__':
     unittest.main()
 

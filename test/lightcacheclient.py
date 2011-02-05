@@ -67,9 +67,12 @@ class LightCacheClient(socket.socket):
 	self.send_packet(key=key, data=value, command=self.CMD_CHG_SETTING)	
    
     def get_setting(self, key):	
-	self.send_packet(key=key, command=self.CMD_GET_SETTING)	
-	r = struct.unpack("!Q", self.recv_packet()) # (!) means data comes from network(big-endian)
-	return r[0]
+        self.send_packet(key=key, command=self.CMD_GET_SETTING)	
+        resp = self.recv_packet()
+        if resp is None:
+            return resp
+        r = struct.unpack("!Q", resp) # (!) means data comes from network(big-endian)
+        return r[0]
             
     def set(self, key, value, timeout):
 	self.send_packet(key=key, data=value, command=self.CMD_SET, extra=timeout)	   

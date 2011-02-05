@@ -50,20 +50,6 @@ init_stats(void)
     stats.mem_request_count = 0;
 }
 
-
-
-
-int
-atoull(const char *s, uint64_t *ret)
-{
-    errno = 0;
-    *ret = strtoull(s, NULL, 10);
-    if (errno == ERANGE || errno == EINVAL) {
-        return 0;
-    }
-    return 1;
-}
-
 struct conn*
 make_conn(int fd) {
     struct conn *conn, *item;
@@ -319,18 +305,12 @@ execute_cmd(struct conn* conn)
             dprintf("invalid data param in CMD_SET");
             return;
         }
-
-        val = 0;
+        
         if (!atoull(conn->in->rextra, &val)) {
             dprintf("invalid timeout param in CMD_SET");
             disconnect_conn(conn);
             return;
-        }
-        if (!val) {
-            dprintf("invalid timeout param in CMD_SET (2)");
-            disconnect_conn(conn);
-            return;
-        }
+        }        
 
         /* add to cache */
         ret = hset(cache, conn->in->rkey, conn->in->req_header.key_length, conn->in);
@@ -356,7 +336,7 @@ execute_cmd(struct conn* conn)
 
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!atoull(conn->in->rdata, &val)) {
-                dprintf("idle conn timeout param not in range.");
+                dprintf("invalid idle conn timeout param.");
                 disconnect_conn(conn);
                 return;
             }
@@ -364,7 +344,7 @@ execute_cmd(struct conn* conn)
             settings.idle_conn_timeout = val;
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
             if (!atoull(conn->in->rdata, &val)) {
-                dprintf("mem avail param not in range.");
+                dprintf("invalid mem avail param.");
                 disconnect_conn(conn);
                 return;
             }

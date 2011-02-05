@@ -29,3 +29,19 @@ uint64_t htonll(uint64_t val)
 {
     return li_swap64(val);
 }
+
+int
+atoull(const char *s, uint64_t *ret)
+{
+    errno = 0;
+    *ret = strtoull(s, NULL, 10);
+    if (errno == ERANGE || errno == EINVAL) {
+        return 0;
+    }
+    
+    if (*ret == 0) { /*TODO: platform independent way to detect invalid values for an integer*/
+    	return 0;
+    }
+    
+    return 1;
+}
