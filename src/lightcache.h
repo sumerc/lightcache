@@ -22,7 +22,7 @@
 #define dprintf(fmt, args...) fprintf(stderr, "[+] " fmt "\n", ## args)
 #endif
 
-struct settings {    
+struct settings {
     int deamon_mode; /* specify whether to run in deamon mode */
     uint64_t mem_avail; /*in bytes. max. memory this lightcache instance is allowed to use */
     uint64_t idle_conn_timeout; /* timeout in sec that idle connections will be disconnected */

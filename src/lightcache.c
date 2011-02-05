@@ -54,13 +54,14 @@ init_stats(void)
 
 
 int
-atoull(const char *s, uint64_t *ret) {
-	errno = 0;
-	*ret = strtoull(s, NULL, 10);
-    if (errno == ERANGE || errno == EINVAL) {        	
-    	return 0;
+atoull(const char *s, uint64_t *ret)
+{
+    errno = 0;
+    *ret = strtoull(s, NULL, 10);
+    if (errno == ERANGE || errno == EINVAL) {
+        return 0;
     }
-    return 1;	
+    return 1;
 }
 
 struct conn*
@@ -240,14 +241,14 @@ static int
 prepare_response(conn *conn, size_t data_length, int alloc_mem)
 {
     assert(conn->out != NULL);
-	
-	if (alloc_mem) {
-	    conn->out->sdata = (char *)li_malloc(data_length);
-	    if (!conn->out->sdata) {
-	        disconnect_conn(conn);
-	        return 0;
-	    }
-	}
+
+    if (alloc_mem) {
+        conn->out->sdata = (char *)li_malloc(data_length);
+        if (!conn->out->sdata) {
+            disconnect_conn(conn);
+            return 0;
+        }
+    }
     conn->out->resp_header.data_length = htonl(data_length);
     conn->out->resp_header.opcode = conn->in->req_header.opcode;
 
@@ -257,7 +258,7 @@ prepare_response(conn *conn, size_t data_length, int alloc_mem)
 void
 execute_cmd(struct conn* conn)
 {
-	int r;
+    int r;
     hresult ret;
     uint8_t cmd;
     uint64_t val;
@@ -281,11 +282,11 @@ execute_cmd(struct conn* conn)
             return;
         }
         cached_req = (request *)tab_item->val;
-        
+
         /* check timeout expire */
         r = atoull(cached_req->rextra, &val);
         assert(r != 0);/* CMD_SET already does this validation but re-check*/
-        
+
         if ( (time(NULL)-cached_req->received) > val) {
             dprintf("time expired for key:%s", conn->in->rkey);
             cached_req->can_free = 1;
@@ -296,7 +297,7 @@ execute_cmd(struct conn* conn)
         }
         if (!prepare_response(conn, cached_req->req_header.data_length, 0)) { // do not alloc mem
             return;
-        }        
+        }
         conn->out->sdata = cached_req->rdata;
         conn->out->can_free = 0;
 
@@ -318,17 +319,17 @@ execute_cmd(struct conn* conn)
             dprintf("invalid data param in CMD_SET");
             return;
         }
-        
+
         val = 0;
         if (!atoull(conn->in->rextra, &val)) {
-        	dprintf("invalid timeout param in CMD_SET");
-        	disconnect_conn(conn);
-        	return;        	
-        }        
+            dprintf("invalid timeout param in CMD_SET");
+            disconnect_conn(conn);
+            return;
+        }
         if (!val) {
-        	dprintf("invalid timeout param in CMD_SET (2)");
-        	disconnect_conn(conn);
-        	return; 
+            dprintf("invalid timeout param in CMD_SET (2)");
+            disconnect_conn(conn);
+            return;
         }
 
         /* add to cache */
@@ -352,22 +353,22 @@ execute_cmd(struct conn* conn)
             dprintf("(null) data param in CMD_CHG_SETTING");
             break;
         }
-        
+
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
-        	if (!atoull(conn->in->rdata, &val)) {
-	        	dprintf("idle conn timeout param not in range.");
-	        	disconnect_conn(conn);
-	        	return;        	
-	        }	        
-	        dprintf("SET idle conn timeout :%llu", val);   
+            if (!atoull(conn->in->rdata, &val)) {
+                dprintf("idle conn timeout param not in range.");
+                disconnect_conn(conn);
+                return;
+            }
+            dprintf("SET idle conn timeout :%llu", val);
             settings.idle_conn_timeout = val;
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
             if (!atoull(conn->in->rdata, &val)) {
-	        	dprintf("mem avail param not in range.");
-	        	disconnect_conn(conn);
-	        	return;        	
-	        }          
-            dprintf("SET mem avail :%llu", val);     
+                dprintf("mem avail param not in range.");
+                disconnect_conn(conn);
+                return;
+            }
+            dprintf("SET mem avail :%llu", val);
             settings.mem_avail = val * 1024 * 1024; /*todo:can overflow*/
         }
         set_conn_state(conn, READ_HEADER);
@@ -378,7 +379,7 @@ execute_cmd(struct conn* conn)
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!prepare_response(conn, sizeof(uint64_t), 1)) {
                 return;
-            }            
+            }
             *(uint64_t *)conn->out->sdata = htonll(settings.idle_conn_timeout);
             set_conn_state(conn, SEND_HEADER);
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
@@ -412,7 +413,7 @@ disconnect_idle_conns(void)
         next = conn->next;
         //dprintf(">>>>>>>>>>>>>>>idle timeout:%llu, timediff=%d", settings.idle_conn_timeout,
         //	time(NULL) - conn->last_heard);
-            
+
         if (time(NULL) - conn->last_heard > settings.idle_conn_timeout) {
             dprintf("idle conn detected. idle timeout:%llu", settings.idle_conn_timeout);
             disconnect_conn(conn);
@@ -459,11 +460,11 @@ try_read_request(conn* conn)
 
         ret = read_nbytes(conn, (char *)conn->in->req_header.bytes, sizeof(req_header));
         if (ret == READ_COMPLETED) {
-        	
-        	/* convert network2host byte ordering before using in our code. */    
-        	conn->in->req_header.data_length = ntohl(conn->in->req_header.data_length);        	
-        	conn->in->req_header.extra_length = ntohl(conn->in->req_header.extra_length);
-        	
+
+            /* convert network2host byte ordering before using in our code. */
+            conn->in->req_header.data_length = ntohl(conn->in->req_header.data_length);
+            conn->in->req_header.extra_length = ntohl(conn->in->req_header.extra_length);
+
             if ( (conn->in->req_header.data_length >= PROTOCOL_MAX_DATA_SIZE) ||
                     (conn->in->req_header.key_length >= PROTOCOL_MAX_KEY_SIZE) ||
                     (conn->in->req_header.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
@@ -659,7 +660,7 @@ main(int argc, char **argv)
     struct conn *conn;
     time_t ctime, ptime;
     uint64_t param;
-    
+
     init_settings();
 
     /* get cmd line args */
@@ -667,11 +668,11 @@ main(int argc, char **argv)
                             ))) {
         switch (c) {
         case 'm':
-        	ret = atoull(optarg, &param);
-        	if (!ret) {
-        		syslog(LOG_ERR, "Maximum Available Memory setting value not in range.");
-        		goto err;
-        	}
+            ret = atoull(optarg, &param);
+            if (!ret) {
+                syslog(LOG_ERR, "Maximum Available Memory setting value not in range.");
+                goto err;
+            }
             settings.mem_avail = (param * 1024 * 1024);
             break;
         case 'd':
@@ -736,7 +737,7 @@ main(int argc, char **argv)
 
         ctime = time(NULL);
 
-        event_process();       
+        event_process();
 
         if (ctime-ptime > LIGHTCACHE_TIMEDRUN_INVOKE_INTERVAL) { // invoke per-sec
 
