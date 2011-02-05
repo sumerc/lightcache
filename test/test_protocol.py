@@ -6,7 +6,7 @@ class ProtocolTests(LightCacheTestBase):
     
     def test_idle_timeout(self):
 	self.client.chg_setting("idle_conn_timeout", 2)
-     	self.assertTrue(self.client._is_disconnected(in_secs=4))
+     	self.assertTrue(self.client._is_disconnected(in_secs=5))
     
     def test_send_overflow_header(self):
 	self.client.send_raw("OVERFLOWHEADER")

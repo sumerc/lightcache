@@ -6,6 +6,7 @@
 #include "freelist.h"
 #include "events/event.h"
 #include "mem.h"
+#include "util.h"
 
 /* forward declarations */
 void set_conn_state(struct conn* conn, conn_states state);
@@ -48,21 +49,16 @@ init_stats(void)
     stats.mem_used = 0;
     stats.mem_request_count = 0;
 }
-/*Also, while the man page for ntohl says it takes a uint32_t argument, the actual definition 
- * in the header files takes an unsigned long, and maps to the appropriate NXSwap... function, 
- * taking a long. So, on a 64-bit architecture, ntohl will swap 64-bit longs. Of course, you 
- * probably want behaviour that's the same on 32-bit and 64-bit systems...
- * */
+
+
+
+
 int
-atoul(char *s, unsigned long int *ret) {
-	
-	*ret = strtoul(s, NULL, 10);
-	/* overflowed unsigned long? */
-    if (*ret == ULONG_MAX) {
-        if (errno == ERANGE) {
-        	errno = 0;
-        	return 0;
-        } 
+atoull(const char *s, uint64_t *ret) {
+	errno = 0;
+	*ret = strtoull(s, NULL, 10);
+    if (errno == ERANGE || errno == EINVAL) {        	
+    	return 0;
     }
     return 1;	
 }
@@ -261,9 +257,10 @@ prepare_response(conn *conn, size_t data_length, int alloc_mem)
 void
 execute_cmd(struct conn* conn)
 {
+	int r;
     hresult ret;
     uint8_t cmd;
-    unsigned long int val;
+    uint64_t val;
     request *cached_req;
     _hitem *tab_item;
 
@@ -284,12 +281,11 @@ execute_cmd(struct conn* conn)
             return;
         }
         cached_req = (request *)tab_item->val;
+        
         /* check timeout expire */
-        val = atoi(cached_req->rextra);
-        assert( val != 0);/* CMD_SET already does this validation but re-check*/
-
-        //dprintf("KEY timeout:%d, received:%d, elapsed:%d ", val,
-        //	cached_req->received, (time(NULL)-cached_req->received) );
+        r = atoull(cached_req->rextra, &val);
+        assert(r != 0);/* CMD_SET already does this validation but re-check*/
+        
         if ( (time(NULL)-cached_req->received) > val) {
             dprintf("time expired for key:%s", conn->in->rkey);
             cached_req->can_free = 1;
@@ -323,19 +319,17 @@ execute_cmd(struct conn* conn)
             return;
         }
         
-        if (!atoul(conn->in->rextra, &val)) {
+        val = 0;
+        if (!atoull(conn->in->rextra, &val)) {
         	dprintf("invalid timeout param in CMD_SET");
         	disconnect_conn(conn);
         	return;        	
         }        
-        val = ntohl(val) * 1000; //sec2msec
         if (!val) {
-            dprintf("invalid timeout param in CMD_SET");
-            disconnect_conn(conn);
-            return;
+        	dprintf("invalid timeout param in CMD_SET (2)");
+        	disconnect_conn(conn);
+        	return; 
         }
-
-        dprintf("SET key with timeout:%lu", val);
 
         /* add to cache */
         ret = hset(cache, conn->in->rkey, conn->in->req_header.key_length, conn->in);
@@ -358,27 +352,23 @@ execute_cmd(struct conn* conn)
             dprintf("(null) data param in CMD_CHG_SETTING");
             break;
         }
-        /* Although the settings coming from the network is usually integral types, 
-         * endianness is not a problem as we do not directly use native integral types 
-         * at the client side. atoi() will happily convert the string to the integral 
-         * type in the correct endianness.
-         * */
+        
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
-        	if (!atoul(conn->in->rdata, &val)) {
+        	if (!atoull(conn->in->rdata, &val)) {
 	        	dprintf("idle conn timeout param not in range.");
 	        	disconnect_conn(conn);
 	        	return;        	
-	        }
-            dprintf("SET idle conn timeout :%lu", val);   
+	        }	        
+	        dprintf("SET idle conn timeout :%llu", val);   
             settings.idle_conn_timeout = val;
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
-            if (!atoul(conn->in->rdata, &val)) {
+            if (!atoull(conn->in->rdata, &val)) {
 	        	dprintf("mem avail param not in range.");
 	        	disconnect_conn(conn);
 	        	return;        	
 	        }          
-            dprintf("SET mem avail :%lu", val);        
-            settings.mem_avail = val * 1024 * 1024;
+            dprintf("SET mem avail :%llu", val);     
+            settings.mem_avail = val * 1024 * 1024; /*todo:can overflow*/
         }
         set_conn_state(conn, READ_HEADER);
         break;
@@ -386,16 +376,16 @@ execute_cmd(struct conn* conn)
         dprintf("CMD_GET_SETTING request for key: %s, data:%s", conn->in->rkey,
                 conn->in->rdata);
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
-            if (!prepare_response(conn, sizeof(unsigned int), 1)) {
+            if (!prepare_response(conn, sizeof(uint64_t), 1)) {
                 return;
             }            
-            *(unsigned long int *)conn->out->sdata = htonl(settings.idle_conn_timeout);
+            *(uint64_t *)conn->out->sdata = htonll(settings.idle_conn_timeout);
             set_conn_state(conn, SEND_HEADER);
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
-            if (!prepare_response(conn, sizeof(unsigned long int), 1)) {
+            if (!prepare_response(conn, sizeof(uint64_t), 1)) {
                 return;
             }
-            *(unsigned long int *)conn->out->sdata = htonl(settings.mem_avail / 1024 / 1024);
+            *(uint64_t *)conn->out->sdata = htonll(settings.mem_avail / 1024 / 1024);
             set_conn_state(conn, SEND_HEADER);
         }
         break;
@@ -404,7 +394,7 @@ execute_cmd(struct conn* conn)
         if (!prepare_response(conn, 250, 1)) {
             return;
         }
-        sprintf(conn->out->sdata, "mem_used:%u\r\n", stats.mem_used);
+        sprintf(conn->out->sdata, "mem_used:%llu\r\n", stats.mem_used);
         set_conn_state(conn, SEND_HEADER);
         break;
     }
@@ -420,8 +410,11 @@ disconnect_idle_conns(void)
     conn=conns;
     while( conn != NULL && !conn->free && !conn->listening) {
         next = conn->next;
+        //dprintf(">>>>>>>>>>>>>>>idle timeout:%llu, timediff=%d", settings.idle_conn_timeout,
+        //	time(NULL) - conn->last_heard);
+            
         if (time(NULL) - conn->last_heard > settings.idle_conn_timeout) {
-            dprintf("idle conn detected. idle timeout:%lu", settings.idle_conn_timeout);
+            dprintf("idle conn detected. idle timeout:%llu", settings.idle_conn_timeout);
             disconnect_conn(conn);
             // todo: move free items closer to head for faster searching for free items in make_conn
         }
@@ -665,9 +658,8 @@ main(int argc, char **argv)
     struct sockaddr_in si_me;
     struct conn *conn;
     time_t ctime, ptime;
+    uint64_t param;
     
-    dprintf("max long:%lu", ULONG_MAX);
-
     init_settings();
 
     /* get cmd line args */
@@ -675,7 +667,12 @@ main(int argc, char **argv)
                             ))) {
         switch (c) {
         case 'm':
-            settings.mem_avail = ((unsigned int)atoi(optarg)) * 1024 * 1024;
+        	ret = atoull(optarg, &param);
+        	if (!ret) {
+        		syslog(LOG_ERR, "Maximum Available Memory setting value not in range.");
+        		goto err;
+        	}
+            settings.mem_avail = (param * 1024 * 1024);
             break;
         case 'd':
             settings.deamon_mode = atoi(optarg);
@@ -739,9 +736,7 @@ main(int argc, char **argv)
 
         ctime = time(NULL);
 
-        event_process();
-
-        //dprintf("cycle elapsed:%d", ctime-ptime);
+        event_process();       
 
         if (ctime-ptime > LIGHTCACHE_TIMEDRUN_INVOKE_INTERVAL) { // invoke per-sec
 

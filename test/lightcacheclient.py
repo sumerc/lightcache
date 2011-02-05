@@ -38,7 +38,7 @@ class LightCacheClient(socket.socket):
 	extra = kwargs.pop("extra", "")
 	extra_len = kwargs.pop("extra_length", len(str(extra)))
 	
-	# data/extra lengths are 32 bit UINTs. Convert them with ntohl
+	# data/extra lengths are 32 bit UINTs.
 	data_len = socket.htonl(data_len)
 	extra_len = socket.htonl(extra_len)
 
@@ -68,9 +68,8 @@ class LightCacheClient(socket.socket):
    
     def get_setting(self, key):	
 	self.send_packet(key=key, command=self.CMD_GET_SETTING)	
-	r = struct.unpack("I", self.recv_packet())
-	r = socket.ntohl(r[0])
-	return r
+	r = struct.unpack("!Q", self.recv_packet()) # (!) means data comes from network(big-endian)
+	return r[0]
             
     def set(self, key, value, timeout):
 	self.send_packet(key=key, data=value, command=self.CMD_SET, extra=timeout)	   

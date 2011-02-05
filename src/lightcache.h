@@ -12,6 +12,8 @@
 #include "unistd.h"
 #include "sys/stat.h"
 #include "limits.h"
+#include "stdint.h"
+#include "endian.h"
 
 #ifndef LIGHTCACHE_H
 #define LIGHTCACHE_H
@@ -22,13 +24,13 @@
 
 struct settings {    
     int deamon_mode; /* specify whether to run in deamon mode */
-    unsigned long int mem_avail; /*in bytes. max. memory this lightcache instance is allowed to use */
-    unsigned long int idle_conn_timeout; /* timeout in ms that idle connections will be disconnected */
+    uint64_t mem_avail; /*in bytes. max. memory this lightcache instance is allowed to use */
+    uint64_t idle_conn_timeout; /* timeout in sec that idle connections will be disconnected */
 };
 
 struct stats {
-    size_t mem_used;
-    unsigned int mem_request_count; /* number of times mem is demanded from OS */
+    uint64_t mem_used;
+    uint64_t mem_request_count; /* number of times mem is demanded from OS */
 };
 
 #define LIGHTCACHE_PORT 13131
