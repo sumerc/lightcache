@@ -13,7 +13,7 @@ li_malloc(size_t size)
     if (size + stats.mem_used > (settings.mem_avail)) {
         //syslog(LOG_ERR, "No memory available![%u MB]", settings.mem_avail);
         dprintf("No memory available! %llu, %llu, %u", (long long unsigned int)settings.mem_avail, 
-            (long long unsigned int)stats.mem_used, size);
+            (long long unsigned int)stats.mem_used, (unsigned int)size);
         return NULL;
     }
 
