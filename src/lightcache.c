@@ -348,7 +348,7 @@ execute_cmd(struct conn* conn)
                 disconnect_conn(conn);
                 return;
             }
-            dprintf("SET mem avail :%llu", val);
+            dprintf("SET mem avail :%llu", (long long unsigned int)val);
             settings.mem_avail = val * 1024 * 1024; /*todo:can overflow*/
         }
         set_conn_state(conn, READ_HEADER);
@@ -375,7 +375,7 @@ execute_cmd(struct conn* conn)
         if (!prepare_response(conn, 250, 1)) {
             return;
         }
-        sprintf(conn->out->sdata, "mem_used:%llu\r\n", stats.mem_used);
+        sprintf(conn->out->sdata, "mem_used:%llu\r\n", (long long unsigned int)stats.mem_used);
         set_conn_state(conn, SEND_HEADER);
         break;
     }
@@ -395,7 +395,7 @@ disconnect_idle_conns(void)
         //	time(NULL) - conn->last_heard);
 
         if (time(NULL) - conn->last_heard > settings.idle_conn_timeout) {
-            dprintf("idle conn detected. idle timeout:%llu", settings.idle_conn_timeout);
+            dprintf("idle conn detected. idle timeout:%llu", (long long unsigned int)settings.idle_conn_timeout);
             disconnect_conn(conn);
             // todo: move free items closer to head for faster searching for free items in make_conn
         }
