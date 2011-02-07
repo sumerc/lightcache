@@ -93,7 +93,7 @@ free_request(request *req)
     }
 
     if (req->can_free) {
-        dprintf("FREEING request data.[%p]", req);
+        dprintf("FREEING request data.[%p], sizeof:[%u]", req, sizeof(request *));
         li_free(req->rkey);
         li_free(req->rdata);
         li_free(req->rextra);
