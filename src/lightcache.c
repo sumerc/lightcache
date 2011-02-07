@@ -1,6 +1,5 @@
 #include "lightcache.h"
 #include "protocol.h"
-#include "deamon.h"
 #include "socket.h"
 #include "hashtab.h"
 #include "freelist.h"
