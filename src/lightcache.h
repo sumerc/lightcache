@@ -19,10 +19,6 @@
 #ifndef LIGHTCACHE_H
 #define LIGHTCACHE_H
 
-#ifdef DEBUG
-#define dprintf(fmt, args...) fprintf(stderr, "[+] " fmt "\n", ## args)
-#endif
-
 struct settings {
     int deamon_mode; /* specify whether to run in deamon mode */
     uint64_t mem_avail; /*in bytes. max. memory this lightcache instance is allowed to use */
@@ -36,12 +32,8 @@ struct stats {
 
 #define LIGHTCACHE_PORT 13131
 #define LIGHTCACHE_LISTEN_BACKLOG 100
-/*the ratio threshold that garbage collect functions will start demanding memory.
- * */
-#define LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD 75
-/* in sec. The timed procedures will be invoked at this interval. Like garbage collection...etc..
- * */
-#define LIGHTCACHE_TIMEDRUN_INVOKE_INTERVAL 1
+#define LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD 75 /*the ratio threshold that garbage collect functions will start demanding memory.*/
+#define LIGHTCACHE_TIMEDRUN_INVOKE_INTERVAL 1 /* in sec. The timed procedures will be invoked at this interval. Like garbage collection...etc..*/
 
 #endif
 

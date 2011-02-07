@@ -93,7 +93,7 @@ free_request(request *req)
     }
 
     if (req->can_free) {
-        dprintf("FREEING request data.[%p], sizeof:[%u]", req, sizeof(request *));
+        fprintf(stderr, "FREEING request data.[%p], sizeof:[%u]", (void *)req, sizeof(request *));
         li_free(req->rkey);
         li_free(req->rdata);
         li_free(req->rextra);
@@ -113,7 +113,7 @@ free_response(response *resp)
     }
 
     if (resp->can_free && resp->sdata) {
-        dprintf("FREEING response data.[%p]", resp);
+        fprintf(stderr, "FREEING response data.[%p]", (void *)resp);
         li_free(resp->sdata);
     }
 
@@ -156,7 +156,7 @@ init_resources(conn *conn)
 static void
 disconnect_conn(conn* conn)
 {
-    dprintf("disconnect conn called.");
+    fprintf(stderr, "disconnect conn called.");
 
     event_del(conn);
 
@@ -261,10 +261,10 @@ execute_cmd(struct conn* conn)
     switch(cmd) {
     case CMD_GET:
 
-        dprintf("CMD_GET request for key: %s", conn->in->rkey);
+        fprintf(stderr, "CMD_GET request for key: %s", conn->in->rkey);
         tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
         if (!tab_item) {
-            dprintf("key not found:%s", conn->in->rkey);
+            fprintf(stderr, "key not found:%s", conn->in->rkey);
             return;
         }
         cached_req = (request *)tab_item->val;
@@ -274,7 +274,7 @@ execute_cmd(struct conn* conn)
         assert(r != 0);/* CMD_SET already does this validation but re-check*/
 
         if ( (time(NULL)-cached_req->received) > val) {
-            dprintf("time expired for key:%s", conn->in->rkey);
+            fprintf(stderr, "time expired for key:%s", conn->in->rkey);
             cached_req->can_free = 1;
             free_request(cached_req);
             hfree(cache, tab_item); // recycle tab_item
@@ -287,27 +287,27 @@ execute_cmd(struct conn* conn)
         conn->out->sdata = cached_req->rdata;
         conn->out->can_free = 0;
 
-        dprintf("sending GET data:%s", conn->out->sdata);
+        fprintf(stderr, "sending GET data:%s", conn->out->sdata);
 
         set_conn_state(conn, SEND_HEADER);
         break;
 
     case CMD_SET:
-        dprintf("CMD_SET request for key, data, extra: %s, %s, %s", conn->in->rkey, conn->in->rdata,
+        fprintf(stderr, "CMD_SET request for key, data, extra: %s, %s, %s", conn->in->rkey, conn->in->rdata,
                 conn->in->rextra);
 
         /* validate params */
         if (!conn->in->rkey) {
-            dprintf("invalid key param in CMD_SET");
+            fprintf(stderr, "invalid key param in CMD_SET");
             return;
         }
         if (!conn->in->rdata) {
-            dprintf("invalid data param in CMD_SET");
+            fprintf(stderr, "invalid data param in CMD_SET");
             return;
         }
         
         if (!atoull(conn->in->rextra, &val)) {
-            dprintf("invalid timeout param in CMD_SET");
+            fprintf(stderr, "invalid timeout param in CMD_SET");
             disconnect_conn(conn);
             return;
         }        
@@ -327,34 +327,34 @@ execute_cmd(struct conn* conn)
         set_conn_state(conn, READ_HEADER);
         break;
     case CMD_CHG_SETTING:
-        dprintf("CMD_CHG_SETTING request with data %s, key_length:%d",
+        fprintf(stderr, "CMD_CHG_SETTING request with data %s, key_length:%d",
                 conn->in->rdata, conn->in->req_header.request.key_length);
         if (!conn->in->rdata) {
-            dprintf("(null) data param in CMD_CHG_SETTING");
+            fprintf(stderr, "(null) data param in CMD_CHG_SETTING");
             break;
         }
 
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!atoull(conn->in->rdata, &val)) {
-                dprintf("invalid idle conn timeout param.");
+                fprintf(stderr, "invalid idle conn timeout param.");
                 disconnect_conn(conn);
                 return;
             }
-            dprintf("SET idle conn timeout :%llu", (long long unsigned int)val);
+            fprintf(stderr, "SET idle conn timeout :%llu", (long long unsigned int)val);
             settings.idle_conn_timeout = val;
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
             if (!atoull(conn->in->rdata, &val)) {
-                dprintf("invalid mem avail param.");
+                fprintf(stderr, "invalid mem avail param.");
                 disconnect_conn(conn);
                 return;
             }
-            dprintf("SET mem avail :%llu", (long long unsigned int)val);
+            fprintf(stderr, "SET mem avail :%llu", (long long unsigned int)val);
             settings.mem_avail = val * 1024 * 1024; /*todo:can overflow*/
         }
         set_conn_state(conn, READ_HEADER);
         break;
     case CMD_GET_SETTING:
-        dprintf("CMD_GET_SETTING request for key: %s, data:%s", conn->in->rkey,
+        fprintf(stderr, "CMD_GET_SETTING request for key: %s, data:%s", conn->in->rkey,
                 conn->in->rdata);
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!prepare_response(conn, sizeof(uint64_t), 1)) {
@@ -371,7 +371,7 @@ execute_cmd(struct conn* conn)
         }
         break;
     case CMD_GET_STATS:
-        dprintf("CMD_GET_STATS request");
+        fprintf(stderr, "CMD_GET_STATS request");
         if (!prepare_response(conn, 250, 1)) {
             return;
         }
@@ -391,11 +391,11 @@ disconnect_idle_conns(void)
     conn=conns;
     while( conn != NULL && !conn->free && !conn->listening) {
         next = conn->next;
-        //dprintf(">>>>>>>>>>>>>>>idle timeout:%llu, timediff=%d", settings.idle_conn_timeout,
+        //fprintf(stderr, ">>>>>>>>>>>>>>>idle timeout:%llu, timediff=%d", settings.idle_conn_timeout,
         //	time(NULL) - conn->last_heard);
 
         if (time(NULL) - conn->last_heard > settings.idle_conn_timeout) {
-            dprintf("idle conn detected. idle timeout:%llu", (long long unsigned int)settings.idle_conn_timeout);
+            fprintf(stderr, "idle conn detected. idle timeout:%llu", (long long unsigned int)settings.idle_conn_timeout);
             disconnect_conn(conn);
             // todo: move free items closer to head for faster searching for free items in make_conn
         }
@@ -408,7 +408,7 @@ read_nbytes(conn*conn, char *bytes, size_t total)
 {
     unsigned int needed, nbytes;
 
-    dprintf("read_nbytes called.");
+    fprintf(stderr, "read_nbytes called.");
 
     needed = total - conn->in->rbytes;
     nbytes = read(conn->fd, &bytes[conn->in->rbytes], needed);
@@ -417,7 +417,7 @@ read_nbytes(conn*conn, char *bytes, size_t total)
         return READ_ERR;
     } else if (nbytes == -1) {
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
-            dprintf("socket read EWOUDLBLOCK, EAGAIN.");
+            fprintf(stderr, "socket read EWOUDLBLOCK, EAGAIN.");
             return NEED_MORE;
         }
     }
@@ -449,7 +449,7 @@ try_read_request(conn* conn)
                     (conn->in->req_header.request.key_length >= PROTOCOL_MAX_KEY_SIZE) ||
                     (conn->in->req_header.request.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
                 syslog(LOG_ERR, "request data or key length exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
-                dprintf("request data or key length exceeded maximum allowed");
+                fprintf(stderr, "request data or key length exceeded maximum allowed");
                 return READ_ERR;
             }
 
@@ -504,7 +504,7 @@ try_read_request(conn* conn)
         }
         break;
     default:
-        dprintf("Invalid state in try_read_request");
+        fprintf(stderr, "Invalid state in try_read_request");
         ret = INVALID_STATE;
         break;
     } // switch(conn->state)
@@ -517,7 +517,7 @@ send_nbytes(conn*conn, char *bytes, size_t total)
 {
     int needed, nbytes;
 
-    dprintf("send_nbytes called.");
+    fprintf(stderr, "send_nbytes called.");
 
     needed = total - conn->out->sbytes;
     nbytes = write(conn->fd, &bytes[conn->out->sbytes], needed);
@@ -579,7 +579,7 @@ event_handler(conn *conn, event ev)
     /* check if connection is closed, this may happen where a READ and WRITE
      * event is awaiting for an fd in one cycle. Just noop for this situation.*/
     if (conn->state == CONN_CLOSED) {
-        dprintf("Connection is closed in the previous event of the cycle.");
+        fprintf(stderr, "Connection is closed in the previous event of the cycle.");
         return;
     }
 

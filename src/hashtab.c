@@ -33,7 +33,7 @@ _hgrow(_htab *ht)
     _htab *dummy;
     _hitem *p, *next, *it;
 
-    dprintf("hgrow called growing to:%d", ht->logsize+1);
+    fprintf(stderr, "hgrow called growing to:%d", ht->logsize+1);
 
     dummy = htcreate(ht->logsize+1);
     if (!dummy) {

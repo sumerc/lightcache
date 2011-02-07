@@ -88,5 +88,5 @@ deamonize(void)
     dummy = freopen( "/dev/null", "w", stderr);
 
     /* Tell the parent process that we are A-okay */
-    kill( parent, SIGUSR1 );
+    //kill( parent, SIGUSR1 );
 }
