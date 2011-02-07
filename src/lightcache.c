@@ -340,7 +340,7 @@ execute_cmd(struct conn* conn)
                 disconnect_conn(conn);
                 return;
             }
-            dprintf("SET idle conn timeout :%llu", val);
+            dprintf("SET idle conn timeout :%llu", (long long unsigned int)val);
             settings.idle_conn_timeout = val;
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
             if (!atoull(conn->in->rdata, &val)) {
