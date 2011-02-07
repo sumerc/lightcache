@@ -14,6 +14,7 @@
 #include "limits.h"
 #include "stdint.h"
 #include "endian.h"
+#include "getopt.h"
 
 #ifndef LIGHTCACHE_H
 #define LIGHTCACHE_H

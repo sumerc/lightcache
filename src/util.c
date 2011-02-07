@@ -4,6 +4,7 @@
 static uint64_t
 li_swap64(uint64_t in)
 {
+
 #ifdef LITTLE_ENDIAN
     /* Little endian, flip the bytes around until someone makes a faster/better
     * way to do this. */

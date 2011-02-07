@@ -186,28 +186,28 @@ set_conn_state(struct conn* conn, conn_states state)
         event_set(conn, EVENT_READ);
         break;
     case READ_KEY:
-        conn->in->rkey = (char *)li_malloc(conn->in->req_header.key_length + 1);
+        conn->in->rkey = (char *)li_malloc(conn->in->req_header.request.key_length + 1);
         if (!conn->in->rkey) {
             disconnect_conn(conn);
             return;
         }
-        conn->in->rkey[conn->in->req_header.key_length] = (char)0;
+        conn->in->rkey[conn->in->req_header.request.key_length] = (char)0;
         break;
     case READ_DATA:
-        conn->in->rdata = (char *)li_malloc(conn->in->req_header.data_length + 1);
+        conn->in->rdata = (char *)li_malloc(conn->in->req_header.request.data_length + 1);
         if (!conn->in->rdata) {
             disconnect_conn(conn);
             return;
         }
-        conn->in->rdata[conn->in->req_header.data_length] = (char)0;
+        conn->in->rdata[conn->in->req_header.request.data_length] = (char)0;
         break;
     case READ_EXTRA:
-        conn->in->rextra = (char *)li_malloc(conn->in->req_header.extra_length + 1);
+        conn->in->rextra = (char *)li_malloc(conn->in->req_header.request.extra_length + 1);
         if (!conn->in->rextra) {
             disconnect_conn(conn);
             return;
         }
-        conn->in->rextra[conn->in->req_header.extra_length] = (char)0;
+        conn->in->rextra[conn->in->req_header.request.extra_length] = (char)0;
         break;
     case CMD_RECEIVED:
         break;
@@ -235,8 +235,8 @@ prepare_response(conn *conn, size_t data_length, int alloc_mem)
             return 0;
         }
     }
-    conn->out->resp_header.data_length = htonl(data_length);
-    conn->out->resp_header.opcode = conn->in->req_header.opcode;
+    conn->out->resp_header.response.data_length = htonl(data_length);
+    conn->out->resp_header.response.opcode = conn->in->req_header.request.opcode;
 
     return 1;
 }
@@ -256,13 +256,13 @@ execute_cmd(struct conn* conn)
     /* here, the complete request is received from the connection */
     conn->in->received = time(NULL);
 
-    cmd = conn->in->req_header.opcode;
+    cmd = conn->in->req_header.request.opcode;
 
     switch(cmd) {
     case CMD_GET:
 
         dprintf("CMD_GET request for key: %s", conn->in->rkey);
-        tab_item = hget(cache, conn->in->rkey, conn->in->req_header.key_length);
+        tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
         if (!tab_item) {
             dprintf("key not found:%s", conn->in->rkey);
             return;
@@ -281,7 +281,7 @@ execute_cmd(struct conn* conn)
             disconnect_conn(conn);
             return;
         }
-        if (!prepare_response(conn, cached_req->req_header.data_length, 0)) { // do not alloc mem
+        if (!prepare_response(conn, cached_req->req_header.request.data_length, 0)) { // do not alloc mem
             return;
         }
         conn->out->sdata = cached_req->rdata;
@@ -313,9 +313,9 @@ execute_cmd(struct conn* conn)
         }        
 
         /* add to cache */
-        ret = hset(cache, conn->in->rkey, conn->in->req_header.key_length, conn->in);
+        ret = hset(cache, conn->in->rkey, conn->in->req_header.request.key_length, conn->in);
         if (ret == HEXISTS) { // key exists? then force-update the data
-            tab_item = hget(cache, conn->in->rkey, conn->in->req_header.key_length);
+            tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
             assert(tab_item != NULL);
 
             cached_req = (request *)tab_item->val;
@@ -328,7 +328,7 @@ execute_cmd(struct conn* conn)
         break;
     case CMD_CHG_SETTING:
         dprintf("CMD_CHG_SETTING request with data %s, key_length:%d",
-                conn->in->rdata, conn->in->req_header.key_length);
+                conn->in->rdata, conn->in->req_header.request.key_length);
         if (!conn->in->rdata) {
             dprintf("(null) data param in CMD_CHG_SETTING");
             break;
@@ -442,19 +442,19 @@ try_read_request(conn* conn)
         if (ret == READ_COMPLETED) {
 
             /* convert network2host byte ordering before using in our code. */
-            conn->in->req_header.data_length = ntohl(conn->in->req_header.data_length);
-            conn->in->req_header.extra_length = ntohl(conn->in->req_header.extra_length);
+            conn->in->req_header.request.data_length = ntohl(conn->in->req_header.request.data_length);
+            conn->in->req_header.request.extra_length = ntohl(conn->in->req_header.request.extra_length);
 
-            if ( (conn->in->req_header.data_length >= PROTOCOL_MAX_DATA_SIZE) ||
-                    (conn->in->req_header.key_length >= PROTOCOL_MAX_KEY_SIZE) ||
-                    (conn->in->req_header.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
+            if ( (conn->in->req_header.request.data_length >= PROTOCOL_MAX_DATA_SIZE) ||
+                    (conn->in->req_header.request.key_length >= PROTOCOL_MAX_KEY_SIZE) ||
+                    (conn->in->req_header.request.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
                 syslog(LOG_ERR, "request data or key length exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
                 dprintf("request data or key length exceeded maximum allowed");
                 return READ_ERR;
             }
 
             // need2 read key?
-            if (conn->in->req_header.key_length == 0) {
+            if (conn->in->req_header.request.key_length == 0) {
                 set_conn_state(conn, CMD_RECEIVED);
                 execute_cmd(conn);
             } else {
@@ -465,14 +465,14 @@ try_read_request(conn* conn)
     case READ_KEY:
         assert(conn->in);
         assert(conn->in->rkey);
-        assert(conn->in->req_header.key_length);
+        assert(conn->in->req_header.request.key_length);
 
-        ret = read_nbytes(conn, conn->in->rkey, conn->in->req_header.key_length);
+        ret = read_nbytes(conn, conn->in->rkey, conn->in->req_header.request.key_length);
 
         if (ret == READ_COMPLETED) {
 
             // need2 read data?
-            if (conn->in->req_header.data_length == 0) {
+            if (conn->in->req_header.request.data_length == 0) {
                 set_conn_state(conn, CMD_RECEIVED);
                 execute_cmd(conn);
             } else {
@@ -483,12 +483,12 @@ try_read_request(conn* conn)
     case READ_DATA:
         assert(conn->in);
         assert(conn->in->rdata);
-        assert(conn->in->req_header.data_length);
+        assert(conn->in->req_header.request.data_length);
 
-        ret = read_nbytes(conn, conn->in->rdata, conn->in->req_header.data_length);
+        ret = read_nbytes(conn, conn->in->rdata, conn->in->req_header.request.data_length);
 
         if (ret == READ_COMPLETED) {
-            if (conn->in->req_header.extra_length) { // do we have extra data?
+            if (conn->in->req_header.request.extra_length) { // do we have extra data?
                 set_conn_state(conn, READ_EXTRA);
             } else {
                 set_conn_state(conn, CMD_RECEIVED);
@@ -497,7 +497,7 @@ try_read_request(conn* conn)
         }
         break;
     case READ_EXTRA:
-        ret = read_nbytes(conn, conn->in->rextra, conn->in->req_header.extra_length);
+        ret = read_nbytes(conn, conn->in->rextra, conn->in->req_header.request.extra_length);
         if (ret == READ_COMPLETED) {
             set_conn_state(conn, CMD_RECEIVED);
             execute_cmd(conn);
@@ -546,15 +546,15 @@ try_send_response(conn *conn)
     case SEND_HEADER:
         ret = send_nbytes(conn, (char *)conn->out->resp_header.bytes, sizeof(resp_header));
         if (ret == SEND_COMPLETED) {
-            if (ntohl(conn->out->resp_header.data_length) != 0) {
+            if (ntohl(conn->out->resp_header.response.data_length) != 0) {
                 set_conn_state(conn, SEND_DATA);
             }
         }
         break;
     case SEND_DATA:
-        ret = send_nbytes(conn, conn->out->sdata, ntohl(conn->out->resp_header.data_length));
+        ret = send_nbytes(conn, conn->out->sdata, ntohl(conn->out->resp_header.response.data_length));
         if (ret == SEND_COMPLETED) {
-            if (ntohl(conn->out->resp_header.data_length) != 0) {
+            if (ntohl(conn->out->resp_header.response.data_length) != 0) {
                 set_conn_state(conn, READ_HEADER);// wait for new commands
             }
         }
