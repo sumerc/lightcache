@@ -272,7 +272,7 @@ execute_cmd(struct conn* conn)
         r = atoull(cached_req->rextra, &val);
         assert(r != 0);/* CMD_SET already does this validation but re-check*/
 
-        if ( (time(NULL)-cached_req->received) > val) {
+        if ( (unsigned int)(time(NULL)-cached_req->received) > val) {
             fprintf(stderr, "time expired for key:%s", conn->in->rkey);
             cached_req->can_free = 1;
             free_request(cached_req);
@@ -390,10 +390,11 @@ disconnect_idle_conns(void)
     conn=conns;
     while( conn != NULL && !conn->free && !conn->listening) {
         next = conn->next;
+
         //fprintf(stderr, ">>>>>>>>>>>>>>>idle timeout:%llu, timediff=%d", settings.idle_conn_timeout,
         //	time(NULL) - conn->last_heard);
 
-        if (time(NULL) - conn->last_heard > settings.idle_conn_timeout) {
+        if ((unsigned int)(time(NULL) - conn->last_heard) > settings.idle_conn_timeout) {
             fprintf(stderr, "idle conn detected. idle timeout:%llu", (long long unsigned int)settings.idle_conn_timeout);
             disconnect_conn(conn);
             // todo: move free items closer to head for faster searching for free items in make_conn
@@ -405,7 +406,8 @@ disconnect_idle_conns(void)
 socket_state
 read_nbytes(conn*conn, char *bytes, size_t total)
 {
-    unsigned int needed, nbytes;
+    unsigned int needed;
+    int nbytes;
 
     fprintf(stderr, "read_nbytes called.");
 

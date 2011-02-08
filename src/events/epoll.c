@@ -1,5 +1,5 @@
 
-#include "event.h"
+#include "sys/epoll.h"
 
 // globals
 static int epollfd = 0;

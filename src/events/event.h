@@ -1,10 +1,6 @@
 #include "../lightcache.h"
 #include "../protocol.h"
 
-#ifdef EPOLL
-#include "sys/epoll.h"
-#endif
-
 #ifndef EVENT_H
 #define EVENT_H
 
