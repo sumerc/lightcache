@@ -3,7 +3,7 @@
 #include "socket.h"
 #include "hashtab.h"
 #include "freelist.h"
-#include "events/event.h"
+#include "event.h"
 #include "mem.h"
 #include "util.h"
 
@@ -92,7 +92,7 @@ free_request(request *req)
     }
 
     if (req->can_free) {
-        fprintf(stderr, "FREEING request data.[%p], sizeof:[%u]", (void *)req, sizeof(request *));
+        fprintf(stderr, "FREEING request data.[%p], sizeof:[%lu]", (void *)req, sizeof(request *));
         li_free(req->rkey);
         li_free(req->rdata);
         li_free(req->rextra);

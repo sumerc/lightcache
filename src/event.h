@@ -1,5 +1,5 @@
-#include "../lightcache.h"
-#include "../protocol.h"
+#include "lightcache.h"
+#include "protocol.h"
 
 #ifndef EVENT_H
 #define EVENT_H

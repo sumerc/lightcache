@@ -9,7 +9,7 @@ INSTALL_TOP= /usr/local
 INSTALL_BIN= $(INSTALL_TOP)/bin
 INSTALL= cp -p
 
-FILES = lightcache.c events/event.c socket.c hashtab.c mem.c freelist.c util.c
+FILES = lightcache.c event.c socket.c hashtab.c mem.c freelist.c util.c
 
 PRGNAME = lightcache
 
