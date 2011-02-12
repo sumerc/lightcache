@@ -13,8 +13,11 @@
 #include "sys/stat.h"
 #include "limits.h"
 #include "stdint.h"
-#include "endian.h"
+//#include "endian.h"
 #include "getopt.h"
+#include "sys/socket.h"
+#include "sys/types.h"
+#include "netinet/in.h"
 
 #ifndef LIGHTCACHE_H
 #define LIGHTCACHE_H
