@@ -5,19 +5,21 @@
 #include "signal.h"
 #include "string.h"
 #include "stdlib.h"
-#include "arpa/inet.h"
 #include "time.h"
 #include "assert.h"
 #include "fcntl.h"
 #include "unistd.h"
-#include "sys/stat.h"
 #include "limits.h"
 #include "stdint.h"
-//#include "endian.h"
 #include "getopt.h"
+#include "arpa/inet.h"
+#include "sys/stat.h"
+
+#ifndef __linux__
 #include "sys/socket.h"
 #include "sys/types.h"
 #include "netinet/in.h"
+#endif
 
 #ifndef LIGHTCACHE_H
 #define LIGHTCACHE_H
@@ -42,3 +44,4 @@ struct stats {
 
 extern struct settings settings;
 extern struct stats stats;
+
