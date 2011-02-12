@@ -1,14 +1,14 @@
 
 #include "sys/epoll.h"
 
-// globals
+/* globals */
 static int epollfd = 0;
 static void (*event_handler)(conn *c, event ev) = NULL;
 
-// constants
+/* constants */
 #define EPOLL_MAX_EVENTS 10
-#define EPOLL_TIMEOUT 1000 // in ms todo: maybe get it from settings?
 
+/* functions */
 int
 event_init(void (*ev_handler)(conn *c, event ev))
 {
@@ -70,7 +70,7 @@ event_process(void)
     struct epoll_event events[EPOLL_MAX_EVENTS];
     conn *conn;
 
-    nfds = epoll_wait(epollfd, events, EPOLL_MAX_EVENTS, EPOLL_TIMEOUT);
+    nfds = epoll_wait(epollfd, events, EPOLL_MAX_EVENTS, POLL_TIMEOUT);
     if (nfds == -1) {
         syslog(LOG_ERR, "%s (%s)", "epoll wait error.", strerror(errno));
         return;

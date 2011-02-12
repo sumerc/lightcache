@@ -4,6 +4,8 @@
 #ifndef EVENT_H
 #define EVENT_H
 
+#define POLL_TIMEOUT 1000 // in ms todo: maybe get it from settings?
+
 typedef enum {
     EVENT_READ = 0x01,
     EVENT_WRITE = 0x02,
