@@ -87,7 +87,7 @@ event_process(void)
             event_handler(conn, EVENT_WRITE);
         }
 
-    } // process events end
+    }
 }
 
 

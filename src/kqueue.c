@@ -56,7 +56,8 @@ event_set(conn *c, int flags)
         eflags |= EVFILT_WRITE;
     }
 	
-	EV_SET(&ke, conn->fd, eflags, EV_ADD, 0, 0, NULL);
+	ke.udata = c;
+	EV_SET(&ke, c->fd, eflags, EV_ADD, 0, 0, NULL);
 	if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
 		syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
 		return 0;
@@ -67,7 +68,27 @@ event_set(conn *c, int flags)
 void
 event_process(void)
 {
-    return;
+	int nfds;
+	struct kevent events[AE_SETSIZE];
+	conn *conn;
+	
+	nfds = kevent(kqfd, NULL, 0, events, AE_SETSIZE, &timeout);
+	if (nfds == -1) {
+        syslog(LOG_ERR, "%s (%s)", "kqueue wait error.", strerror(errno));
+        return;
+    }
+	
+	// process events
+    for (n = 0; n < nfds; ++n) {
+        conn = (struct conn *)events[n].udata;
+
+        if ( events[n].filter == EVFILT_READ ) {
+            event_handler(conn, EVENT_READ);
+        }
+        if (events[n].filter == EVFILT_WRITE) {
+            event_handler(conn, EVENT_WRITE);
+        }
+    }
 }
 
 
