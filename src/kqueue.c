@@ -23,7 +23,7 @@ event_init(void (*ev_handler)(conn *c, event ev))
 	
 	/* calculate timeout */	
 	timeout.tv_sec = POLL_TIMEOUT / 1000; /* TODO: convert ms to sec/nsec */
-	timeout.tv_nsec = 0
+	timeout.tv_nsec = 0;
 		
     return  kqfd;
 }
