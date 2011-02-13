@@ -78,7 +78,8 @@ event_process(void)
     // process events
     for (n = 0; n < nfds; ++n) {
         conn = (struct conn *)events[n].data.ptr;
-
+		assert(conn != NULL);
+		
         if ( events[n].events & EPOLLIN ) {
             event_handler(conn, EVENT_READ);
         }

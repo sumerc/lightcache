@@ -47,20 +47,21 @@ event_set(conn *c, int flags)
 	unsigned short eflags;
 	struct kevent ke;
 	
+	
     if (flags & EVENT_READ) {
-        EV_SET(&ke, c->fd, EVFILT_READ, EV_ADD, 0, 0, c);
-		if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
-			syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
-			return 0;
-		}
+        eflags |= EVFILT_READ;
     }
     if (flags & EVENT_WRITE) {
-        EV_SET(&ke, c->fd, EVFILT_READ, EV_ADD, 0, 0, c);
-		if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
-			syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
-			return 0;
-		}
-    }		
+        eflags |= EVFILT_WRITE;
+    }
+	
+	perror("event_set called.");
+	EV_SET(&ke, c->fd, eflags, EV_ADD, 0, 0, c); /* udata=c */
+	if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
+		perror("kevent failed.");
+    	syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
+		return 0;
+	}	
 	return 1;
 }
 
@@ -71,7 +72,7 @@ event_process(void)
 	struct kevent events[POLL_MAX_EVENTS];
 	conn *conn;
 	
-	nfds = kevent(kqfd, NULL, 0, events, POLL_MAX_EVENTS, NULL);
+	nfds = kevent(kqfd, NULL, 0, events, POLL_MAX_EVENTS, &timeout);
 	if (nfds == -1) {
         syslog(LOG_ERR, "%s (%s)", "kqueue wait error.", strerror(errno));
         return;
@@ -79,10 +80,8 @@ event_process(void)
 	
 	// process events
     for (n = 0; n < nfds; ++n) {
-		fprintf(stderr, "event udata: %p, event no:%d \r\n", events[n].udata, n);
-	
-        conn = (struct conn *)events[n].udata;
 		
+        conn = (struct conn *)events[n].udata;
 		assert(conn != NULL);
 	
         if ( events[n].filter == EVFILT_READ ) {
