@@ -23,7 +23,11 @@ v0.1
 [+] kqueue integration.
 [+] use predefined macros to compile lightcache. Use only makefile like redis.
 [+] fprintf(xxx)'s should end with \r\n.
-[-] kqueue pass TESTS. Getting broken pipe errors on some occasions.
+[+] kqueue pass TESTS. Getting broken pipe errors on some occasions.
+[-] refactor/optimize kqueue. Before refactoring write a test for epoll that sends subsequent packets before receiving data
+	to see what happens and use that info to refactor kqueue. IMHO, if event_set() is called with EVENT_READ then this should
+    be the only	event registered in the pollfd, others shall be discarded.Verify that assumption with epoll and integrate same
+	logic with kqueue.
 [-] use HHASH algorithm same as memcached. Bob Jenkins is the expert there:)
 [-] Program received signal SIGFPE, Arithmetic exception. disable this. 
 	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD)	
