@@ -57,14 +57,13 @@ event_set(conn *c, int flags)
     }
 	
 	ke.udata = c;
-	fprintf(stderr, "(kqueue)event_set with user data: %p\r\n", ke.udata);
 	EV_SET(&ke, c->fd, eflags, EV_ADD, 0, 0, NULL);
 	if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
-		perror("kevent");
 		syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
 		return 0;
 	}	
-    return 1;
+	perror("(kqueue)event_set");
+	return 1;
 }
 
 void
@@ -83,7 +82,9 @@ event_process(void)
 	// process events
     for (n = 0; n < nfds; ++n) {
         conn = (struct conn *)events[n].udata;
-
+		
+		assert(conn != NULL);
+	
         if ( events[n].filter == EVFILT_READ ) {
             event_handler(conn, EVENT_READ);
         }
