@@ -1,0 +1,13 @@
+import unittest
+from testbase import LightCacheTestBase
+
+class SimpleTest(LightCacheTestBase):
+    
+    def test_simple(self):
+		print "Simple test:"
+		print "Stats:"
+		print self.client.get_stats()
+       
+if __name__ == '__main__':
+    unittest.main()
+

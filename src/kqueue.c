@@ -33,6 +33,8 @@ event_del(conn *conn)
 {
 	struct kevent ke;
 	
+	fprintf(stderr, "(kqueue)event_del called.\r\n");
+	
 	EV_SET(&ke, conn->fd, 0, EV_DELETE, 0, 0, NULL); /* TODO: need any filter? */
     if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
 		syslog(LOG_ERR, "%s (%s)", "kevent_del error.", strerror(errno));
@@ -47,25 +49,19 @@ event_set(conn *c, int flags)
 	unsigned short eflags;
 	struct kevent ke;
 	
+	fprintf(stderr, "(kqueue)event_set called.\r\n");
+	
     if (flags & EVENT_READ) {
-        //eflags |= EVFILT_READ;
-		EV_SET(&ke, c->fd, EVFILT_READ, EV_ADD, 0, 0, c); /* udata=c */
-		if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
-			perror("kevent failed.");
-			syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
-			return 0;
-		}
+        EV_SET(&ke, c->fd, EVFILT_READ, EV_ADD, 0, 0, c); /* udata=c */
     }
     if (flags & EVENT_WRITE) {
-        //eflags |= EVFILT_WRITE;
-		EV_SET(&ke, c->fd, EVFILT_WRITE, EV_ADD, 0, 0, c); /* udata=c */
-		if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
-			perror("kevent failed.");
-			syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
-			return 0;
-		}
+        EV_SET(&ke, c->fd, EVFILT_WRITE, EV_ADD, 0, 0, c); /* udata=c */
     }
-		
+	if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
+		perror("kevent failed.");
+		syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
+		return 0;
+	}	
 	return 1;
 }
 

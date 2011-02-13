@@ -326,7 +326,7 @@ execute_cmd(struct conn* conn)
         set_conn_state(conn, READ_HEADER);
         break;
     case CMD_CHG_SETTING:
-        fprintf(stderr, "CMD_CHG_SETTING request with data %s, key_length:%d",
+        fprintf(stderr, "CMD_CHG_SETTING request with data %s, key_length:%d\r\n",
                 conn->in->rdata, conn->in->req_header.request.key_length);
         if (!conn->in->rdata) {
             fprintf(stderr, "(null) data param in CMD_CHG_SETTING\r\n");
@@ -353,7 +353,7 @@ execute_cmd(struct conn* conn)
         set_conn_state(conn, READ_HEADER);
         break;
     case CMD_GET_SETTING:
-        fprintf(stderr, "CMD_GET_SETTING request for key: %s, data:%s", conn->in->rkey,
+        fprintf(stderr, "CMD_GET_SETTING request for key: %s, data:%s\r\n", conn->in->rkey,
                 conn->in->rdata);
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!prepare_response(conn, sizeof(uint64_t), 1)) {
@@ -370,7 +370,7 @@ execute_cmd(struct conn* conn)
         }
         break;
     case CMD_GET_STATS:
-        fprintf(stderr, "CMD_GET_STATS request");
+        fprintf(stderr, "CMD_GET_STATS request\r\n");
         if (!prepare_response(conn, 250, 1)) {
             return;
         }
