@@ -561,6 +561,7 @@ try_send_response(conn *conn)
         }
         break;
     default:
+		fprintf(stderr, "Invalid state in try_send_response %d\r\n", conn->state);
         ret = INVALID_STATE;
         break;
     }

@@ -54,11 +54,14 @@ event_set(conn *c, int flags)
 	
 	fprintf(stderr, "(kqueue)event_set called.\r\n");
 	
+	EV_SET(&ke, conn->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+	EV_SET(&ke, conn->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+	
     if (flags & EVENT_READ) {
-        EV_SET(&ke, c->fd, EVFILT_READ, EV_ADD, 0, 0, c); /* udata=c */
+		EV_SET(&ke, c->fd, EVFILT_READ, EV_ADD, 0, 0, c); /* udata=c */		
     }
     if (flags & EVENT_WRITE) {
-        EV_SET(&ke, c->fd, EVFILT_WRITE, EV_ADD, 0, 0, c); /* udata=c */
+		EV_SET(&ke, c->fd, EVFILT_WRITE, EV_ADD, 0, 0, c); /* udata=c */
     }
 	if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
 		perror("kevent failed.");
