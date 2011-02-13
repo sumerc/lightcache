@@ -20,12 +20,14 @@ v0.1
 	so, just decide which to use.
 [+] send invalid/boundary integers for GET, CHG_SETTING, GET(...) functions shall return None on error.
 	server generally disconnects in invalid situations.
-[-] use predefined macros to compile lightcache. Use only makefile like redis.
+[+] kqueue integration.
+[+] use predefined macros to compile lightcache. Use only makefile like redis.
+[-] fprintf(xxx)'s should end with \r\n.
+[-] kqueue pass TESTS. WRITE seems not to be working.
 [-] use HHASH algorithm same as memcached. Bob Jenkins is the expert there:)
 [-] Program received signal SIGFPE, Arithmetic exception. disable this. 
 	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD)	
 [-] req per sec/sent per sec stats, and total sent/received stats.
 [-] GET_MANY after all of above is working.
 [-] implement unix domain sockets.
-[-] kqueue integration.
 [-] more tests & more tests.
