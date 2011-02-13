@@ -47,20 +47,20 @@ event_set(conn *c, int flags)
 	unsigned short eflags;
 	struct kevent ke;
 	
-	
     if (flags & EVENT_READ) {
-        eflags |= EVFILT_READ;
+        EV_SET(&ke, c->fd, EVFILT_READ, EV_ADD, 0, 0, c);
+		if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
+			syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
+			return 0;
+		}
     }
     if (flags & EVENT_WRITE) {
-        eflags |= EVFILT_WRITE;
-    }
-	
-	ke.udata = c;
-	EV_SET(&ke, c->fd, eflags, EV_ADD, 0, 0, c);
-	if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
-		syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
-		return 0;
-	}	
+        EV_SET(&ke, c->fd, EVFILT_READ, EV_ADD, 0, 0, c);
+		if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
+			syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
+			return 0;
+		}
+    }		
 	return 1;
 }
 
