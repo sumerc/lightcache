@@ -31,15 +31,18 @@ event_init(void (*ev_handler)(conn *c, event ev))
 int
 event_del(conn *conn)
 {
+/*  It seems closing fd seems enough for kqueue to delete associated events.
+
 	struct kevent ke;
 	
 	fprintf(stderr, "(kqueue)event_del called.\r\n");
 	
-	EV_SET(&ke, conn->fd, 0, EV_DELETE, 0, 0, NULL); /* TODO: need any filter? */
+	EV_SET(&ke, conn->fd, 0, EV_DELETE, 0, 0, NULL); 
     if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
 		syslog(LOG_ERR, "%s (%s)", "kevent_del error.", strerror(errno));
         return 0;
 	}
+*/
     return 1;
 }
 

@@ -22,8 +22,8 @@ v0.1
 	server generally disconnects in invalid situations.
 [+] kqueue integration.
 [+] use predefined macros to compile lightcache. Use only makefile like redis.
-[-] fprintf(xxx)'s should end with \r\n.
-[-] kqueue pass TESTS. WRITE seems not to be working.
+[+] fprintf(xxx)'s should end with \r\n.
+[-] kqueue pass TESTS. Getting broken pipe errors on some occasions.
 [-] use HHASH algorithm same as memcached. Bob Jenkins is the expert there:)
 [-] Program received signal SIGFPE, Arithmetic exception. disable this. 
 	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD)	
