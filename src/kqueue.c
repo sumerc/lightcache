@@ -62,7 +62,6 @@ event_set(conn *c, int flags)
 		syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
 		return 0;
 	}	
-	perror("(kqueue)event_set");
 	return 1;
 }
 
@@ -73,7 +72,7 @@ event_process(void)
 	struct kevent events[POLL_MAX_EVENTS];
 	conn *conn;
 	
-	nfds = kevent(kqfd, NULL, 0, events, POLL_MAX_EVENTS, &timeout);
+	nfds = kevent(kqfd, NULL, 0, events, POLL_MAX_EVENTS, NULL);
 	if (nfds == -1) {
         syslog(LOG_ERR, "%s (%s)", "kqueue wait error.", strerror(errno));
         return;
@@ -81,6 +80,8 @@ event_process(void)
 	
 	// process events
     for (n = 0; n < nfds; ++n) {
+		fprintf(stderr, "event udata: %p, event no:%d \r\n", events[n].udata, n);
+	
         conn = (struct conn *)events[n].udata;
 		
 		assert(conn != NULL);
