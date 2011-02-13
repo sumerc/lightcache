@@ -45,10 +45,10 @@ int
 event_set(conn *c, int flags)
 {
 	unsigned short eflags;
-	struct kevent ke;
+	struct kevent *ke;
 	
-	memset(&ke, 0, sizeof(struct kevent));
-    
+	ke = li_malloc(sizeof(struct kevent));	
+	
     if (flags & EVENT_READ) {
         eflags |= EVFILT_READ;
     }
@@ -56,9 +56,9 @@ event_set(conn *c, int flags)
         eflags |= EVFILT_WRITE;
     }
 	
-	ke.udata = c;
-	EV_SET(&ke, c->fd, eflags, EV_ADD, 0, 0, NULL);
-	if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
+	ke->udata = c;
+	EV_SET(ke, c->fd, eflags, EV_ADD, 0, 0, NULL);
+	if (kevent(kqfd, ke, 1, NULL, 0, NULL) == -1) {
 		syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
 		return 0;
 	}	
