@@ -57,8 +57,10 @@ event_set(conn *c, int flags)
     }
 	
 	ke.udata = c;
+	fprintf(stderr, "(kqueue)event_set with user data: %p\r\n", ke.udata);
 	EV_SET(&ke, c->fd, eflags, EV_ADD, 0, 0, NULL);
 	if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
+		perror("kevent");
 		syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
 		return 0;
 	}	
