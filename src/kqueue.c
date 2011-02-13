@@ -68,11 +68,11 @@ event_set(conn *c, int flags)
 void
 event_process(void)
 {
-	int nfds;
-	struct kevent events[AE_SETSIZE];
+	int nfds, n;
+	struct kevent events[POLL_MAX_EVENTS];
 	conn *conn;
 	
-	nfds = kevent(kqfd, NULL, 0, events, AE_SETSIZE, &timeout);
+	nfds = kevent(kqfd, NULL, 0, events, POLL_MAX_EVENTS, &timeout);
 	if (nfds == -1) {
         syslog(LOG_ERR, "%s (%s)", "kqueue wait error.", strerror(errno));
         return;
