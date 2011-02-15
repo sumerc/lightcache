@@ -3,7 +3,7 @@ import unittest
 from testbase import LightCacheTestBase
 
 class ProtocolTests(LightCacheTestBase):
-    """
+    
     def test_idle_timeout(self):
 	self.client.chg_setting("idle_conn_timeout", 2)
      	self.assertTrue(self.client._is_disconnected(in_secs=5))
@@ -81,7 +81,7 @@ class ProtocolTests(LightCacheTestBase):
     def test_chg_setting_overflowed(self):
         self.client.chg_setting("idle_conn_timeout", 2222222222222222222222222222222)
         self.client.assertDisconnected() 
-    """
+    
     def test_subsequent_packets(self):
 	self.client.set("key_sub", "val_sub", 60)
 	self.client.send_packet(key="key_sub", command=self.client.CMD_GET) 

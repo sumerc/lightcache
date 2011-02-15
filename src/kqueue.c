@@ -55,9 +55,9 @@ event_set(conn *c, int flags)
 	fprintf(stderr, "(kqueue)event_set called.\r\n");
 	
 	// clear all previous events
-	EV_SET(&ke[0], c->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+	EV_SET(&ke, c->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
     kevent(kqfd, (struct kevent *)&ke, 1, NULL, 0, NULL);
-	EV_SET(&ke[0], c->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+	EV_SET(&ke, c->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
     kevent(kqfd, (struct kevent *)&ke, 1, NULL, 0, NULL);
 	
 	if (flags & EVENT_READ) {
