@@ -53,8 +53,12 @@ event_set(conn *c, int flags)
 	struct kevent ke;
 	
 	// clear all previous events
-	event_del(c);
-	
+	//event_del(c);
+	EV_SET(&ke, c->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+    kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1);	
+	EV_SET(&ke, c->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+    kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1);
+		
 	if (flags & EVENT_READ) {
 		EV_SET(&ke, c->fd, EVFILT_READ, EV_ADD, 0, 0, c);
 		if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
