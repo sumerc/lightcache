@@ -32,18 +32,16 @@ int
 event_del(conn *c)
 {
 	struct kevent ke;
+
 	EV_SET(&ke, c->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
     if (kevent(kqfd, (struct kevent *)&ke, 1, NULL, 0, NULL) == -1) {
-		goto err;
+		;
 	}
 	EV_SET(&ke, c->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
     if (kevent(kqfd, (struct kevent *)&ke, 1, NULL, 0, NULL) == -1) {
-		goto err;
+		;
 	}    
 	return 1;
-err:
-	perror("(event_del)kevent failed.");
-	return 0;
 }
 
 int
@@ -52,13 +50,9 @@ event_set(conn *c, int flags)
 	unsigned short eflags;
 	struct kevent ke;
 	
-	// clear all previous events
-	//event_del(c);
-	EV_SET(&ke, c->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-    kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1);	
-	EV_SET(&ke, c->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-    kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1);
-		
+	/* clear all previous events */
+	event_del(c);
+	
 	if (flags & EVENT_READ) {
 		EV_SET(&ke, c->fd, EVFILT_READ, EV_ADD, 0, 0, c);
 		if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
