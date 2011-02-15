@@ -41,9 +41,11 @@ event_set(conn *c, int flags)
     memset(&ev, 0, sizeof(struct epoll_event));
 
     if (flags & EVENT_READ) {
+    	fprintf(stderr, "event_set() event_read\r\n");
         ev.events |= EPOLLIN;
     }
     if (flags & EVENT_WRITE) {
+    	fprintf(stderr, "event_set() event_write\r\n");
         ev.events |= EPOLLOUT;
     }
 
