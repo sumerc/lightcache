@@ -50,23 +50,27 @@ int
 event_set(conn *c, int flags)
 {
 	unsigned short eflags;
-	struct kevent ke[3];
+	struct kevent ke[1];
 	int nchanges;
 	
 	fprintf(stderr, "(kqueue)event_set called.\r\n");
 	
+	// clear all previous events
 	EV_SET(&ke[0], c->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-    EV_SET(&ke[1], c->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-    nchanges = 2;
+    kevent(kqfd, (struct kevent *)&ke, 1, NULL, 0, NULL)
+	EV_SET(&ke[0], c->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+    kevent(kqfd, (struct kevent *)&ke, 1, NULL, 0, NULL)
+	
+	nchanges = 0;
 	if (flags & EVENT_READ) {
-		EV_SET(&ke[2], c->fd, EVFILT_READ, EV_ADD, 0, 0, c); /* udata=c */
+		EV_SET(&ke[0], c->fd, EVFILT_READ, EV_ADD, 0, 0, c);
 		nchanges++;
     }
     if (flags & EVENT_WRITE) {
-		EV_SET(&ke[3], c->fd, EVFILT_WRITE, EV_ADD, 0, 0, c); /* udata=c */
+		EV_SET(&ke[1], c->fd, EVFILT_WRITE, EV_ADD, 0, 0, c);
 		nchanges++;
     }
-	if (kevent(kqfd, &ke, nchanges, NULL, 0, NULL) == -1) {
+	if (kevent(kqfd, (struct kevent *)&ke, nchanges, NULL, 0, NULL) == -1) {
 		perror("kevent failed.");
 		syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
 		return 0;
