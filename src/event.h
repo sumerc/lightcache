@@ -13,8 +13,17 @@ typedef enum {
 } event;
 
 int event_init(void (*ev_handler)(conn *c, event ev));
+
+/* Deletes all previous events and set the new flags.
+*/
 int event_set(conn *c, int flags);
+
+/* Deletes all associated events on the fd.
+*/
 int event_del(conn *c);
-void event_process(void); /* call in server loop */
+
+/* Call in server loop 
+*/
+void event_process(void); 
 
 #endif

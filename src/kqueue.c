@@ -7,8 +7,8 @@
 static int kqfd = 0;
 static void (*event_handler)(conn *c, event ev) = NULL;
 static struct timespec timeout;
-/* constants */
 
+/* constants */
 
 /* functions */
 int
@@ -29,21 +29,21 @@ event_init(void (*ev_handler)(conn *c, event ev))
 }
 
 int
-event_del(conn *conn)
+event_del(conn *c)
 {
-/*  It seems closing fd seems enough for kqueue to delete associated events.
-
 	struct kevent ke;
-	
-	fprintf(stderr, "(kqueue)event_del called.\r\n");
-	
-	EV_SET(&ke, conn->fd, 0, EV_DELETE, 0, 0, NULL); 
-    if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
-		syslog(LOG_ERR, "%s (%s)", "kevent_del error.", strerror(errno));
-        return 0;
+	EV_SET(&ke, c->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+    if (kevent(kqfd, (struct kevent *)&ke, 1, NULL, 0, NULL) == -1) {
+		goto err;
 	}
-*/
-    return 1;
+	EV_SET(&ke, c->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+    if (kevent(kqfd, (struct kevent *)&ke, 1, NULL, 0, NULL) == -1) {
+		goto err;
+	}    
+	return 1;
+err:
+	perror("(event_del)kevent failed.");
+	return 0;
 }
 
 int
@@ -51,33 +51,27 @@ event_set(conn *c, int flags)
 {
 	unsigned short eflags;
 	struct kevent ke;
-		
-	fprintf(stderr, "(kqueue)event_set called.\r\n");
 	
 	// clear all previous events
-	EV_SET(&ke, c->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-    kevent(kqfd, (struct kevent *)&ke, 1, NULL, 0, NULL);
-	EV_SET(&ke, c->fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-    kevent(kqfd, (struct kevent *)&ke, 1, NULL, 0, NULL);
+	event_del(c);
 	
 	if (flags & EVENT_READ) {
 		EV_SET(&ke, c->fd, EVFILT_READ, EV_ADD, 0, 0, c);
 		if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
-			perror("kevent failed.");
-			syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
-			return 0;
+			goto err;
 		}
     }
     if (flags & EVENT_WRITE) {
 		EV_SET(&ke, c->fd, EVFILT_WRITE, EV_ADD, 0, 0, c);
 		if (kevent(kqfd, &ke, 1, NULL, 0, NULL) == -1) {
-			perror("kevent failed.");
-			syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
-			return 0;
+			goto err;
 		}
-    }
-		
+    }		
 	return 1;
+err:
+	perror("(event_set)kevent failed.");
+	syslog(LOG_ERR, "%s (%s)", "kevent mod. connection error.", strerror(errno));
+	return 0;
 }
 
 void

@@ -23,6 +23,8 @@ event_init(void (*ev_handler)(conn *c, event ev))
 int
 event_del(conn *conn)
 {
+	/* todo : Note, Kernel < 2.6.9 requires a non null event pointer even for
+         * EPOLL_CTL_DEL. */
     if (epoll_ctl(epollfd, EPOLL_CTL_DEL, conn->fd, 0) == -1) {
         syslog(LOG_ERR, "%s (%s)", "epoll_ctl disconnect conn.", strerror(errno));
         return 0;
@@ -36,16 +38,10 @@ event_set(conn *c, int flags)
     int op;
     struct epoll_event ev;
 
-    //dprintf("flags:%d, anded:%d", flags, flags & EVENT_READ);
-
-    memset(&ev, 0, sizeof(struct epoll_event));
-
     if (flags & EVENT_READ) {
-    	fprintf(stderr, "event_set() event_read\r\n");
         ev.events |= EPOLLIN;
     }
     if (flags & EVENT_WRITE) {
-    	fprintf(stderr, "event_set() event_write\r\n");
         ev.events |= EPOLLOUT;
     }
 
