@@ -92,7 +92,7 @@ free_request(request *req)
     }
 
     if (req->can_free) {
-        fprintf(stderr, "FREEING request data.[%p], sizeof:[%lu]\r\n", (void *)req, sizeof(request *));
+        fprintf(stderr, "FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, sizeof(request *));
         li_free(req->rkey);
         li_free(req->rdata);
         li_free(req->rextra);
@@ -713,6 +713,8 @@ main(int argc, char **argv)
     if (!cache) {
         goto err;
     }
+    
+    fprintf(stderr, "lightcache started.\r\n");    
 
     ptime = 0;
     for (;;) {
