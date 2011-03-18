@@ -30,7 +30,10 @@ v0.1
 	logic with kqueue.
 v0.2
 ---------
-[-] supporting full-duplex mode per client?
+[*] TOO HARD from now on and memcached is also not doing like this.Subsequent read/write should be possible at the same time.
+    and i don't expect any valid use case for this requirement. If you see one write here.
+[-] test_protocol suite failing when run in remote. send_overflow_data is not returning from assertDisconnect() 
+    somehow when lightcache is run remotely. Remote system is CentOS 64 bit.
 [-] use HHASH algorithm same as memcached. Bob Jenkins is the expert there:)
 [-] Program received signal SIGFPE, Arithmetic exception. disable this. 
 	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD)	
