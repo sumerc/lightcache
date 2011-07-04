@@ -30,14 +30,14 @@ v0.1
 	logic with kqueue.
 v0.2
 ---------
-[*] TOO HARD from now on and memcached is also not doing like this.Subsequent read/write should be possible at the same time.
-    and i don't expect any valid use case for this requirement. If you see one write here.
-[-] test_protocol suite failing when run in remote. send_overflow_data is not returning from assertDisconnect() 
-    somehow when lightcache is run remotely. Remote system is CentOS 64 bit.
-[-] use HHASH algorithm same as memcached. Bob Jenkins is the expert there:)
-[-] Program received signal SIGFPE, Arithmetic exception. disable this. 
-	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD)	
+[*] TOO HARD from now on and memcached is also not doing like this.Subsequent read/write should be possible at the same time. And i don't expect any valid use case for this requirement. If you see one write here.
+[*] use HHASH algorithm same as memcached. Bob Jenkins is the expert there:)
+    Maybe improve in next versions, currently it is ok using one_at_a_time hash.
+[+] use DEBUG macro for debugging the flow. Currently they are fprintf(stderr,)
 [-] req per sec/sent per sec stats, and total sent/received stats.
 [-] GET_MANY after all of above is working.
+[-] test_protocol suite failing when run in remote. send_overflow_data is not returning from assertDisconnect() somehow when lightcache is run remotely. Remote system is CentOS 64 bit.
+[-] Program received signal SIGFPE, Arithmetic exception. disable this. 
+	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD)	
 [-] implement unix domain sockets.
 [-] more tests & more tests.

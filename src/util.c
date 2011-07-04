@@ -34,6 +34,7 @@ deamonize(void)
     signal(SIGCHLD,_child_handler);
     signal(SIGUSR1,_child_handler);
     signal(SIGALRM,_child_handler);
+    //signal(SIGFPE, SIG_IGN); comment in after extensive testing.
 
     /* Fork off the parent process */
     pid = fork();
