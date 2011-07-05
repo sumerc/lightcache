@@ -60,6 +60,7 @@ typedef enum {
     SEND_HEADER = 0x05,
     SEND_DATA = 0x06,
     READ_EXTRA = 0x07,
+    CMD_SENT = 0x08,
 } conn_states;
 
 typedef struct conn conn;
