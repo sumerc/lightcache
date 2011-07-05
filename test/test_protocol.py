@@ -51,12 +51,12 @@ class ProtocolTests(LightCacheTestBase):
 	self.assertEqual(self.client.get("key2"), None)  # key expired
     
     def test_get_overflowed_timeout(self):
-	self.client.set("key5", "value5", 101010101010010101001010101001)
-	self.assertEqual(self.client.get("key5"), None)
-    
+        self.client.set("key5", "value5", 101010101010010101001010101001)
+        self.client.assertDisconnected()
+                
     def test_get_invalid_timeout(self):
-	self.client.set("key5", "value5", "invalid_value")
-	self.assertEqual(self.client.get("key5"), None)
+        self.client.set("key5", "value5", "invalid_value")
+        self.client.assertDisconnected()
 
     def test_get_setting(self):
 	self.client.chg_setting("idle_conn_timeout", 5)
