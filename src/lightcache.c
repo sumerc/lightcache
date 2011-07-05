@@ -646,6 +646,7 @@ init_server_socket(void)
     struct sockaddr_un su_me;         
     struct conn *conn;
     struct stat tstat;
+    struct linger ling = {0, 0};
     
     if (settings.socket_path) {        
         // clean previous socket file.
@@ -675,7 +676,7 @@ init_server_socket(void)
     if (ret != 0) {
         syslog(LOG_ERR, "setsockopt(SO_KEEPALIVE) error.(%s)", strerror(errno));
     }
-    setsockopt(s, SOL_SOCKET, SO_LINGER, &optval, sizeof(optval));
+    setsockopt(s, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling));
     if (ret != 0) {
         syslog(LOG_ERR, "setsockopt(SO_LINGER) error.(%s)", strerror(errno));
     }
