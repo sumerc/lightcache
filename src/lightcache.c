@@ -637,56 +637,84 @@ collect_unused_memory(void)
     // TODO: Implement.
 }
 
-
-static int
-init_server_unix_socket(void)
-{
-    return 1;
-}
-
 static int 
 init_server_socket(void)
 {
     int s, optval, ret;
-    struct sockaddr_in si_me;        
+    struct sockaddr_in si_me;  
+    struct sockaddr_un su_me;         
     struct conn *conn;
-
-    if ((s=socket(AF_INET, SOCK_STREAM, 0))==-1) {
-        syslog(LOG_ERR, "%s (%s)", "socket make error.", strerror(errno));
-        return 0;
+    struct stat tstat;
+    
+    if (settings.socket_path) {        
+        // clean previous socket file.
+        // todo: lstat() meybe necessary but not ANSI complaint, aslo the check
+        // of S_ISSOCK() here is needed but not ANSI compliant.        
+        if (stat(settings.socket_path, &tstat) == 0) {
+            unlink(settings.socket_path);
+        }
+        
+        if ((s=socket(AF_UNIX, SOCK_STREAM, 0))==-1) {
+            syslog(LOG_ERR, "%s (%s)", "unix socket make error.", strerror(errno));
+            return 0;
+        }
+    } else {
+        if ((s=socket(AF_INET, SOCK_STREAM, 0))==-1) {
+            syslog(LOG_ERR, "%s (%s)", "socket make error.", strerror(errno));
+            return 0;
+        }
     }
+
     optval = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
     if (ret != 0) {
         syslog(LOG_ERR, "setsockopt(SO_REUSEADDR) error.(%s)", strerror(errno));
-        LC_DEBUG(("setsockopt(SO_REUSEADDR) error.(%s)", strerror(errno)));
     }        
     setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
     if (ret != 0) {
         syslog(LOG_ERR, "setsockopt(SO_KEEPALIVE) error.(%s)", strerror(errno));
-        LC_DEBUG(("setsockopt(SO_KEEPALIVE) error.(%s)", strerror(errno)));
     }
     setsockopt(s, SOL_SOCKET, SO_LINGER, &optval, sizeof(optval));
     if (ret != 0) {
         syslog(LOG_ERR, "setsockopt(SO_LINGER) error.(%s)", strerror(errno));
-        LC_DEBUG(("setsockopt(SO_LINGER) error.(%s)", strerror(errno)));
-    }
-    setsockopt(s, IPPROTO_TCP, TCP_NODELAY, &optval, sizeof(optval));
-    if (ret != 0) {
-        syslog(LOG_ERR, "setsockopt(TCP_NODELAY) error.(%s)", strerror(errno));
-        LC_DEBUG(("setsockopt(TCP_NODELAY) error.(%s)", strerror(errno)));
     }
 
-    memset((char *) &si_me, 0, sizeof(si_me));
-    si_me.sin_family = AF_INET;
-    si_me.sin_port = htons(LIGHTCACHE_PORT);
-    si_me.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (bind(s, (struct sockaddr *)&si_me, sizeof(si_me))==-1) {
-        syslog(LOG_ERR, "%s (%s)", "socket bind error.", strerror(errno));
+    // only for TCP sockets.
+    if (!settings.socket_path) {
+        setsockopt(s, IPPROTO_TCP, TCP_NODELAY, &optval, sizeof(optval));
+        if (ret != 0) {
+            syslog(LOG_ERR, "setsockopt(TCP_NODELAY) error.(%s)", strerror(errno));
+        }
+    }
+    
+    if (settings.socket_path) {
+        memset((char *) &su_me, 0, sizeof(su_me));
+        su_me.sun_family = AF_UNIX;
+        strncpy(su_me.sun_path, settings.socket_path, sizeof(su_me.sun_path) - 1);
+        if (bind(s, (struct sockaddr *)&su_me, sizeof(su_me)) == -1) {
+            syslog(LOG_ERR, "%s (%s)", "socket bind error.", strerror(errno));
+            close(s);
+            return 0;
+        }
+    } else { 
+        memset((char *) &si_me, 0, sizeof(si_me));
+        si_me.sin_family = AF_INET;
+        si_me.sin_port = htons(LIGHTCACHE_PORT);
+        si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+        if (bind(s, (struct sockaddr *)&si_me, sizeof(si_me))==-1) {
+            syslog(LOG_ERR, "%s (%s)", "socket bind error.", strerror(errno));
+            close(s);
+            return 0;
+        }
+    }
+
+
+    make_nonblocking(s);
+    if (listen(s, LIGHTCACHE_LISTEN_BACKLOG) == -1) {
+        syslog(LOG_ERR, "%s (%s)", "socket listen error.", strerror(errno));
+        close(s);
         return 0;
     }
-    make_nonblocking(s);
-    listen(s, LIGHTCACHE_LISTEN_BACKLOG);
     conn = make_conn(s);
     if (!conn) {
         return 0;
@@ -745,18 +773,11 @@ main(int argc, char **argv)
         goto err;
     }
 
-    /* init listening socket */
-    if (settings.socket_path != NULL) {
-        if (!init_server_unix_socket()) {
-            goto err;
-        }
-    } else {
-        if (!init_server_socket()) {
-            goto err;
-        }
-    }
+    /* init listening socket. */
+    if (!init_server_socket()) {
+        goto err;
+    }   
     
-
     /* create the in-memory hash table. Constant is not important here.
      * Hash table is an exponantially growing as more and more items being
      * added.

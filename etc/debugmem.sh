@@ -1,1 +1,1 @@
-valgrind --leak-check=full --show-reachable=yes ../lightcache
+valgrind --leak-check=full --show-reachable=yes ../src/lightcache

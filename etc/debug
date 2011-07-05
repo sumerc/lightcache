@@ -1,1 +1,1 @@
-gdb ../lightcache
+gdb ../src/lightcache
