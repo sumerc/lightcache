@@ -53,7 +53,7 @@ class LightCacheClient(socket.socket):
     def recv_packet(self):
         try:
             resp = self.recv(self.RESP_HEADER_SIZE)
-             opcode, data_len = struct.unpack("BI", resp)
+            opcode, data_len = struct.unpack("BI", resp)
             data_len = socket.ntohl(data_len)
             resp = self.recv(data_len)
             return resp

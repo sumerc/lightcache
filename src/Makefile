@@ -1,9 +1,9 @@
 
 OPTIMIZATION?=-O3
-CFLAGS?=  -std=c99 -pedantic $(OPTIMIZATION) -Wall -W 
+CFLAGS?=  -std=c99 -pedantic $(OPTIMIZATION) -Wall -W
 
 CCOPT= $(CFLAGS)
-DEBUG?= -g -rdynamic -ggdb -D LITTLE_ENDIAN -D DEBUG
+DEBUG?= -pg -g -rdynamic -ggdb -D LITTLE_ENDIAN -D DEBUG
 
 INSTALL_TOP= /usr/local
 INSTALL_BIN= $(INSTALL_TOP)/bin
@@ -16,8 +16,8 @@ PRGNAME = lightcache
 all: lightcache_server
 
 lightcache_server :
-	$(CC) -o $(PRGNAME) $(CCOPT) $(DEBUG) $(FILES)
-	
+	$(CC) $(CCOPT) $(DEBUG) $(FILES) -o $(PRGNAME)
+
 clean:
 	rm $(PRGNAME)
 

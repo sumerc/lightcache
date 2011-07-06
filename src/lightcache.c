@@ -790,7 +790,7 @@ main(int argc, char **argv)
     }
 
     LC_DEBUG(("lightcache started.\r\n"));
-
+    
     ptime = 0;
     for (;;) {
 
