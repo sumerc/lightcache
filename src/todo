@@ -37,11 +37,11 @@ v0.2
 [+] req per sec/sent per sec stats, and total sent/received stats.
 [*] GET_MANY after all of above is working. It seems redundant as client can implement this functionality with n pipelined request with a single
     connection.
-[-] memcache accepts a unix domain socket path as a param and does REUSEADDR, KEEPALIVE, LINGER on both socket types. Also, TCP_NODELAY is set for
+[+] memcache accepts a unix domain socket path as a param and does REUSEADDR, KEEPALIVE, LINGER on both socket types. Also, TCP_NODELAY is set for
     normal berkeley sockets.
-[-] implement unix domain sockets.
+[+] implement unix domain sockets.
 [-] RE-TEST again with LINGER OPtion as memcached.test_protocol suite failing when run in remote. send_overflow_data is not returning from assertDisconnect() somehow when lightcache is run remotely. Remote system is CentOS 64 bit.
 [-] Program received signal SIGFPE, Arithmetic exception. disable this. 
 	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD)	
-
 [-] more tests & more tests.
+[-] any optimization window for malloc()'s?
