@@ -298,7 +298,7 @@ execute_cmd(struct conn* conn)
 
     case CMD_SET:
         LC_DEBUG(("CMD_SET request for key, data, extra: %s, %s, %s\r\n", conn->in->rkey, conn->in->rdata,
-                conn->in->rextra));
+                  conn->in->rextra));
 
         /* validate params */
         if (!conn->in->rkey) {
@@ -309,12 +309,12 @@ execute_cmd(struct conn* conn)
             LC_DEBUG(("invalid data param in CMD_SET\r\n"));
             return;
         }
-        
+
         if (!atoull(conn->in->rextra, &val)) {
             LC_DEBUG(("invalid timeout param in CMD_SET\r\n"));
             disconnect_conn(conn);
             return;
-        }        
+        }
 
         /* add to cache */
         ret = hset(cache, conn->in->rkey, conn->in->req_header.request.key_length, conn->in);
@@ -332,7 +332,7 @@ execute_cmd(struct conn* conn)
         break;
     case CMD_CHG_SETTING:
         LC_DEBUG(("CMD_CHG_SETTING request with data %s, key_length:%d\r\n",
-                conn->in->rdata, conn->in->req_header.request.key_length));
+                  conn->in->rdata, conn->in->req_header.request.key_length));
         if (!conn->in->rdata) {
             LC_DEBUG(("(null) data param in CMD_CHG_SETTING\r\n"));
             break;
@@ -359,7 +359,7 @@ execute_cmd(struct conn* conn)
         break;
     case CMD_GET_SETTING:
         LC_DEBUG(("CMD_GET_SETTING request for key: %s, data:%s\r\n", conn->in->rkey,
-                conn->in->rdata));
+                  conn->in->rdata));
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!prepare_response(conn, sizeof(uint64_t), 1)) {
                 return;
@@ -563,7 +563,7 @@ try_send_response(conn *conn)
         }
         break;
     default:
-		LC_DEBUG(("Invalid state in try_send_response %d\r\n", conn->state));
+        LC_DEBUG(("Invalid state in try_send_response %d\r\n", conn->state));
         ret = INVALID_STATE;
         break;
     }
@@ -638,24 +638,24 @@ collect_unused_memory(void)
 }
 
 
-static int 
+static int
 init_server_socket(void)
 {
     int s, optval, ret;
-    struct sockaddr_in si_me;  
-    struct sockaddr_un su_me;         
+    struct sockaddr_in si_me;
+    struct sockaddr_un su_me;
     struct conn *conn;
     struct stat tstat;
     struct linger ling = {0, 0};
-    
-    if (settings.socket_path) {        
+
+    if (settings.socket_path) {
         // clean previous socket file.
         // todo: lstat() meybe necessary but not ANSI complaint, aslo the check
-        // of S_ISSOCK() here is needed but not ANSI compliant.        
+        // of S_ISSOCK() here is needed but not ANSI compliant.
         if (stat(settings.socket_path, &tstat) == 0) {
             unlink(settings.socket_path);
         }
-        
+
         if ((s=socket(AF_UNIX, SOCK_STREAM, 0))==-1) {
             syslog(LOG_ERR, "%s (%s)", "unix socket make error.", strerror(errno));
             return 0;
@@ -671,7 +671,7 @@ init_server_socket(void)
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
     if (ret != 0) {
         syslog(LOG_ERR, "setsockopt(SO_REUSEADDR) error.(%s)", strerror(errno));
-    }        
+    }
     setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
     if (ret != 0) {
         syslog(LOG_ERR, "setsockopt(SO_KEEPALIVE) error.(%s)", strerror(errno));
@@ -688,7 +688,7 @@ init_server_socket(void)
             syslog(LOG_ERR, "setsockopt(TCP_NODELAY) error.(%s)", strerror(errno));
         }
     }
-    
+
     if (settings.socket_path) {
         memset((char *) &su_me, 0, sizeof(su_me));
         su_me.sun_family = AF_UNIX;
@@ -698,7 +698,7 @@ init_server_socket(void)
             close(s);
             return 0;
         }
-    } else { 
+    } else {
         memset((char *) &si_me, 0, sizeof(si_me));
         si_me.sin_family = AF_INET;
         si_me.sin_port = htons(LIGHTCACHE_PORT);
@@ -724,7 +724,7 @@ init_server_socket(void)
 
     conn->listening = 1;
     event_set(conn, EVENT_READ);
-    
+
     return 1;
 }
 
@@ -778,8 +778,8 @@ main(int argc, char **argv)
     /* init listening socket. */
     if (!init_server_socket()) {
         goto err;
-    }   
-    
+    }
+
     /* create the in-memory hash table. Constant is not important here.
      * Hash table is an exponantially growing as more and more items being
      * added.
@@ -788,8 +788,8 @@ main(int argc, char **argv)
     if (!cache) {
         goto err;
     }
-    
-    LC_DEBUG(("lightcache started.\r\n"));    
+
+    LC_DEBUG(("lightcache started.\r\n"));
 
     ptime = 0;
     for (;;) {
@@ -797,17 +797,17 @@ main(int argc, char **argv)
         ctime = CURRENT_TIME;
 
         event_process();
-        
+
         if (ctime-ptime > 1) {
-            
+
             stats.req_per_sec = 0;
-            stats.resp_per_sec = 0;            
+            stats.resp_per_sec = 0;
 
             // Note: This code is executed per-sec roughly. Audits below can hold another variable to count
             // how many seconds elapsed to invoke themselves or not.
 
             disconnect_idle_conns();
-            
+
             if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD) {
                 collect_unused_memory();
             }

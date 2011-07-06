@@ -15,7 +15,7 @@ class LightCacheTestBase(unittest.TestCase):
         if self.use_unix_socket:
             self.client = LightCacheClient(socket.AF_UNIX, socket.SOCK_STREAM) 
             self.client.connect(self.unix_socket_path)
-        else:	    
+        else:    
             self.client = LightCacheClient(socket.AF_INET, socket.SOCK_STREAM)  	        
             self.client.connect((self.host, self.port)) 
         

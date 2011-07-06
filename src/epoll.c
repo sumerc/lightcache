@@ -23,7 +23,7 @@ event_init(void (*ev_handler)(conn *c, event ev))
 int
 event_del(conn *conn)
 {
-	/* todo : Note, Kernel < 2.6.9 requires a non null event pointer even for
+    /* todo : Note, Kernel < 2.6.9 requires a non null event pointer even for
          * EPOLL_CTL_DEL. */
     if (epoll_ctl(epollfd, EPOLL_CTL_DEL, conn->fd, 0) == -1) {
         syslog(LOG_ERR, "%s (%s)", "epoll_ctl disconnect conn.", strerror(errno));
@@ -78,8 +78,8 @@ event_process(void)
     // process events
     for (n = 0; n < nfds; ++n) {
         conn = (struct conn *)events[n].data.ptr;
-		assert(conn != NULL);
-		
+        assert(conn != NULL);
+
         if ( events[n].events & EPOLLIN ) {
             event_handler(conn, EVENT_READ);
         }

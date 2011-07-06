@@ -22,8 +22,8 @@ int event_set(conn *c, int flags);
 */
 int event_del(conn *c);
 
-/* Call in server loop 
+/* Call in server loop
 */
-void event_process(void); 
+void event_process(void);
 
 #endif

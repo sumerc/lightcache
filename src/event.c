@@ -4,10 +4,10 @@
 #ifdef HAVE_EPOLL
 #include "epoll.c"
 #else
-    #ifdef HAVE_KQUEUE
-    #include "kqueue.c"
-    #else
-    #include "select.c"
-    #endif
+#ifdef HAVE_KQUEUE
+#include "kqueue.c"
+#else
+#include "select.c"
+#endif
 #endif
 

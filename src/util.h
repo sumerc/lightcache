@@ -7,7 +7,7 @@
 #ifdef DEBUG
 #define LC_DEBUG(x) printf x
 #else
-#define LC_DEBUG(x) 
+#define LC_DEBUG(x)
 #endif
 
 #define CURRENT_TIME time(NULL)

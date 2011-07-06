@@ -131,10 +131,10 @@ atoull(const char *s, uint64_t *ret)
     if (errno == ERANGE || errno == EINVAL) {
         return 0;
     }
-    
+
     if (*ret == 0) { /*TODO: platform independent way to detect invalid values for an integer*/
-    	return 0;
+        return 0;
     }
-    
+
     return 1;
 }
