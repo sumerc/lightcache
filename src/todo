@@ -46,6 +46,7 @@ v0.2
     Current test cases have assertDisconnect on protocol errors and this should not be the case. disconnect on server 
     side should only happen on server side errors such as not being able to alloc mem or so...
 [-] add tests for uncompleted messages where we have key but data is missing etc. Write test for most of them,, if possible all of them.
+[-] Tests need refactoring. maybe a testprotocol file definind protocol messages errcodes...etc. Combine asertErrcode somehow.
 [-] manual testing interface. 
 [-] write uptime and version info in stats.
 [-] maybe a cmd to flush data..etc., too?
