@@ -30,8 +30,13 @@ init_freelists(void)
 void
 init_settings(void)
 {
-    settings.idle_conn_timeout = 2; // in secs -- default same as memcached
+#ifndef DEBUG
     settings.deamon_mode = 1;
+    settings.idle_conn_timeout = 2; // in secs -- default same as memcached
+#else
+    settings.deamon_mode = 0;
+    settings.idle_conn_timeout = 4000000000; // near infinite for testing
+#endif
     settings.mem_avail = 64 * 1024 * 1024; // in bytes -- 64 mb -- default same as memcached
     settings.socket_path = NULL;    // unix domain socket is off by default.
 }
@@ -48,6 +53,9 @@ init_stats(void)
 {
     stats.mem_used = 0;
     stats.mem_request_count = 0;
+    stats.req_per_sec = 0;
+    stats.resp_per_sec = 0;
+    stats.start_time = CURRENT_TIME;
 }
 
 struct conn*
@@ -227,6 +235,23 @@ set_conn_state(struct conn* conn, conn_states state)
 
 }
 
+static void
+send_err_response(conn *conn, errors err)
+{
+    assert(conn->out != NULL);
+    
+    conn->out->resp_header.response.data_length = 0;
+    conn->out->resp_header.response.opcode = conn->in->req_header.request.opcode;
+    conn->out->resp_header.response.errcode = err;
+    
+    conn->out->sdata = NULL;
+    conn->out->can_free = 1;
+
+    LC_DEBUG(("sending err response:%d\r\n", err));
+
+    set_conn_state(conn, SEND_HEADER);
+}
+
 static int
 prepare_response(conn *conn, size_t data_length, int alloc_mem)
 {
@@ -241,7 +266,8 @@ prepare_response(conn *conn, size_t data_length, int alloc_mem)
     }
     conn->out->resp_header.response.data_length = htonl(data_length);
     conn->out->resp_header.response.opcode = conn->in->req_header.request.opcode;
-
+    conn->out->resp_header.response.errcode = SUCCESS;
+    
     return 1;
 }
 
@@ -259,16 +285,26 @@ execute_cmd(struct conn* conn)
 
     /* here, the complete request is received from the connection */
     conn->in->received = CURRENT_TIME;
-
     cmd = conn->in->req_header.request.opcode;
 
     switch(cmd) {
     case CMD_GET:
-
+    
+        LC_DEBUG(("CMD_GET request\r\n"));
+    
+        /* validate params */
+        if (!conn->in->rkey) {
+            LC_DEBUG(("invalid key param in CMD_GET\r\n"));
+            send_err_response(conn, INVALID_PARAM);
+            return;
+        }
+        
+        /* get item */
         LC_DEBUG(("CMD_GET request for key: %s\r\n", conn->in->rkey));
         tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
         if (!tab_item) {
             LC_DEBUG(("key not found:%s\r\n", conn->in->rkey));
+            send_err_response(conn, KEY_NOTEXISTS);
             return;
         }
         cached_req = (request *)tab_item->val;
@@ -277,12 +313,12 @@ execute_cmd(struct conn* conn)
         r = atoull(cached_req->rextra, &val);
         assert(r != 0);/* CMD_SET already does this validation but re-check*/
 
-        if ( (unsigned int)(conn->in->received-cached_req->received) > val) {
+        if ((unsigned int)(conn->in->received-cached_req->received) > val) {
             LC_DEBUG(("time expired for key:%s\r\n", conn->in->rkey));
             cached_req->can_free = 1;
             free_request(cached_req);
             hfree(cache, tab_item); // recycle tab_item
-            disconnect_conn(conn);
+            send_err_response(conn, KEY_NOTEXISTS);
             return;
         }
         if (!prepare_response(conn, cached_req->req_header.request.data_length, 0)) { // do not alloc mem
@@ -297,22 +333,24 @@ execute_cmd(struct conn* conn)
         break;
 
     case CMD_SET:
-        LC_DEBUG(("CMD_SET request for key, data, extra: %s, %s, %s\r\n", conn->in->rkey, conn->in->rdata,
-                  conn->in->rextra));
+        
+        LC_DEBUG(("CMD_SET request\r\n"));
 
         /* validate params */
         if (!conn->in->rkey) {
             LC_DEBUG(("invalid key param in CMD_SET\r\n"));
+            send_err_response(conn, INVALID_PARAM);
             return;
         }
         if (!conn->in->rdata) {
             LC_DEBUG(("invalid data param in CMD_SET\r\n"));
+            send_err_response(conn, INVALID_PARAM);
             return;
         }
 
         if (!atoull(conn->in->rextra, &val)) {
             LC_DEBUG(("invalid timeout param in CMD_SET\r\n"));
-            disconnect_conn(conn);
+            send_err_response(conn, INVALID_PARAM);
             return;
         }
 
@@ -331,17 +369,26 @@ execute_cmd(struct conn* conn)
         set_conn_state(conn, READ_HEADER);
         break;
     case CMD_CHG_SETTING:
-        LC_DEBUG(("CMD_CHG_SETTING request with data %s, key_length:%d\r\n",
-                  conn->in->rdata, conn->in->req_header.request.key_length));
-        if (!conn->in->rdata) {
-            LC_DEBUG(("(null) data param in CMD_CHG_SETTING\r\n"));
+    
+        LC_DEBUG(("CMD_CHG_SETTING request\r\n"));
+        
+        /* validate params */
+        if (!conn->in->rkey) {
+            LC_DEBUG(("(null) key param in CMD_CHG_SETTING\r\n"));
+            send_err_response(conn, INVALID_PARAM);
             break;
         }
-
+        if (!conn->in->rdata) {
+            LC_DEBUG(("(null) data param in CMD_CHG_SETTING\r\n"));
+            send_err_response(conn, INVALID_PARAM);
+            break;
+        }
+        
+        /* process */
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!atoull(conn->in->rdata, &val)) {
                 LC_DEBUG(("invalid idle conn timeout param.\r\n"));
-                disconnect_conn(conn);
+                send_err_response(conn, INVALID_PARAM);
                 return;
             }
             LC_DEBUG(("SET idle conn timeout :%llu\r\n", (long long unsigned int)val));
@@ -349,7 +396,7 @@ execute_cmd(struct conn* conn)
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
             if (!atoull(conn->in->rdata, &val)) {
                 LC_DEBUG(("invalid mem avail param.\r\n"));
-                disconnect_conn(conn);
+                send_err_response(conn, INVALID_PARAM);
                 return;
             }
             LC_DEBUG(("SET mem avail :%llu", (long long unsigned int)val));
@@ -358,8 +405,17 @@ execute_cmd(struct conn* conn)
         set_conn_state(conn, READ_HEADER);
         break;
     case CMD_GET_SETTING:
-        LC_DEBUG(("CMD_GET_SETTING request for key: %s, data:%s\r\n", conn->in->rkey,
-                  conn->in->rdata));
+    
+        LC_DEBUG(("CMD_GET_SETTING request\r\n"));
+        
+        
+        /* validate params */
+        if (!conn->in->rkey) {
+            LC_DEBUG(("(null) data param in CMD_GET_SETTING\r\n"));
+            send_err_response(conn, INVALID_PARAM);
+            break;
+        }
+        
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!prepare_response(conn, sizeof(uint64_t), 1)) {
                 return;
@@ -375,14 +431,19 @@ execute_cmd(struct conn* conn)
         }
         break;
     case CMD_GET_STATS:
+        
         LC_DEBUG(("CMD_GET_STATS request\r\n"));
-        if (!prepare_response(conn, 250, 1)) {
+        
+        if (!prepare_response(conn, LIGHTCACHE_STATS_SIZE, 1)) {
             return;
         }
         sprintf(conn->out->sdata, "mem_used:%llu\r\n", (long long unsigned int)stats.mem_used);
+        //sprintf(conn->out->sdata, "uptime:%lu\r\n", (long unsigned int)CURRENT_TIME-stats.start_time);
+        //sprintf(conn->out->sdata, "version: %0.1f Build.%d\r\n", LIGHTCACHE_VERSION, LIGHTCACHE_BUILD);
         set_conn_state(conn, SEND_HEADER);
         break;
     }
+    
     return;
 
 }
@@ -452,7 +513,8 @@ try_read_request(conn* conn)
                     (conn->in->req_header.request.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
                 syslog(LOG_ERR, "request data or key length exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
                 LC_DEBUG(("request data or key length exceeded maximum allowed\r\n"));
-                return READ_ERR;
+                send_err_response(conn, INVALID_PARAM_SIZE);
+                return FAILED;
             }
 
             // need2 read key?
@@ -471,9 +533,7 @@ try_read_request(conn* conn)
 
         ret = read_nbytes(conn, conn->in->rkey, conn->in->req_header.request.key_length);
 
-        if (ret == READ_COMPLETED) {
-
-            // need2 read data?
+        if (ret == READ_COMPLETED) {            
             if (conn->in->req_header.request.data_length == 0) {
                 set_conn_state(conn, CMD_RECEIVED);
                 execute_cmd(conn);
@@ -507,7 +567,8 @@ try_read_request(conn* conn)
         break;
     default:
         LC_DEBUG(("Invalid state in try_read_request\r\n"));
-        ret = INVALID_STATE;
+        ret = FAILED;
+        send_err_response(conn, INVALID_STATE);
         break;
     } // switch(conn->state)
 
@@ -550,21 +611,23 @@ try_send_response(conn *conn)
         if (ret == SEND_COMPLETED) {
             if (ntohl(conn->out->resp_header.response.data_length) != 0) {
                 set_conn_state(conn, SEND_DATA);
+            } else {
+                set_conn_state(conn, CMD_SENT);
+                set_conn_state(conn, READ_HEADER);// wait for new commands
             }
         }
         break;
     case SEND_DATA:
         ret = send_nbytes(conn, conn->out->sdata, ntohl(conn->out->resp_header.response.data_length));
         if (ret == SEND_COMPLETED) {
-            if (ntohl(conn->out->resp_header.response.data_length) != 0) {
-                set_conn_state(conn, CMD_SENT);
-                set_conn_state(conn, READ_HEADER);// wait for new commands
-            }
+            set_conn_state(conn, CMD_SENT);
+            set_conn_state(conn, READ_HEADER);// wait for new commands
         }
         break;
     default:
         LC_DEBUG(("Invalid state in try_send_response %d\r\n", conn->state));
-        ret = INVALID_STATE;
+        ret = FAILED;
+        send_err_response(conn, INVALID_STATE);
         break;
     }
 
@@ -608,7 +671,7 @@ event_handler(conn *conn, event ev)
             set_conn_state(conn, READ_HEADER);
         } else {
             sock_state = try_read_request(conn);
-            if (sock_state == READ_ERR || sock_state == INVALID_STATE) {
+            if (sock_state == READ_ERR) {
                 disconnect_conn(conn);
                 return;
             }
@@ -617,7 +680,7 @@ event_handler(conn *conn, event ev)
         break;
     case EVENT_WRITE:
         sock_state = try_send_response(conn);
-        if (sock_state == SEND_ERR || sock_state == INVALID_STATE) {
+        if (sock_state == SEND_ERR) {
             disconnect_conn(conn);
             return;
         }
@@ -768,6 +831,11 @@ main(int argc, char **argv)
     if (settings.deamon_mode) {
         ;
         //deamonize();
+    } else {
+        // When debugging with gprof, we run app in TTY and exit with CTRL+C(SIGINT)
+        // this is to gracefully exit the app. Otherwise, profiling information
+        // cannot be emited. 
+        signal(SIGINT, sig_handler);
     }
 
     ret = event_init(event_handler);
@@ -779,7 +847,7 @@ main(int argc, char **argv)
     if (!init_server_socket()) {
         goto err;
     }
-
+    
     /* create the in-memory hash table. Constant is not important here.
      * Hash table is an exponantially growing as more and more items being
      * added.

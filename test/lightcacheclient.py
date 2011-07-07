@@ -1,5 +1,15 @@
 import struct
 import socket
+import testconf
+
+def make_client():
+    if testconf.use_unix_socket:
+        client = LightCacheClient(socket.AF_UNIX, socket.SOCK_STREAM) 
+        client.connect(testconf.unix_socket_path)
+    else:    
+        client = LightCacheClient(socket.AF_INET, socket.SOCK_STREAM)  	        
+        client.connect((testconf.host, testconf.port)) 
+    return client
 
 class LightCacheClient(socket.socket):
     CMD_GET = 0x00
@@ -14,7 +24,14 @@ class LightCacheClient(socket.socket):
     PROTOCOL_MAX_KEY_SIZE = 250
     PROTOCOL_MAX_DATA_SIZE = 1024 + PROTOCOL_MAX_KEY_SIZE
 
-    RESP_HEADER_SIZE = 8 # in bytes, sync this(xxx)
+    RESP_HEADER_SIZE = 8 # in bytes, SYNC THIS (xxx)
+    
+    # error definitions
+    KEY_NOTEXISTS = 0x00
+    INVALID_PARAM = 0x01
+    INVALID_STATE = 0x02
+    INVALID_PARAM_SIZE = 0x03
+    SUCCESS = 0x04
     
     def _is_disconnected(self, in_secs=None):
         if in_secs:
@@ -27,7 +44,16 @@ class LightCacheClient(socket.socket):
             return True
     
     def assertDisconnected(self):
-        assert(self._is_disconnected() == True)
+        assert self._is_disconnected() == True
+        
+    def assertErrorResponse(self, err):
+        resp = self.recv(self.RESP_HEADER_SIZE)
+        try:
+            opcode, errcode, data_len = struct.unpack("BBI", resp)
+        except:
+            print "dpfgjdfgdfg"
+            print len(resp)
+        assert errcode == err
 
     def _make_packet(self, **kwargs):
         cmd = kwargs.pop("command", 0)
@@ -52,8 +78,13 @@ class LightCacheClient(socket.socket):
 
     def recv_packet(self):
         try:
+            # TODO: recv_header auxiliary function 
             resp = self.recv(self.RESP_HEADER_SIZE)
-            opcode, data_len = struct.unpack("BI", resp)
+            opcode, errcode, data_len = struct.unpack("BBI", resp)
+            print errcode
+            
+            if errcode != self.SUCCESS: # extra validation
+                return None
             data_len = socket.ntohl(data_len)
             resp = self.recv(data_len)
             return resp
@@ -61,12 +92,17 @@ class LightCacheClient(socket.socket):
             return None
 
     def send_raw(self, data):
-        self.send(data)    
-
+        self.send(data)   
+    
     def chg_setting(self, key, value):
+        assert key is not None
+        assert value is not None
+        
         self.send_packet(key=key, data=value, command=self.CMD_CHG_SETTING)    
    
-    def get_setting(self, key):    
+    def get_setting(self, key):  
+        assert key is not None
+      
         self.send_packet(key=key, command=self.CMD_GET_SETTING)    
         resp = self.recv_packet()
         if resp is None:
@@ -75,13 +111,18 @@ class LightCacheClient(socket.socket):
         return r[0]
             
     def set(self, key, value, timeout):
+        assert key is not None
+        assert value is not None
+        assert timeout is not None
+        
         self.send_packet(key=key, data=value, command=self.CMD_SET, extra=timeout)       
 
-    def get(self, key):    
+    def get(self, key):
+        assert key is not None
+        
         self.send_packet(key=key, command=self.CMD_GET) 
         return self.recv_packet()
         
-
     def get_stats(self):
         self.send_packet(command=self.CMD_GET_STATS)
         return self.recv_packet()

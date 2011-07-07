@@ -4,8 +4,9 @@
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
 
-static void
-_child_handler(int signum)
+// handle signals and exit the application gracefully
+void
+sig_handler(int signum)
 {
     switch(signum) {
     case SIGALRM:
@@ -15,6 +16,9 @@ _child_handler(int signum)
         exit(EXIT_SUCCESS);
         break;
     case SIGCHLD:
+        exit(EXIT_FAILURE);
+        break;
+    case SIGINT:
         exit(EXIT_FAILURE);
         break;
     }
@@ -31,9 +35,9 @@ deamonize(void)
     if ( getppid() == 1 ) return;
 
     /* Trap signals that we expect to receive */
-    signal(SIGCHLD,_child_handler);
-    signal(SIGUSR1,_child_handler);
-    signal(SIGALRM,_child_handler);
+    signal(SIGCHLD, sig_handler);
+    signal(SIGUSR1, sig_handler);
+    signal(SIGALRM, sig_handler);
     //signal(SIGFPE, SIG_IGN); comment in after extensive testing.
 
     /* Fork off the parent process */

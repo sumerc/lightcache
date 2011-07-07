@@ -1,23 +1,11 @@
 import unittest
 import socket
-from lightcacheclient import LightCacheClient
+from lightcacheclient import make_client
 
 class LightCacheTestBase(unittest.TestCase):
-    
-    host = 'localhost'
-    port = 13131 
-    
-    use_unix_socket = True
-    #use_unix_socket = False
-    unix_socket_path = '/home/sumerc/Desktop/deneme'    
      
     def setUp(self):
-        if self.use_unix_socket:
-            self.client = LightCacheClient(socket.AF_UNIX, socket.SOCK_STREAM) 
-            self.client.connect(self.unix_socket_path)
-        else:    
-            self.client = LightCacheClient(socket.AF_INET, socket.SOCK_STREAM)  	        
-            self.client.connect((self.host, self.port)) 
+        self.client = make_client()
         
     def tearDown(self):
         self.client.close()

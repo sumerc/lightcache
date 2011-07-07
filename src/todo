@@ -40,8 +40,15 @@ v0.2
 [+] memcache accepts a unix domain socket path as a param and does REUSEADDR, KEEPALIVE, LINGER on both socket types. Also, TCP_NODELAY is set for
     normal berkeley sockets.
 [+] implement unix domain sockets.
-[-] Gprof is only working when program exists normally, without SIGABRT or SIGKILL. SO find a way to gracefully shutdown a
-    lightcache server. aNy maintenance window? maybe a cmd to flush data..etc., too?
+[+] Gprof is only working when program exists normally, without SIGABRT or SIGKILL. SO find a way to gracefully shutdown a
+    lightcache server. aNy maintenance window?
+[+] responses should have an interface defining return codes from the server such as KEY_NOTEXISTS or PARAM_INVALID
+    Current test cases have assertDisconnect on protocol errors and this should not be the case. disconnect on server 
+    side should only happen on server side errors such as not being able to alloc mem or so...
+[-] add tests for uncompleted messages where we have key but data is missing etc. Write test for most of them,, if possible all of them.
+[-] manual testing interface. 
+[-] write uptime and version info in stats.
+[-] maybe a cmd to flush data..etc., too?
 [-] RE-TEST again with LINGER OPtion as memcached.test_protocol suite failing when run in remote. send_overflow_data is not returning from assertDisconnect() somehow when lightcache is run remotely. Remote system is CentOS 64 bit.
 [-] Program received signal SIGFPE, Arithmetic exception. disable this. 
 	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD)	

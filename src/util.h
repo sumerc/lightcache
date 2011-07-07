@@ -12,6 +12,7 @@
 
 #define CURRENT_TIME time(NULL)
 
+void sig_handler(int signum);
 void deamonize(void);
 uint64_t ntohll(uint64_t val);
 uint64_t htonll(uint64_t val);

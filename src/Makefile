@@ -20,6 +20,8 @@ lightcache_server :
 
 clean:
 	rm $(PRGNAME)
+	rm gmon.out
+	$(CC) $(CCOPT) $(DEBUG) $(FILES) -o $(PRGNAME)
 
 install: all
 	$(INSTALL) $(PRGNAME) $(INSTALL_BIN)

@@ -18,7 +18,8 @@ typedef union req_header {
 
 typedef union {
     struct {
-        uint8_t opcode;
+        uint8_t opcode;        
+        uint8_t errcode;
         uint32_t data_length;
     } response;
     uint8_t bytes[8];
@@ -62,6 +63,14 @@ typedef enum {
     READ_EXTRA = 0x07,
     CMD_SENT = 0x08,
 } conn_states;
+
+typedef enum {
+    KEY_NOTEXISTS = 0x00,
+    INVALID_PARAM = 0x01,
+    INVALID_STATE = 0x02,
+    INVALID_PARAM_SIZE = 0x03,
+    SUCCESS = 0x04,
+} errors;
 
 typedef struct conn conn;
 struct conn {

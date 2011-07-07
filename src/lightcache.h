@@ -27,6 +27,10 @@
 #ifndef LIGHTCACHE_H
 #define LIGHTCACHE_H
 
+// version info
+#define LIGHTCACHE_VERSION 0.1
+#define LIGHTCACHE_BUILD 2
+
 struct settings {
     int deamon_mode; /* specify whether to run in deamon mode */
     uint64_t mem_avail; /*in bytes. max. memory this lightcache instance is allowed to use */
@@ -36,14 +40,16 @@ struct settings {
 
 struct stats {
     uint64_t mem_used;
-    uint64_t mem_request_count; /* number of times mem is demanded from OS */
+    uint64_t mem_request_count; /* TODO(After pre-alloc optimizations):number of times mem is demanded from OS */
     uint64_t req_per_sec;
     uint64_t resp_per_sec;
+    time_t start_time;
 };
 
 #define LIGHTCACHE_PORT 13131
 #define LIGHTCACHE_LISTEN_BACKLOG 100
 #define LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD 75 /*the ratio threshold that garbage collect functions will start demanding memory.*/
+#define LIGHTCACHE_STATS_SIZE 250
 
 #endif
 
