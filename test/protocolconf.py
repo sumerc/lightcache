@@ -1,0 +1,24 @@
+
+
+
+
+CMD_GET = 0x00
+CMD_SET = 0x01  
+CMD_CHG_SETTING = 0x02
+CMD_GET_SETTING = 0X03
+CMD_GET_STATS = 0X04
+
+EVENT_TIMEOUT = 1 # in sec, (used for time critical tests, shall be added to every timing test code)
+IDLE_TIMEOUT = 2 + EVENT_TIMEOUT # in sec  
+
+PROTOCOL_MAX_KEY_SIZE = 250
+PROTOCOL_MAX_DATA_SIZE = 1024 + PROTOCOL_MAX_KEY_SIZE
+
+RESP_HEADER_SIZE = 8 # in bytes, SYNC THIS (xxx)
+
+# error definitions
+KEY_NOTEXISTS = 0x00
+INVALID_PARAM = 0x01
+INVALID_STATE = 0x02
+INVALID_PARAM_SIZE = 0x03
+SUCCESS = 0x04

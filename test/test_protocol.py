@@ -1,30 +1,34 @@
 import time
 import unittest
 from testbase import LightCacheTestBase
+from protocolconf import *
 
 class ProtocolTests(LightCacheTestBase):
-    """
+    
+    # TODO: Sometimes failing locally, too. Even if we are disconnecting
+    # the socket with idle timeout. assertDisconnect() does not work as intended
+    # sometimes? In remote, send_overflow_data is failing with same symptoms.
     def test_idle_timeout(self):
         self.client.chg_setting("idle_conn_timeout", 2)
-        self.assertTrue(self.client._is_disconnected(in_secs=5))
+        self.assertTrue(self.client._is_disconnected(in_secs=10))
     
     def test_send_overflow_header(self):
         self.client.send_raw("OVERFLOWHEADER")
-        self.client.assertErrorResponse(self.client.INVALID_PARAM)
+        self.client.assertErrorResponse(INVALID_PARAM_SIZE)
     
     def test_send_overflow_key(self):
         data = "DENEME"
-        self.client.send_packet(data=data, key_length=self.client.PROTOCOL_MAX_KEY_SIZE)    
-        self.client.assertErrorResponse(self.client.INVALID_PARAM)  
+        self.client.send_packet(data=data, key_length=PROTOCOL_MAX_KEY_SIZE)    
+        self.client.assertErrorResponse(INVALID_PARAM_SIZE)  
 
     def test_send_overflow_data(self):
-        data = "A" *  (self.client.PROTOCOL_MAX_DATA_SIZE+1)
+        data = "A" *  (PROTOCOL_MAX_DATA_SIZE+1)
         self.client.send_packet(data=data, data_length=1)
-        self.client.assertErrorResponse(self.client.INVALID_PARAM)
+        self.client.assertErrorResponse(INVALID_PARAM)
         
     def test_invalid_packets(self):
         self.client.send_packet(data="data_value", key_length=10, 
-        command=self.client.CMD_CHG_SETTING, data_length=12)   
+        command=CMD_CHG_SETTING, data_length=12)   
     
     def test_set(self):
         self.client.set("key1", "value1", 11)
@@ -43,21 +47,13 @@ class ProtocolTests(LightCacheTestBase):
         self.client.set("key", "value2", 5)
         self.assertEqual(self.client.get("key"), "value2")    
         
-    def test_get_with_timeout(self):
-        self.client.set("key2", "value3", 2)
-        time.sleep(1)
-        self.assertEqual(self.client.get("key2"), "value3")
-        time.sleep(2)
-        #self.assertEqual(self.client.get("key2"), None)  # key expired
-        self.client.assertErrorResponse(self.client.KEY_NOTEXISTS)
-        
     def test_get_overflowed_timeout(self):
         self.client.set("key5", "value5", 101010101010010101001010101001)
-        self.client.assertErrorResponse(self.client.INVALID_PARAM)
+        self.client.assertErrorResponse(INVALID_PARAM)
                 
     def test_get_invalid_timeout(self):
         self.client.set("key5", "value5", "invalid_value")
-        self.client.assertErrorResponse(self.client.INVALID_PARAM)
+        self.client.assertErrorResponse(INVALID_PARAM)
 
     def test_get_setting(self):
         self.client.chg_setting("idle_conn_timeout", 5)
@@ -77,28 +73,27 @@ class ProtocolTests(LightCacheTestBase):
     
     def test_chg_setting_invalid(self):
         self.client.chg_setting("idle_conn_timeout", "invalid_value")
-        self.client.assertErrorResponse(self.client.INVALID_PARAM)
+        self.client.assertErrorResponse(INVALID_PARAM)
 
     def test_chg_setting_overflowed(self):
         self.client.chg_setting("idle_conn_timeout", 2222222222222222222222222222222)
-        self.client.assertErrorResponse(self.client.INVALID_PARAM)
+        self.client.assertErrorResponse(INVALID_PARAM)
     
     def test_subsequent_packets(self):
         self.client.set("key_sub", "val_sub", 60)
-        self.client.send_packet(key="key_sub", command=self.client.CMD_GET) 
-        self.client.send_packet(key="key_sub", command=self.client.CMD_GET)
+        self.client.send_packet(key="key_sub", command=CMD_GET) 
+        self.client.send_packet(key="key_sub", command=CMD_GET)
         self.assertEqual(self.client.recv_packet(), "val_sub")
         self.assertEqual(self.client.recv_packet(), "val_sub")
-    """
+
     def test_get_with_timeout(self):
         self.client.set("key2", "value3", 2)
         time.sleep(1)
         self.assertEqual(self.client.get("key2"), "value3")
         time.sleep(2)
-        #self.assertEqual(self.client.get("key2"), None)  # key expired
-        self.client.send_packet(key="key2", command=self.client.CMD_GET) 
-        self.client.assertErrorResponse(self.client.KEY_NOTEXISTS)
-        
+        self.assertEqual(self.client.get("key2"), None)  # key expired
+        self.client.assertErrorResponse(KEY_NOTEXISTS, False)
+       
 if __name__ == '__main__':
     unittest.main()
 

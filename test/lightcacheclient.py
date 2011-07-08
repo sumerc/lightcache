@@ -1,6 +1,7 @@
 import struct
 import socket
 import testconf
+from protocolconf import *
 
 def make_client():
     if testconf.use_unix_socket:
@@ -10,28 +11,21 @@ def make_client():
         client = LightCacheClient(socket.AF_INET, socket.SOCK_STREAM)  	        
         client.connect((testconf.host, testconf.port)) 
     return client
+    
+class Response:
+    opcode = None
+    errcode = None
+    datalen = None
+    data = None
+    
+    def __str__(self):
+        return "%s" % self.data
 
 class LightCacheClient(socket.socket):
-    CMD_GET = 0x00
-    CMD_SET = 0x01  
-    CMD_CHG_SETTING = 0x02
-    CMD_GET_SETTING = 0X03
-    CMD_GET_STATS = 0X04
-
-    EVENT_TIMEOUT = 1 # in sec, (used for time critical tests, shall be added to every timing test code)
-    IDLE_TIMEOUT = 2 + EVENT_TIMEOUT # in sec  
     
-    PROTOCOL_MAX_KEY_SIZE = 250
-    PROTOCOL_MAX_DATA_SIZE = 1024 + PROTOCOL_MAX_KEY_SIZE
-
-    RESP_HEADER_SIZE = 8 # in bytes, SYNC THIS (xxx)
     
-    # error definitions
-    KEY_NOTEXISTS = 0x00
-    INVALID_PARAM = 0x01
-    INVALID_STATE = 0x02
-    INVALID_PARAM_SIZE = 0x03
-    SUCCESS = 0x04
+    # response obj
+    response = Response()
     
     def _is_disconnected(self, in_secs=None):
         if in_secs:
@@ -46,14 +40,10 @@ class LightCacheClient(socket.socket):
     def assertDisconnected(self):
         assert self._is_disconnected() == True
         
-    def assertErrorResponse(self, err):
-        resp = self.recv(self.RESP_HEADER_SIZE)
-        try:
-            opcode, errcode, data_len = struct.unpack("BBI", resp)
-        except:
-            print "dpfgjdfgdfg"
-            print len(resp)
-        assert errcode == err
+    def assertErrorResponse(self, err, get_response=True):
+        if get_response:
+            self.recv_packet()
+        assert self.response.errcode == err
 
     def _make_packet(self, **kwargs):
         cmd = kwargs.pop("command", 0)
@@ -71,25 +61,22 @@ class LightCacheClient(socket.socket):
         request = struct.pack('BBII', cmd, key_len, data_len, extra_len)
         request += "%s%s%s" % (key, data, extra)
         return request
-
+    
+    def _recv_header(self):
+        resp = self.recv(RESP_HEADER_SIZE)
+        return struct.unpack("BBI", resp)
+    
     def send_packet(self, **kwargs):    
         data = self._make_packet(**kwargs)    
         super(LightCacheClient, self).send(data)
 
-    def recv_packet(self):
-        try:
-            # TODO: recv_header auxiliary function 
-            resp = self.recv(self.RESP_HEADER_SIZE)
-            opcode, errcode, data_len = struct.unpack("BBI", resp)
-            print errcode
-            
-            if errcode != self.SUCCESS: # extra validation
-                return None
-            data_len = socket.ntohl(data_len)
-            resp = self.recv(data_len)
-            return resp
-        except:
-            return None
+    def recv_packet(self):        
+        self.response.opcode, self.response.errcode, self.response.data_len = self._recv_header()    
+        self.response.data_len = socket.ntohl(self.response.data_len)
+        if self.response.data_len == 0:
+            return None        
+        self.response.data = self.recv(self.response.data_len)
+        return self.response.data        
 
     def send_raw(self, data):
         self.send(data)   
@@ -98,15 +85,13 @@ class LightCacheClient(socket.socket):
         assert key is not None
         assert value is not None
         
-        self.send_packet(key=key, data=value, command=self.CMD_CHG_SETTING)    
+        self.send_packet(key=key, data=value, command=CMD_CHG_SETTING)    
    
     def get_setting(self, key):  
         assert key is not None
       
-        self.send_packet(key=key, command=self.CMD_GET_SETTING)    
+        self.send_packet(key=key, command=CMD_GET_SETTING)    
         resp = self.recv_packet()
-        if resp is None:
-            return resp
         r = struct.unpack("!Q", resp) # (!) means data comes from network(big-endian)
         return r[0]
             
@@ -115,15 +100,15 @@ class LightCacheClient(socket.socket):
         assert value is not None
         assert timeout is not None
         
-        self.send_packet(key=key, data=value, command=self.CMD_SET, extra=timeout)       
+        self.send_packet(key=key, data=value, command=CMD_SET, extra=timeout)       
 
     def get(self, key):
         assert key is not None
         
-        self.send_packet(key=key, command=self.CMD_GET) 
+        self.send_packet(key=key, command=CMD_GET)
         return self.recv_packet()
-        
+            
     def get_stats(self):
-        self.send_packet(command=self.CMD_GET_STATS)
+        self.send_packet(command=CMD_GET_STATS)
         return self.recv_packet()
-
+    

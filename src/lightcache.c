@@ -401,6 +401,10 @@ execute_cmd(struct conn* conn)
             }
             LC_DEBUG(("SET mem avail :%llu", (long long unsigned int)val));
             settings.mem_avail = val * 1024 * 1024; /*todo:can overflow*/
+        } else {
+            LC_DEBUG(("Invalid setting received :%s", conn->in->rkey));
+            send_err_response(conn, INVALID_PARAM);
+            return;
         }
         set_conn_state(conn, READ_HEADER);
         break;
