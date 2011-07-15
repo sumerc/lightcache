@@ -850,7 +850,7 @@ main(int argc, char **argv)
         goto err;
     }
 
-    LC_DEBUG(("lightcache started.\r\n"));
+    LC_DEBUG(("lightcache started.[%s]\r\n", settings.socket_path));
     
     ptime = 0;
     for (;;) {

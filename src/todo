@@ -49,7 +49,8 @@ v0.2
 [+] Tests need refactoring. maybe a testprotocol file definind protocol messages errcodes...etc. Combine asertErrcode somehow.
 [+] manual testing interface. 
 [+] write uptime and version info in stats.
-[-] test_send_overflow_data is failing. tHe problem is taht it recursively sends INVALID_PARAM_SIZE again and again. Becase the data len
+[+] assert in test suite shall show params when failed.
+[+] test_send_overflow_data is failing. tHe problem is taht it recursively sends INVALID_PARAM_SIZE again and again. Becase the data len
     is so small. the remaning data is treated like a different message. Change the test.
 [-] TEST: add tests for uncompleted messages where we have key but data is missing etc. Write test for most of them,, if possible all of them.
 [-] maybe a cmd to flush data..etc., too?

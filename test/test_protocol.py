@@ -4,12 +4,12 @@ from testbase import LightCacheTestBase
 from protocolconf import *
 
 class ProtocolTests(LightCacheTestBase):
-    """
+    
     def test_send_overflow_data(self):
         data = "A" *  (PROTOCOL_MAX_DATA_SIZE+1)
-        self.client.send_packet(data=data, data_length=1)
+        self.client.send_packet(data=data)
         self.client.assertErrorResponse(INVALID_PARAM_SIZE)
-    """
+    
     # TODO: Sometimes failing locally, too. Even if we are disconnecting
     # the socket with idle timeout. assertDisconnect() does not work as intended
     # sometimes? In remote, send_overflow_data is failing with same symptoms.
@@ -64,7 +64,7 @@ class ProtocolTests(LightCacheTestBase):
     def test_chg_setting(self):
         self.client.chg_setting("idle_conn_timeout", 2)
         self.assertEqual(self.client.get_setting("idle_conn_timeout"), 2)
-            
+           
     def test_chg_setting_64bit_value(self):
         self.client.chg_setting("idle_conn_timeout", 0x1234567890)
         self.assertEqual(self.client.get_setting("idle_conn_timeout"), 0x1234567890)
@@ -77,6 +77,10 @@ class ProtocolTests(LightCacheTestBase):
 
     def test_chg_setting_overflowed(self):
         self.client.chg_setting("idle_conn_timeout", 2222222222222222222222222222222)
+        self.client.assertErrorResponse(INVALID_PARAM)
+        
+    def test_chg_setting_invalid(self):
+        self.client.chg_setting("invalid_setting_key", 1)
         self.client.assertErrorResponse(INVALID_PARAM)
     
     def test_subsequent_packets(self):

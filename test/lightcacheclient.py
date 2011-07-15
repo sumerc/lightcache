@@ -43,7 +43,7 @@ class LightCacheClient(socket.socket):
     def assertErrorResponse(self, err, get_response=True):
         if get_response:
             self.recv_packet()
-        assert self.response.errcode == err
+        assert self.response.errcode == err, "Expected %d but got %d." % (err, self.response.errcode)
 
     def _make_packet(self, **kwargs):
     
