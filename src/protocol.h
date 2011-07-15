@@ -70,6 +70,7 @@ typedef enum {
     INVALID_STATE = 0x02,
     INVALID_PARAM_SIZE = 0x03,
     SUCCESS = 0x04,
+    INVALID_COMMAND = 0x05,
 } errors;
 
 typedef struct conn conn;

@@ -46,8 +46,10 @@ class LightCacheClient(socket.socket):
         assert self.response.errcode == err
 
     def _make_packet(self, **kwargs):
+    
         cmd = kwargs.pop("command", 0)
         key = kwargs.pop("key", "")
+        
         key_len = kwargs.pop("key_length", len(key))
         data = kwargs.pop("data", "")
         data_len = kwargs.pop("data_length", len(str(data)))
@@ -70,7 +72,7 @@ class LightCacheClient(socket.socket):
         data = self._make_packet(**kwargs)    
         super(LightCacheClient, self).send(data)
 
-    def recv_packet(self):        
+    def recv_packet(self):
         self.response.opcode, self.response.errcode, self.response.data_len = self._recv_header()    
         self.response.data_len = socket.ntohl(self.response.data_len)
         if self.response.data_len == 0:

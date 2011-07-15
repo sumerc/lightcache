@@ -286,19 +286,14 @@ execute_cmd(struct conn* conn)
     /* here, the complete request is received from the connection */
     conn->in->received = CURRENT_TIME;
     cmd = conn->in->req_header.request.opcode;
-
+    
+    /* No need for the validation of conn->in->rkey as it is mandatory for the
+       protocol. */
     switch(cmd) {
     case CMD_GET:
     
         LC_DEBUG(("CMD_GET request\r\n"));
     
-        /* validate params */
-        if (!conn->in->rkey) {
-            LC_DEBUG(("invalid key param in CMD_GET\r\n"));
-            send_err_response(conn, INVALID_PARAM);
-            return;
-        }
-        
         /* get item */
         LC_DEBUG(("CMD_GET request for key: %s\r\n", conn->in->rkey));
         tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
@@ -337,11 +332,6 @@ execute_cmd(struct conn* conn)
         LC_DEBUG(("CMD_SET request\r\n"));
 
         /* validate params */
-        if (!conn->in->rkey) {
-            LC_DEBUG(("invalid key param in CMD_SET\r\n"));
-            send_err_response(conn, INVALID_PARAM);
-            return;
-        }
         if (!conn->in->rdata) {
             LC_DEBUG(("invalid data param in CMD_SET\r\n"));
             send_err_response(conn, INVALID_PARAM);
@@ -372,12 +362,7 @@ execute_cmd(struct conn* conn)
     
         LC_DEBUG(("CMD_CHG_SETTING request\r\n"));
         
-        /* validate params */
-        if (!conn->in->rkey) {
-            LC_DEBUG(("(null) key param in CMD_CHG_SETTING\r\n"));
-            send_err_response(conn, INVALID_PARAM);
-            break;
-        }
+        /* validate params */        
         if (!conn->in->rdata) {
             LC_DEBUG(("(null) data param in CMD_CHG_SETTING\r\n"));
             send_err_response(conn, INVALID_PARAM);
@@ -402,7 +387,7 @@ execute_cmd(struct conn* conn)
             LC_DEBUG(("SET mem avail :%llu", (long long unsigned int)val));
             settings.mem_avail = val * 1024 * 1024; /*todo:can overflow*/
         } else {
-            LC_DEBUG(("Invalid setting received :%s", conn->in->rkey));
+            LC_DEBUG(("Invalid setting received :%s\r\n", conn->in->rkey));
             send_err_response(conn, INVALID_PARAM);
             return;
         }
@@ -412,14 +397,7 @@ execute_cmd(struct conn* conn)
     
         LC_DEBUG(("CMD_GET_SETTING request\r\n"));
         
-        
         /* validate params */
-        if (!conn->in->rkey) {
-            LC_DEBUG(("(null) data param in CMD_GET_SETTING\r\n"));
-            send_err_response(conn, INVALID_PARAM);
-            break;
-        }
-        
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!prepare_response(conn, sizeof(uint64_t), 1)) {
                 return;
@@ -432,6 +410,10 @@ execute_cmd(struct conn* conn)
             }
             *(uint64_t *)conn->out->sdata = htonll(settings.mem_avail / 1024 / 1024);
             set_conn_state(conn, SEND_HEADER);
+        } else {
+            LC_DEBUG(("Invalid setting received :%s\r\n", conn->in->rkey));
+            send_err_response(conn, INVALID_PARAM);
+            return;
         }
         break;
     case CMD_GET_STATS:
@@ -441,10 +423,17 @@ execute_cmd(struct conn* conn)
         if (!prepare_response(conn, LIGHTCACHE_STATS_SIZE, 1)) {
             return;
         }
-        sprintf(conn->out->sdata, "mem_used:%llu\r\n", (long long unsigned int)stats.mem_used);
-        //sprintf(conn->out->sdata, "uptime:%lu\r\n", (long unsigned int)CURRENT_TIME-stats.start_time);
-        //sprintf(conn->out->sdata, "version: %0.1f Build.%d\r\n", LIGHTCACHE_VERSION, LIGHTCACHE_BUILD);
+        sprintf(conn->out->sdata, 
+            "mem_used:%llu\r\nuptime:%lu\r\nversion: %0.1f Build.%d\r\n", 
+            (long long unsigned int)stats.mem_used,
+            (long unsigned int)CURRENT_TIME-stats.start_time,
+            LIGHTCACHE_VERSION, 
+            LIGHTCACHE_BUILD);
         set_conn_state(conn, SEND_HEADER);
+        break;
+    default:
+        LC_DEBUG(("Unrecognized command.[%d]\r\n", cmd));
+        send_err_response(conn, INVALID_COMMAND);
         break;
     }
     
@@ -504,7 +493,6 @@ try_read_request(conn* conn)
 
     switch(conn->state) {
     case READ_HEADER:
-
         ret = read_nbytes(conn, (char *)conn->in->req_header.bytes, sizeof(req_header));
         if (ret == READ_COMPLETED) {
 
@@ -525,7 +513,7 @@ try_read_request(conn* conn)
             if (conn->in->req_header.request.key_length == 0) {
                 set_conn_state(conn, CMD_RECEIVED);
                 execute_cmd(conn);
-            } else {
+            } else {LC_DEBUG(("CMD_GET request\r\n"));
                 set_conn_state(conn, READ_KEY);
             }
         }
@@ -617,6 +605,7 @@ try_send_response(conn *conn)
                 set_conn_state(conn, SEND_DATA);
             } else {
                 set_conn_state(conn, CMD_SENT);
+                LC_DEBUG(("a command is sent.\r\n"));
                 set_conn_state(conn, READ_HEADER);// wait for new commands
             }
         }

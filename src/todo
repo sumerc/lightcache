@@ -45,12 +45,17 @@ v0.2
 [+] responses should have an interface defining return codes from the server such as KEY_NOTEXISTS or PARAM_INVALID
     Current test cases have assertDisconnect on protocol errors and this should not be the case. disconnect on server 
     side should only happen on server side errors such as not being able to alloc mem or so...
-[-] TEST: Invalid setting CHG_setting
+[+] TEST: Invalid setting CHG_setting
+[+] Tests need refactoring. maybe a testprotocol file definind protocol messages errcodes...etc. Combine asertErrcode somehow.
+[+] manual testing interface. 
+[+] write uptime and version info in stats.
+[-] test_send_overflow_data is failing. tHe problem is taht it recursively sends INVALID_PARAM_SIZE again and again. Becase the data len
+    is so small. the remaning data is treated like a different message. Change the test.
 [-] TEST: add tests for uncompleted messages where we have key but data is missing etc. Write test for most of them,, if possible all of them.
-[-] Tests need refactoring. maybe a testprotocol file definind protocol messages errcodes...etc. Combine asertErrcode somehow.
-[-] manual testing interface. 
-[-] write uptime and version info in stats.
 [-] maybe a cmd to flush data..etc., too?
+[-] show errcode strings defniitons in manuak tests.
+[-] any severity number for logs that can be passed in compile time? for example we only want to trace protocol messages or do a 
+    deeper trace.
 [-] RE-TEST again with LINGER OPtion as memcached.test_protocol suite failing when run in remote. send_overflow_data is not returning from assertDisconnect() somehow when lightcache is run remotely. Remote system is CentOS 64 bit.
 [-] Program received signal SIGFPE, Arithmetic exception. disable this. 
 	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD)	
