@@ -4,6 +4,7 @@
 /* globals */
 static int epollfd = 0;
 static void (*event_handler)(conn *c, event ev) = NULL;
+static struct epoll_event events[POLL_MAX_EVENTS];
 
 /* constants */
 
@@ -40,6 +41,7 @@ event_set(conn *c, int flags)
 
     memset(&ev, 0, sizeof(struct epoll_event));
     
+    
     if (flags & EVENT_READ) {
         ev.events |= EPOLLIN;
     }
@@ -67,8 +69,8 @@ event_process(void)
 {
     int nfds, n;
     conn *conn;
-    static struct epoll_event events[POLL_MAX_EVENTS];
-
+    
+    
     nfds = epoll_wait(epollfd, events, POLL_MAX_EVENTS, POLL_TIMEOUT);
     if (nfds == -1) {
         syslog(LOG_ERR, "%s (%s)", "epoll wait error.", strerror(errno));

@@ -597,13 +597,15 @@ int
 try_send_response(conn *conn)
 {
     socket_state ret;
+    
+    LC_DEBUG(("TRY SEND..\r\n"));
 
     switch(conn->state) {
 
     case SEND_HEADER:
         ret = send_nbytes(conn, (char *)conn->out->resp_header.bytes, sizeof(resp_header));
         if (ret == SEND_COMPLETED) {
-            if (ntohl(conn->out->resp_header.response.data_length) != 0) {
+            if (ntohl(conn->out->resp_header.response.data_length) != 0) {                
                 set_conn_state(conn, SEND_DATA);
             } else {
                 LC_DEBUG(("wait for new cmd...\r\n"));
