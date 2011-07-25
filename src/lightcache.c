@@ -247,7 +247,7 @@ send_err_response(conn *conn, errors err)
     conn->out->sdata = NULL;
     conn->out->can_free = 1;
 
-    LC_DEBUG(("sending err response:%d\r\n", err));
+    LC_DEBUG(("sending err response:%d [fd:%d]\r\n", err, conn->fd));
 
     set_conn_state(conn, SEND_HEADER);
 }
@@ -464,10 +464,10 @@ read_nbytes(conn*conn, char *bytes, size_t total)
     unsigned int needed;
     int nbytes;
 
-    LC_DEBUG(("read_nbytes called.\r\n"));
+    LC_DEBUG(("read_nbytes called.[fd:%d]\r\n", conn->fd));
 
     needed = total - conn->in->rbytes;
-    nbytes = read(conn->fd, &bytes[conn->in->rbytes], needed);
+    nbytes = read(conn->fd, &bytes[conn->in->rbytes], 1); // needed
     if (nbytes == 0) {
         syslog(LOG_ERR, "%s (%s)", "socket read error.\r\n", strerror(errno));
         return READ_ERR;
@@ -503,7 +503,7 @@ try_read_request(conn* conn)
             if ( (conn->in->req_header.request.data_length >= PROTOCOL_MAX_DATA_SIZE) ||
                     (conn->in->req_header.request.key_length >= PROTOCOL_MAX_KEY_SIZE) ||
                     (conn->in->req_header.request.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
-                syslog(LOG_ERR, "request data or key length exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
+                syslog(LOG_ERR, "request data or key lflgrow called.read_nbytes called.ength exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
                 LC_DEBUG(("request data or key length exceeded maximum allowed\r\n"));
                 send_err_response(conn, INVALID_PARAM_SIZE);
                 return FAILED;
@@ -572,11 +572,11 @@ send_nbytes(conn*conn, char *bytes, size_t total)
 {
     int needed, nbytes;
 
-    LC_DEBUG(("send_nbytes called.\r\n"));
+    LC_DEBUG(("send_nbytes called.[left:%d, fd:%d]\r\n", total - conn->out->sbytes, conn->fd));
 
     needed = total - conn->out->sbytes;
-    needed = 1;
-    nbytes = write(conn->fd, &bytes[conn->out->sbytes], needed);
+    nbytes = write(conn->fd, &bytes[conn->out->sbytes], 1); //needed
+    
     if (nbytes == -1) {
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
             return NEED_MORE;
@@ -589,6 +589,7 @@ send_nbytes(conn*conn, char *bytes, size_t total)
         conn->out->sbytes = 0;
         return SEND_COMPLETED;
     }
+    
     return NEED_MORE;
 }
 
@@ -605,8 +606,8 @@ try_send_response(conn *conn)
             if (ntohl(conn->out->resp_header.response.data_length) != 0) {
                 set_conn_state(conn, SEND_DATA);
             } else {
+                LC_DEBUG(("wait for new cmd...\r\n"));
                 set_conn_state(conn, CMD_SENT);
-                LC_DEBUG(("a command is sent.\r\n"));
                 set_conn_state(conn, READ_HEADER);// wait for new commands
             }
         }

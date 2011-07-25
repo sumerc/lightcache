@@ -29,7 +29,7 @@ class ProtocolTests(LightCacheTestBase):
     def test_invalid_packets(self):
         self.client.send_packet(data="data_value", key_length=10, 
         command=CMD_CHG_SETTING, data_length=12)   
-    
+    """
     def test_set(self):
         self.client.set("key1", "value1", 11)
     
@@ -97,7 +97,7 @@ class ProtocolTests(LightCacheTestBase):
         time.sleep(2)
         self.assertEqual(self.client.get("key2"), None)  # key expired
         self.client.assertErrorResponse(KEY_NOTEXISTS, False)
-     
+    """ 
 if __name__ == '__main__':
     unittest.main()
 

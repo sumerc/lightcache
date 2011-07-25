@@ -56,6 +56,22 @@ v0.2
     think it is because idle timeout is set to 2 in auto and inifinite in manual tests when auto run after manual it disconnects the manual
     client.
 [-] send_nbytes with 1 byte fails on autotests somehow. Dont understand why?
+    
+    Boils down to this: Somehow send_nbytes cannot be finished. This may be related 
+    with the blocking unix socket problem.
+
+    CMD_CHG_SETTING request
+    Invalid setting received :invalid_setting_key
+    sending err response:1
+    send_nbytes called.[left:8]
+    write completed
+    send_nbytes called.[left:7]
+    write completed
+    read_nbytes called.
+    
+    It seems like that when a new connection comes in previous send events are cleared.
+
+
 [-] when using unix sockets send_overflow_data kind of tests put write() into blocking mode. Is socket remain blocking?
     unix socket write blocking problem?
 [-] TEST: add tests for uncompleted messages where we have key but data is missing etc. Write test for most of them,, if possible all of them.

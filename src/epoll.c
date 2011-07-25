@@ -39,7 +39,7 @@ event_set(conn *c, int flags)
     struct epoll_event ev;
 
     memset(&ev, 0, sizeof(struct epoll_event));
-
+    
     if (flags & EVENT_READ) {
         ev.events |= EPOLLIN;
     }
@@ -66,8 +66,8 @@ void
 event_process(void)
 {
     int nfds, n;
-    struct epoll_event events[POLL_MAX_EVENTS];
     conn *conn;
+    static struct epoll_event events[POLL_MAX_EVENTS];
 
     nfds = epoll_wait(epollfd, events, POLL_MAX_EVENTS, POLL_TIMEOUT);
     if (nfds == -1) {
