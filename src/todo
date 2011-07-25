@@ -52,6 +52,12 @@ v0.2
 [+] assert in test suite shall show params when failed.
 [+] test_send_overflow_data is failing. tHe problem is taht it recursively sends INVALID_PARAM_SIZE again and again. Becase the data len
     is so small. the remaning data is treated like a different message. Change the test.
+[*] problem when run autotest and manual test together at the same time, when auto tests finish, manual gives unpack error.
+    think it is because idle timeout is set to 2 in auto and inifinite in manual tests when auto run after manual it disconnects the manual
+    client.
+[-] send_nbytes with 1 byte fails on autotests somehow. Dont understand why?
+[-] when using unix sockets send_overflow_data kind of tests put write() into blocking mode. Is socket remain blocking?
+    unix socket write blocking problem?
 [-] TEST: add tests for uncompleted messages where we have key but data is missing etc. Write test for most of them,, if possible all of them.
 [-] maybe a cmd to flush data..etc., too?
 [-] show errcode strings defniitons in manuak tests.

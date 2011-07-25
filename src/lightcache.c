@@ -575,6 +575,7 @@ send_nbytes(conn*conn, char *bytes, size_t total)
     LC_DEBUG(("send_nbytes called.\r\n"));
 
     needed = total - conn->out->sbytes;
+    needed = 1;
     nbytes = write(conn->fd, &bytes[conn->out->sbytes], needed);
     if (nbytes == -1) {
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
