@@ -92,8 +92,8 @@ v0.2
     strace command used to start lightcache is:
     strace -Ff -tt /home/sumerc/projects/lightcache/src/lightcache -s /home/sumerc/Desktop/deneme
     
-
-    
+    ** memcache ignores SIGPIPE on both deamon and tty modes.
+  
 [-] we need some kind of variable on the sh files if we are running on domain sockets or not.    
 [-] maybe an strace .sh file.    
 [-] TEST: add tests for uncompleted messages where we have key but data is missing etc. Write test for most of them,, if possible all of them.
