@@ -470,6 +470,7 @@ read_nbytes(conn*conn, char *bytes, size_t total)
     nbytes = read(conn->fd, &bytes[conn->in->rbytes], 1);
     if (nbytes == 0) {
         LC_DEBUG(("socket read error.[%s]\r\n", strerror(errno) ));
+        syslog(LOG_ERR, "%s (%s)", "socket write error.", strerror(errno));
         return READ_ERR;
     } else if (nbytes == -1) {
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
