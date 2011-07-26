@@ -1,1 +1,1 @@
-gdb ../src/lightcache
+python run.py gdb

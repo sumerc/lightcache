@@ -1,5 +1,6 @@
 cd ../src/
 make
-./lightcache
+cd ../etc/
+python run.py
 sleep 10000
 

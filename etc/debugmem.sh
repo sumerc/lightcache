@@ -1,1 +1,1 @@
-valgrind --leak-check=full --show-reachable=yes ../src/lightcache
+python run.py 'valgrind --leak-check=full --show-reachable=yes'
