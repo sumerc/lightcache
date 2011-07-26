@@ -101,7 +101,7 @@ free_request(request *req)
     }
 
     if (req->can_free) {
-        LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, sizeof(request *)));
+        LC_DEBUG(("FREEING request data.[%p], sizeof:[%lu]\r\n", (void *)req, sizeof(request *)));
         li_free(req->rkey);
         li_free(req->rdata);
         li_free(req->rextra);
@@ -572,7 +572,7 @@ send_nbytes(conn*conn, char *bytes, size_t total)
 {
     int needed, nbytes;
 
-    LC_DEBUG(("send_nbytes called.[left:%d, fd:%d]\r\n", total - conn->out->sbytes, conn->fd));
+    LC_DEBUG(("send_nbytes called.[left:%ld, fd:%d]\r\n", total - conn->out->sbytes, conn->fd));
 
     needed = total - conn->out->sbytes;
     nbytes = write(conn->fd, &bytes[conn->out->sbytes], 1); //needed
@@ -716,6 +716,7 @@ init_server_socket(void)
         // of S_ISSOCK() here is needed but not ANSI compliant.
         if (stat(settings.socket_path, &tstat) == 0) {
             unlink(settings.socket_path);
+                
         }
 
         if ((s=socket(AF_UNIX, SOCK_STREAM, 0))==-1) {
@@ -730,22 +731,22 @@ init_server_socket(void)
     }
 
     optval = 1;
-    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    ret = setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
     if (ret != 0) {
         syslog(LOG_ERR, "setsockopt(SO_REUSEADDR) error.(%s)", strerror(errno));
     }
-    setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
+    ret = setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
     if (ret != 0) {
         syslog(LOG_ERR, "setsockopt(SO_KEEPALIVE) error.(%s)", strerror(errno));
     }
-    setsockopt(s, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling));
+    ret = setsockopt(s, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling));
     if (ret != 0) {
         syslog(LOG_ERR, "setsockopt(SO_LINGER) error.(%s)", strerror(errno));
     }
     
     // only for TCP sockets.
     if (!settings.socket_path) {
-        setsockopt(s, IPPROTO_TCP, TCP_NODELAY, &optval, sizeof(optval));
+        ret = setsockopt(s, IPPROTO_TCP, TCP_NODELAY, &optval, sizeof(optval));
         if (ret != 0) {
             syslog(LOG_ERR, "setsockopt(TCP_NODELAY) error.(%s)", strerror(errno));
         }
@@ -756,6 +757,7 @@ init_server_socket(void)
         su_me.sun_family = AF_UNIX;
         strncpy(su_me.sun_path, settings.socket_path, sizeof(su_me.sun_path) - 1);
         if (bind(s, (struct sockaddr *)&su_me, sizeof(su_me)) == -1) {
+            LC_DEBUG(("%s (%s)\r\n", "socket bind error.", strerror(errno)));
             syslog(LOG_ERR, "%s (%s)", "socket bind error.", strerror(errno));
             close(s);
             return 0;
@@ -766,6 +768,7 @@ init_server_socket(void)
         si_me.sin_port = htons(LIGHTCACHE_PORT);
         si_me.sin_addr.s_addr = htonl(INADDR_ANY);
         if (bind(s, (struct sockaddr *)&si_me, sizeof(si_me))==-1) {
+            LC_DEBUG(("%s (%s)\r\n", "socket bind error.", strerror(errno)));
             syslog(LOG_ERR, "%s (%s)", "socket bind error.", strerror(errno));
             close(s);
             return 0;

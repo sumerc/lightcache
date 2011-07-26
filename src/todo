@@ -71,7 +71,8 @@ v0.2
     when we send 1 bytes on server side.
 [+] check non-blocking rc and debug.
 [+] latest freelist from yappi included.
-[-] show errcode strings defniitons in manuak tests.
+[-] verify socket_path is valid.
+[-] show errcode strings defniitons in manual tests.
 [-] run and inspect debugmem.sh for mem leaks or buf. overflows.
 [-] what does this mean: socket Numerical result out of range (read_error) in var/log/syslog.
 [-] when using unix sockets send_overflow_data kind of tests put write() into blocking mode. Is socket remain blocking?

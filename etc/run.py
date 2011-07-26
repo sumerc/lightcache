@@ -10,7 +10,7 @@ def main():
     
     pre_cmd = ""
     try:
-        pre_cmd = sys.argv[1:] # cmd to be prepended
+        pre_cmd = " ".join(sys.argv[1:]) # cmd to be prepended
     except:
         pass
         
@@ -18,7 +18,9 @@ def main():
     if testconf.use_unix_socket:
         params += "-s %s" % (testconf.unix_socket_path)
     
-    os.system(pre_cmd + " ../src/lightcache" + " " + params)
+    cmd = pre_cmd + " ../src/lightcache" + " " + params
+    print "Executing %s..." % (cmd)    
+    os.system(cmd)
 
 if __name__ == "__main__":
     main()
