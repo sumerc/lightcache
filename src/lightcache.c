@@ -836,6 +836,7 @@ main(int argc, char **argv)
         // this is to gracefully exit the app. Otherwise, profiling information
         // cannot be emited. 
         signal(SIGINT, sig_handler);
+        signal(SIGPIPE, SIG_IGN);
     }
 
     ret = event_init(event_handler);
@@ -861,8 +862,6 @@ main(int argc, char **argv)
     
     ptime = 0;
     for (;;) {
-    
-        LC_DEBUG(("ps::\r\n"));
 
         ctime = CURRENT_TIME;
 
