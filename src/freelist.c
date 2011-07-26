@@ -1,5 +1,3 @@
-
-
 #include "freelist.h"
 #include "mem.h"
 
@@ -9,14 +7,11 @@ _flgrow(freelist *flp)
     int i, newsize;
     void **old;
 
-    fprintf(stderr, "flgrow called.");
-
     old = flp->items;
     newsize = flp->size * 2;
     flp->items = li_malloc(newsize * sizeof(void *));
-    if (!flp->items) {
+    if (!flp->items)
         return 0;
-    }
 
     // init new list
     for(i=0; i<flp->size; i++) {
@@ -43,9 +38,8 @@ flcreate(int chunksize, int size)
     freelist *flp;
 
     flp = (freelist *)li_malloc(sizeof(freelist));
-    if (!flp) {
+    if (!flp)
         return NULL;
-    }
     flp->items = li_malloc(size * sizeof(void *));
     if (!flp->items) {
         li_free(flp);
@@ -82,9 +76,8 @@ void *
 flget(freelist *flp)
 {
     if (flp->head < 0) {
-        if (!_flgrow(flp)) {
+        if (!_flgrow(flp))
             return NULL;
-        }
     }
     return flp->items[flp->head--];
 }
@@ -92,7 +85,7 @@ flget(freelist *flp)
 int
 flput(freelist *flp, void *p)
 {
-    if (flp->head >= flp->size-1)
+    if (flp->head > flp->size-2)
         return 0;
 
     flp->items[++flp->head] = p;

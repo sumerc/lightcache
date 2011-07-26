@@ -55,11 +55,9 @@ v0.2
 [*] problem when run autotest and manual test together at the same time, when auto tests finish, manual gives unpack error.
     think it is because idle timeout is set to 2 in auto and inifinite in manual tests when auto run after manual it disconnects the manual
     client.
-[-] send_nbytes with 1 byte fails on autotests somehow. Dont understand why?
-    
+[+] send_nbytes with 1 byte fails on autotests somehow. Dont understand why?    
     Boils down to this: Somehow send_nbytes cannot be finished. This may be related 
     with the blocking unix socket problem.
-
     CMD_CHG_SETTING request
     Invalid setting received :invalid_setting_key
     sending err response:1
@@ -67,13 +65,16 @@ v0.2
     write completed
     send_nbytes called.[left:7]
     write completed
-    read_nbytes called.
-    
-    It seems like that when a new connection comes in previous send events are cleared.
-
-
+    read_nbytes called.    
+    It seems like that when a new connection comes in previous send events are cleared.    
+    Problem seeems to be in client side, when we call recv(NBYTES) it does not wait for NBYTES this behavior is the problem
+    when we send 1 bytes on server side.
+[+] check non-blocking rc and debug.
+[+] latest freelist from yappi included.
+[-] what does this mean: socket Numerical result out of range (read_error) in var/log/syslog.
 [-] when using unix sockets send_overflow_data kind of tests put write() into blocking mode. Is socket remain blocking?
-    unix socket write blocking problem?
+    unix socket write blocking problem? in my tests I received Connection reset by peer after test_overflow_header
+    and no conn is accpted from then on.  
 [-] TEST: add tests for uncompleted messages where we have key but data is missing etc. Write test for most of them,, if possible all of them.
 [-] maybe a cmd to flush data..etc., too?
 [-] show errcode strings defniitons in manuak tests.

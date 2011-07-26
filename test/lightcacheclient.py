@@ -63,9 +63,18 @@ class LightCacheClient(socket.socket):
         request = struct.pack('BBII', cmd, key_len, data_len, extra_len)
         request += "%s%s%s" % (key, data, extra)
         return request
+        
+    def _recv_until(self, n):
+        # todo: optimize
+        i = 0
+        resp = ""
+        while(i < n):
+            resp += self.recv(1)
+            i += 1
+        return resp
     
     def _recv_header(self):
-        resp = self.recv(RESP_HEADER_SIZE)
+        resp = self._recv_until(RESP_HEADER_SIZE)
         return struct.unpack("BBI", resp)
     
     def send_packet(self, **kwargs):    
@@ -76,8 +85,8 @@ class LightCacheClient(socket.socket):
         self.response.opcode, self.response.errcode, self.response.data_len = self._recv_header()    
         self.response.data_len = socket.ntohl(self.response.data_len)
         if self.response.data_len == 0:
-            return None        
-        self.response.data = self.recv(self.response.data_len)
+            return None 
+        self.response.data = self._recv_until(self.response.data_len)
         return self.response.data        
 
     def send_raw(self, data):
@@ -94,8 +103,9 @@ class LightCacheClient(socket.socket):
       
         self.send_packet(key=key, command=CMD_GET_SETTING)    
         resp = self.recv_packet()
-        r = struct.unpack("!Q", resp) # (!) means data comes from network(big-endian)
-        return r[0]
+        if resp:
+            r = struct.unpack("!Q", resp) # (!) means data comes from network(big-endian)
+            return r[0]
             
     def set(self, key, value, timeout):
         assert key is not None

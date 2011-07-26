@@ -467,7 +467,7 @@ read_nbytes(conn*conn, char *bytes, size_t total)
     LC_DEBUG(("read_nbytes called.[fd:%d]\r\n", conn->fd));
 
     needed = total - conn->in->rbytes;
-    nbytes = read(conn->fd, &bytes[conn->in->rbytes], 1); // needed
+    nbytes = read(conn->fd, &bytes[conn->in->rbytes], 1);
     if (nbytes == 0) {
         syslog(LOG_ERR, "%s (%s)", "socket read error.\r\n", strerror(errno));
         return READ_ERR;
@@ -503,7 +503,7 @@ try_read_request(conn* conn)
             if ( (conn->in->req_header.request.data_length >= PROTOCOL_MAX_DATA_SIZE) ||
                     (conn->in->req_header.request.key_length >= PROTOCOL_MAX_KEY_SIZE) ||
                     (conn->in->req_header.request.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
-                syslog(LOG_ERR, "request data or key lflgrow called.read_nbytes called.ength exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
+                syslog(LOG_ERR, "request data or key length exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
                 LC_DEBUG(("request data or key length exceeded maximum allowed\r\n"));
                 send_err_response(conn, INVALID_PARAM_SIZE);
                 return FAILED;
@@ -576,11 +576,11 @@ send_nbytes(conn*conn, char *bytes, size_t total)
 
     needed = total - conn->out->sbytes;
     nbytes = write(conn->fd, &bytes[conn->out->sbytes], 1); //needed
-    
     if (nbytes == -1) {
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
             return NEED_MORE;
         }
+        LC_DEBUG(("%s (%s)", "socket write error.", strerror(errno)));
         syslog(LOG_ERR, "%s (%s)", "socket write error.", strerror(errno));
         return SEND_ERR;
     }
@@ -597,8 +597,6 @@ int
 try_send_response(conn *conn)
 {
     socket_state ret;
-    
-    LC_DEBUG(("TRY SEND..\r\n"));
 
     switch(conn->state) {
 
@@ -608,7 +606,6 @@ try_send_response(conn *conn)
             if (ntohl(conn->out->resp_header.response.data_length) != 0) {                
                 set_conn_state(conn, SEND_DATA);
             } else {
-                LC_DEBUG(("wait for new cmd...\r\n"));
                 set_conn_state(conn, CMD_SENT);
                 set_conn_state(conn, READ_HEADER);// wait for new commands
             }
@@ -659,7 +656,9 @@ event_handler(conn *conn, event ev)
                 syslog(LOG_ERR, "%s (%s)", "socket accept  error.", strerror(errno));
                 return;
             }
-            make_nonblocking(conn_sock);
+            if (make_nonblocking(conn_sock)) {
+                LC_DEBUG(("make_nonblocking failed.\r\n"));
+            }
             conn = make_conn(conn_sock);
             if (!conn) {
                 close(conn_sock);
@@ -771,7 +770,9 @@ init_server_socket(void)
     }
 
 
-    make_nonblocking(s);
+    if (make_nonblocking(s)) {
+        LC_DEBUG(("make_nonblocking failed.\r\n"));
+    }
     if (listen(s, LIGHTCACHE_LISTEN_BACKLOG) == -1) {
         syslog(LOG_ERR, "%s (%s)", "socket listen error.", strerror(errno));
         close(s);

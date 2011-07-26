@@ -17,4 +17,3 @@ make_nonblocking(int sock)
     return ioctl(sock, FIOBIO, &flags);
 #endif
 }
-

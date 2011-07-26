@@ -29,29 +29,29 @@ if __name__ == '__main__':
         
         print "Sending command: %s" % (s)
         
-        try:
-            resp = None
-            if cmd == 'GET':
-                resp = client.get(key)
-            elif cmd == 'SET':
-                resp = client.set(key, data, extra)
-            elif cmd == 'CHG_SETTING':
-                resp = client.chg_setting(key, data)
-            elif cmd == 'GET_SETTING':
-                resp = client.chg_setting(key)
-            elif cmd == 'GET_STATS':
-                resp = client.get_stats(key)
-            else:
-                args = {}
-                args["key"] = key
-                args["command"] = int(cmd)
-                if data:
-                    args["data"] = data
-                if extra:
-                    args["extra"] = extra                
-                client.send_packet(**args)  
-                resp = client.recv_packet()
-            print "Received response data: %s, errcode:%s" % (resp, client.response.errcode)
-        except Exception,e:
-            print "Command Error: %s" % (e) 
-            continue
+        #try:
+        resp = None
+        if cmd == 'GET':
+            resp = client.get(key)
+        elif cmd == 'SET':
+            resp = client.set(key, data, extra)
+        elif cmd == 'CHG_SETTING':
+            resp = client.chg_setting(key, data)
+        elif cmd == 'GET_SETTING':
+            resp = client.get_setting(key)
+        elif cmd == 'GET_STATS':
+            resp = client.get_stats(key)
+        else:
+            args = {}
+            args["key"] = key
+            args["command"] = int(cmd)
+            if data:
+                args["data"] = data
+            if extra:
+                args["extra"] = extra                
+            client.send_packet(**args)  
+            resp = client.recv_packet()
+        print "Received response data: %s, errcode:%s" % (resp, client.response.errcode)
+        #except Exception,e:
+        #    print "Command Error: %s" % (e) 
+        #    continue

@@ -78,7 +78,7 @@ event_process(void)
     }
 
     // process events
-    for (n = 0; n < nfds; ++n) {
+    for (n = 0; n < nfds; n++) {
         conn = (struct conn *)events[n].data.ptr;
         assert(conn != NULL);
 

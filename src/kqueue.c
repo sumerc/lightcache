@@ -86,7 +86,7 @@ event_process(void)
     }
 
     // process events
-    for (n = 0; n < nfds; ++n) {
+    for (n = 0; n < nfds; n++) {
 
         conn = (struct conn *)events[n].udata;
         assert(conn != NULL);
