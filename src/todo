@@ -71,11 +71,9 @@ v0.2
     when we send 1 bytes on server side.
 [+] check non-blocking rc and debug.
 [+] latest freelist from yappi included.
-[-] verify socket_path is valid.
-[-] show errcode strings defniitons in manual tests.
-[-] run and inspect debugmem.sh for mem leaks or buf. overflows.
-[-] what does this mean: socket Numerical result out of range (read_error) in var/log/syslog.
-[-] when using unix sockets send_overflow_data kind of tests put write() into blocking mode. Is socket remain blocking?
+[*] verify socket_path is valid. BIND gives error.
+[+] show errcode strings defniitons in manual tests.
+[+] when using unix sockets send_overflow_data kind of tests put write() into blocking mode. Is socket remain blocking?
     unix socket write blocking problem? in my tests I received Connection reset by peer after test_overflow_header
     and no conn is accpted from then on.  
     
@@ -89,14 +87,16 @@ v0.2
     16:06:12.295293 --- SIGPIPE (Broken pipe) @ 0 (0) ---
     16:06:12.306404 +++ killed by SIGPIPE +++
     
-    
     strace command used to start lightcache is:
     strace -Ff -tt /home/sumerc/projects/lightcache/src/lightcache -s /home/sumerc/Desktop/deneme
     
     ** memcache ignores SIGPIPE on both deamon and tty modes.
-  
-[-] we need some kind of variable on the sh files if we are running on domain sockets or not.    
-[-] maybe an strace .sh file.    
+[+] we need some kind of variable on the sh files if we are running on domain sockets or not.    
+[+] maybe an strace .sh file.    
+[-] all kqueue tests passed. 
+[-] We may need tests for MacOSx
+[-] run and inspect debugmem.sh for mem leaks or buf. overflows.
+[-] what does this mean: socket Numerical result out of range (read_error) in var/log/syslog.
 [-] TEST: add tests for uncompleted messages where we have key but data is missing etc. Write test for most of them,, if possible all of them.
 [-] maybe a cmd to flush data..etc., too?
 [-] any severity number for logs that can be passed in compile time? for example we only want to trace protocol messages or do a 
