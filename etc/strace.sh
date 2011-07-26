@@ -1,0 +1,1 @@
+python run.py strace -Ff -tt

@@ -3,11 +3,6 @@
 import os
 import sys
 
-
-
-
-
-
 def main():
     
     sys.path.insert(0, "../test")
@@ -15,7 +10,7 @@ def main():
     
     pre_cmd = ""
     try:
-        pre_cmd = sys.argv[1] # cmd to be prepended
+        pre_cmd = sys.argv[1:] # cmd to be prepended
     except:
         pass
         
