@@ -469,7 +469,7 @@ read_nbytes(conn*conn, char *bytes, size_t total)
     needed = total - conn->in->rbytes;
     nbytes = read(conn->fd, &bytes[conn->in->rbytes], 1);
     if (nbytes == 0) {
-        syslog(LOG_ERR, "%s (%s)", "socket read error.\r\n", strerror(errno));
+        LC_DEBUG(("socket read error.[%s]\r\n", strerror(errno) ));
         return READ_ERR;
     } else if (nbytes == -1) {
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
@@ -503,7 +503,6 @@ try_read_request(conn* conn)
             if ( (conn->in->req_header.request.data_length >= PROTOCOL_MAX_DATA_SIZE) ||
                     (conn->in->req_header.request.key_length >= PROTOCOL_MAX_KEY_SIZE) ||
                     (conn->in->req_header.request.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
-                syslog(LOG_ERR, "request data or key length exceeded maximum allowed %u.", PROTOCOL_MAX_DATA_SIZE);
                 LC_DEBUG(("request data or key length exceeded maximum allowed\r\n"));
                 send_err_response(conn, INVALID_PARAM_SIZE);
                 return FAILED;
@@ -576,6 +575,9 @@ send_nbytes(conn*conn, char *bytes, size_t total)
 
     needed = total - conn->out->sbytes;
     nbytes = write(conn->fd, &bytes[conn->out->sbytes], 1); //needed
+    
+    LC_DEBUG(("send_nbytes completed.\r\n"));
+    
     if (nbytes == -1) {
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
             return NEED_MORE;
@@ -739,7 +741,7 @@ init_server_socket(void)
     if (ret != 0) {
         syslog(LOG_ERR, "setsockopt(SO_LINGER) error.(%s)", strerror(errno));
     }
-
+    
     // only for TCP sockets.
     if (!settings.socket_path) {
         setsockopt(s, IPPROTO_TCP, TCP_NODELAY, &optval, sizeof(optval));
@@ -773,6 +775,7 @@ init_server_socket(void)
     if (make_nonblocking(s)) {
         LC_DEBUG(("make_nonblocking failed.\r\n"));
     }
+    
     if (listen(s, LIGHTCACHE_LISTEN_BACKLOG) == -1) {
         syslog(LOG_ERR, "%s (%s)", "socket listen error.", strerror(errno));
         close(s);
@@ -827,8 +830,7 @@ main(int argc, char **argv)
     init_log();
 
     if (settings.deamon_mode) {
-        ;
-        //deamonize();
+        deamonize();
     } else {
         // When debugging with gprof, we run app in TTY and exit with CTRL+C(SIGINT)
         // this is to gracefully exit the app. Otherwise, profiling information
@@ -859,6 +861,8 @@ main(int argc, char **argv)
     
     ptime = 0;
     for (;;) {
+    
+        LC_DEBUG(("ps::\r\n"));
 
         ctime = CURRENT_TIME;
 

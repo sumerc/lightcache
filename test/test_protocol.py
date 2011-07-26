@@ -102,6 +102,11 @@ class ProtocolTests(LightCacheTestBase):
         self.assertEqual(self.client.get("key2"), None)  # key expired
         self.client.assertErrorResponse(KEY_NOTEXISTS, False)
     
+    def test_send_overflow_header(self):
+        self.client.send_raw("OVERFLOWHEADER")
+        self.client.assertErrorResponse(INVALID_PARAM_SIZE)
+        
+            
 if __name__ == '__main__':
     unittest.main()
 

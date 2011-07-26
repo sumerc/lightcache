@@ -23,3 +23,19 @@ INVALID_STATE = 0x02
 INVALID_PARAM_SIZE = 0x03
 SUCCESS = 0x04
 INVALID_COMMAND = 0x05
+
+def err2str(e):
+    if e == KEY_NOTEXISTS:
+        return "KeyNotExists"
+    elif e == INVALID_PARAM:
+        return "InvalidParam"
+    elif e == INVALID_STATE:
+        return "InvalidState"
+    elif e == INVALID_PARAM_SIZE:
+        return "InvalidParamSize"
+    elif e == SUCCESS:
+        return "Success"
+    elif e == INVALID_COMMAND:
+        return "InvalidCommand"
+    raise Exception, "Unrecognized error code received.[%d]" % (e)
+        
