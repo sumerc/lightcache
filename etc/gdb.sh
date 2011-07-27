@@ -1,2 +1,2 @@
-python run.py gdb
+python run.py gdb --args
 
