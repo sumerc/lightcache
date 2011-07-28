@@ -97,8 +97,9 @@ v0.2
 	to see what happens and use that info to refactor kqueue. IMHO, if event_set() is called with EVENT_READ then this should
     be the only	event registered in the pollfd, others shall be discarded.Verify that assumption with epoll and integrate same
 	logic with kqueue. 
-[-] run and inspect debugmem.sh for mem leaks or buf. overflows.
-[-] a shutdown command for the server to gracefully shutdown itself.(Only available in DEBUG version) ????
+[*] run and inspect debugmem.sh for mem leaks or buf. overflows. Not very successfull, instead using my own memleak testing.
+[+] a shutdown command for the server to gracefully shutdown itself.(Only available in DEBUG version) 
+    not necessary as i am able to detect memleaks.
 [-] what does this mean: socket Numerical result out of range (read_error) in var/log/syslog.
 [-] TEST: add tests for uncompleted messages where we have key but data is missing etc. Write test for most of them,, if possible all of them.
 [-] maybe a cmd to flush data..etc., too?

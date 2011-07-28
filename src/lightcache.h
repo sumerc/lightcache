@@ -29,7 +29,7 @@
 
 // version info
 #define LIGHTCACHE_VERSION 0.1
-#define LIGHTCACHE_BUILD 2
+#define LIGHTCACHE_BUILD 3
 
 struct settings {
     int deamon_mode; /* specify whether to run in deamon mode */

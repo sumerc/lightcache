@@ -25,6 +25,10 @@ SUCCESS = 0x04
 INVALID_COMMAND = 0x05
 
 def err2str(e):
+
+    assert(e is not None)
+    assert(type(e)==int)       
+    
     if e == KEY_NOTEXISTS:
         return "KeyNotExists"
     elif e == INVALID_PARAM:
