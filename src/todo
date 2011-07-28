@@ -93,11 +93,12 @@ v0.2
 [*] NOT NECESSARY.any severity number for logs that can be passed in compile time? for example we only want to trace protocol messages or do a 
     deeper trace.
 [+] gdb.sh now accepts cmd line params.
-[-] refactor/optimize kqueue. Before refactoring write a test for epoll that sends subsequent packets before receiving data
+[+] refactor/optimize kqueue. Before refactoring write a test for epoll that sends subsequent packets before receiving data
 	to see what happens and use that info to refactor kqueue. IMHO, if event_set() is called with EVENT_READ then this should
     be the only	event registered in the pollfd, others shall be discarded.Verify that assumption with epoll and integrate same
 	logic with kqueue. 
 [-] run and inspect debugmem.sh for mem leaks or buf. overflows.
+[-] a shutdown command for the server to gracefully shutdown itself.(Only available in DEBUG version) ????
 [-] what does this mean: socket Numerical result out of range (read_error) in var/log/syslog.
 [-] TEST: add tests for uncompleted messages where we have key but data is missing etc. Write test for most of them,, if possible all of them.
 [-] maybe a cmd to flush data..etc., too?

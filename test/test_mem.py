@@ -15,7 +15,11 @@ class MemTests(LightCacheTestBase):
 
     def test_memleak_after_getstats(self):
         self.check_for_memusage_delta( [ ("get_stats", ), ] )
+        
+    def test_memleak_after_get_invalid_key(self):
+        self.check_for_memusage_delta( [ ("get", "invalid_key" ), ] )
            
 if __name__ == '__main__':
+    print "Running MemTests..."
     unittest.main()
 

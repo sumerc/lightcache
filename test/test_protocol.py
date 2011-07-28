@@ -108,5 +108,6 @@ class ProtocolTests(LightCacheTestBase):
         
             
 if __name__ == '__main__':
+    print "Running ProtocolTests..."
     unittest.main()
 

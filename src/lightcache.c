@@ -101,7 +101,7 @@ free_request(request *req)
     }
 
     if (req->can_free) {
-        LC_DEBUG(("FREEING request data.[%p], sizeof:[%lu]\r\n", (void *)req, sizeof(request *)));
+        //LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
         li_free(req->rkey);
         li_free(req->rdata);
         li_free(req->rextra);
@@ -121,7 +121,7 @@ free_response(response *resp)
     }
 
     if (resp->can_free && resp->sdata) {
-        LC_DEBUG(("FREEING response data.[%p]\r\n", (void *)resp));
+        //LC_DEBUG(("FREEING response data.[%p]\r\n", (void *)resp));
         li_free(resp->sdata);
     }
 
@@ -247,7 +247,7 @@ send_err_response(conn *conn, errors err)
     conn->out->sdata = NULL;
     conn->out->can_free = 1;
 
-    LC_DEBUG(("sending err response:%d [fd:%d]\r\n", err, conn->fd));
+    //LC_DEBUG(("sending err response:%d [fd:%d]\r\n", err, conn->fd));
 
     set_conn_state(conn, SEND_HEADER);
 }
@@ -292,8 +292,6 @@ execute_cmd(struct conn* conn)
     switch(cmd) {
     case CMD_GET:
     
-        LC_DEBUG(("CMD_GET request\r\n"));
-    
         /* get item */
         LC_DEBUG(("CMD_GET request for key: %s\r\n", conn->in->rkey));
         tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
@@ -321,8 +319,6 @@ execute_cmd(struct conn* conn)
         }
         conn->out->sdata = cached_req->rdata;
         conn->out->can_free = 0;
-
-        LC_DEBUG(("sending GET data:%s\r\n", conn->out->sdata));
 
         set_conn_state(conn, SEND_HEADER);
         break;
@@ -464,13 +460,9 @@ read_nbytes(conn*conn, char *bytes, size_t total)
     unsigned int needed;
     int nbytes;
 
-    LC_DEBUG(("read_nbytes called.[fd:%d]\r\n", conn->fd));
-
     needed = total - conn->in->rbytes;
     nbytes = read(conn->fd, &bytes[conn->in->rbytes], 1);
     if (nbytes == 0) {
-        LC_DEBUG(("socket read error.[%s]\r\n", strerror(errno) ));
-        syslog(LOG_ERR, "%s (%s)", "socket write error.", strerror(errno));
         return READ_ERR;
     } else if (nbytes == -1) {
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
@@ -513,7 +505,7 @@ try_read_request(conn* conn)
             if (conn->in->req_header.request.key_length == 0) {
                 set_conn_state(conn, CMD_RECEIVED);
                 execute_cmd(conn);
-            } else {LC_DEBUG(("CMD_GET request\r\n"));
+            } else {
                 set_conn_state(conn, READ_KEY);
             }
         }
@@ -572,13 +564,10 @@ send_nbytes(conn*conn, char *bytes, size_t total)
 {
     int needed, nbytes;
 
-    LC_DEBUG(("send_nbytes called.[left:%ld, fd:%d]\r\n", total - conn->out->sbytes, conn->fd));
+    //LC_DEBUG(("send_nbytes called.[left:%ld, fd:%d]\r\n", total - conn->out->sbytes, conn->fd));
 
     needed = total - conn->out->sbytes;
     nbytes = write(conn->fd, &bytes[conn->out->sbytes], 1); //needed
-    
-    LC_DEBUG(("send_nbytes completed.\r\n"));
-    
     if (nbytes == -1) {
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
             return NEED_MORE;
@@ -840,9 +829,10 @@ main(int argc, char **argv)
         // this is to gracefully exit the app. Otherwise, profiling information
         // cannot be emited. 
         signal(SIGINT, sig_handler);
-        signal(SIGPIPE, SIG_IGN);
     }
-
+    
+    signal(SIGPIPE, SIG_IGN);
+    
     ret = event_init(event_handler);
     if (!ret) {
         goto err;
