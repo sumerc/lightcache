@@ -106,7 +106,18 @@ class ProtocolTests(LightCacheTestBase):
         self.client.send_raw("OVERFLOWHEADER")
         self.client.assertErrorResponse(INVALID_PARAM_SIZE)
         
-            
+    def test_delete(self):
+        self.client.set("key5", "value5", 2)
+        self.assertEqual(self.client.get("key5"), "value5")
+        self.client.delete("key5")
+        
+        self.assertEqual(self.client.get("key5"), None)  # key expired
+        self.client.assertErrorResponse(KEY_NOTEXISTS, False)
+        
+    def test_delete_invalid_key(self):
+        self.client.delete("invalid_key")     
+        self.client.assertErrorResponse(KEY_NOTEXISTS)
+        
 if __name__ == '__main__':
     print "Running ProtocolTests..."
     unittest.main()

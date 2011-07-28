@@ -293,7 +293,7 @@ execute_cmd(struct conn* conn)
     case CMD_GET:
     
         /* get item */
-        LC_DEBUG(("CMD_GET request for key: %s\r\n", conn->in->rkey));
+        LC_DEBUG(("CMD_GET [key: %s]\r\n", conn->in->rkey));
         tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
         if (!tab_item) {
             LC_DEBUG(("key not found:%s\r\n", conn->in->rkey));
@@ -322,10 +322,10 @@ execute_cmd(struct conn* conn)
 
         set_conn_state(conn, SEND_HEADER);
         break;
-
+    
     case CMD_SET:
         
-        LC_DEBUG(("CMD_SET request\r\n"));
+        LC_DEBUG(("CMD_SET\r\n"));
 
         /* validate params */
         if (!conn->in->rdata) {
@@ -354,9 +354,33 @@ execute_cmd(struct conn* conn)
         conn->in->can_free = 0;
         set_conn_state(conn, READ_HEADER);
         break;
+    case CMD_DELETE:
+        
+        LC_DEBUG(("CMD_DELETE request for key: %s\r\n", conn->in->rkey));
+        tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
+        if (!tab_item) {
+            LC_DEBUG(("key not found:%s\r\n", conn->in->rkey));
+            send_err_response(conn, KEY_NOTEXISTS);
+            return;
+        }
+        
+        cached_req = (request *)tab_item->val;
+        cached_req->can_free = 1;
+        free_request(cached_req);
+        
+        hfree(cache, tab_item); 
+        
+        set_conn_state(conn, READ_HEADER);
+        break;
+    case CMD_FLUSH_ALL:
+        LC_DEBUG(("CMD_FLUSH_ALL.\r\n"));
+        
+        // TODO: henum
+        
+        break;      
     case CMD_CHG_SETTING:
     
-        LC_DEBUG(("CMD_CHG_SETTING request\r\n"));
+        LC_DEBUG(("CMD_CHG_SETTING.\r\n"));
         
         /* validate params */        
         if (!conn->in->rdata) {

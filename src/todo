@@ -100,9 +100,19 @@ v0.2
 [*] run and inspect debugmem.sh for mem leaks or buf. overflows. Not very successfull, instead using my own memleak testing.
 [+] a shutdown command for the server to gracefully shutdown itself.(Only available in DEBUG version) 
     not necessary as i am able to detect memleaks.
+[+] delete command.
+[-] flush_all command. memcache uses an optional timeout to flush the data but IMHO in LC we dont need that in current versions. 
+[-] TEST: flush all. add more related tests. Maybe to clear all keys on some tests, may be needed dunno.
+[-] TEST: more delete related tests especially in memleaks.
+[-] add more stats mimic memcached.
+[-] write a php client, there is an unpack function for PHP4-5.
+[-] ruby client. there is an unpack() cmd.
+[-] solve distribution problem on client side. http://amix.dk/blog/post/19370.
+    there is also a video for DHTs on google tech talks but cannot remember its name. 
 [-] what does this mean: socket Numerical result out of range (read_error) in var/log/syslog.
 [-] TEST: add tests for uncompleted messages where we have key but data is missing etc. Write test for most of them,, if possible all of them.
-[-] maybe a cmd to flush data..etc., too?
+[-] TEST:more memleak tests required but logic is some kind of hard because all items alloc'd in LC are
+    recyclable. Think more carefully about that tests.
 [-] RE-TEST again with LINGER OPtion as memcached.test_protocol suite failing when run in remote. send_overflow_data is not returning from assertDisconnect() somehow when lightcache is run remotely. Remote system is CentOS 64 bit.
 [-] Program received signal SIGFPE, Arithmetic exception. disable this. 
 	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD)	

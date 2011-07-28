@@ -26,20 +26,21 @@ if __name__ == '__main__':
         
         print "Sending command: %s" % (s)
         
-        #try:
         resp = None
         if cmd == 'GET':
             resp = client.get(key)
         elif cmd == 'SET':
             resp = client.set(key, data, extra)
-            continue
         elif cmd == 'CHG_SETTING':
             resp = client.chg_setting(key, data)
-            continue
         elif cmd == 'GET_SETTING':
             resp = client.get_setting(key)
         elif cmd == 'GET_STATS':
             resp = client.get_stats()
+        elif cmd == 'DELETE':
+            resp = client.delete(key)
+        elif cmd == 'FLUSH_ALL':
+            resp = client.flush_all()
         else:
             args = {}
             args["key"] = key
@@ -50,7 +51,6 @@ if __name__ == '__main__':
                 args["extra"] = extra                
             client.send_packet(**args)  
             resp = client.recv_packet()
-        print "Received response data: %s, errcode:%s" % (resp, err2str(client.response.errcode))
-        #except Exception,e:
-        #    print "Command Error: %s" % (e) 
-        #    continue
+        if resp is not None or client.response.errcode is not None:
+            print "Received response data: %s, errcode:%s" % (resp, err2str(client.response.errcode))
+        

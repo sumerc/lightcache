@@ -23,8 +23,6 @@ class Response:
 
 class LightCacheClient(socket.socket):
     
-    
-    # response obj
     response = Response()
     
     def _is_disconnected(self, in_secs=None):
@@ -49,7 +47,6 @@ class LightCacheClient(socket.socket):
     
         cmd = kwargs.pop("command", 0)
         key = kwargs.pop("key", "")
-        
         key_len = kwargs.pop("key_length", len(key))
         data = kwargs.pop("data", "")
         data_len = kwargs.pop("data_length", len(str(data)))
@@ -76,8 +73,19 @@ class LightCacheClient(socket.socket):
     def _recv_header(self):
         resp = self._recv_until(RESP_HEADER_SIZE)
         return struct.unpack("BBI", resp)
+        
+    def _reset_prev_resp(self):
+        self.response.opcode = None
+        self.response.errcode = None
+        self.response.data_len = None
+        self.response.data = None
+        
+    def send_raw(self, data):
+        self._reset_prev_resp()
+        super(LightCacheClient, self).send(data)
     
-    def send_packet(self, **kwargs):    
+    def send_packet(self, **kwargs):            
+        self._reset_prev_resp()        
         data = self._make_packet(**kwargs)    
         super(LightCacheClient, self).send(data)
 
@@ -88,9 +96,6 @@ class LightCacheClient(socket.socket):
             return None 
         self.response.data = self._recv_until(self.response.data_len)
         return self.response.data        
-
-    def send_raw(self, data):
-        self.send(data)   
     
     def chg_setting(self, key, value):
         assert key is not None
@@ -114,6 +119,11 @@ class LightCacheClient(socket.socket):
         
         self.send_packet(key=key, data=value, command=CMD_SET, extra=timeout)       
 
+    def delete(self, key):
+        assert key is not None
+        
+        self.send_packet(key=key, command=CMD_DELETE)
+        
     def get(self, key):
         assert key is not None
         
@@ -123,4 +133,9 @@ class LightCacheClient(socket.socket):
     def get_stats(self):
         self.send_packet(command=CMD_GET_STATS)
         return self.recv_packet()
+        
+    def flush_all(self):
+        self.send_packet(command=CMD_FLUSH_ALL)
+        
+        
     

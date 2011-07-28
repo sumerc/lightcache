@@ -50,6 +50,8 @@ typedef enum {
     CMD_CHG_SETTING = 0x02,
     CMD_GET_SETTING = 0x03,
     CMD_GET_STATS = 0x04,
+    CMD_DELETE = 0x05,
+    CMD_FLUSH_ALL = 0x06,
 } protocol_commands;
 
 typedef enum {
