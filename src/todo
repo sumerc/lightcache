@@ -101,7 +101,7 @@ v0.2
 [+] a shutdown command for the server to gracefully shutdown itself.(Only available in DEBUG version) 
     not necessary as i am able to detect memleaks.
 [+] delete command.
-[-] flush_all command. memcache uses an optional timeout to flush the data but IMHO in LC we dont need that in current versions. 
+[+] flush_all command. memcache uses an optional timeout to flush the data but IMHO in LC we dont need that in current versions. 
 [-] TEST: flush all. add more related tests. Maybe to clear all keys on some tests, may be needed dunno.
 [-] TEST: more delete related tests especially in memleaks.
 [-] add more stats mimic memcached.

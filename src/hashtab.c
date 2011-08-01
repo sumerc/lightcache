@@ -203,7 +203,7 @@ henum(_htab *ht, int (*enumfn)(_hitem *item, void *arg), void *arg, int enum_fre
             next = p->next;
             if ((!p->free) || (enum_free)) {
                 rc = enumfn(p, arg); // item may be freed.
-                if(rc) // abort enumeration on "0"
+                if(rc)
                     return;
             }
             p = next;

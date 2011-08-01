@@ -25,7 +25,7 @@ class LightCacheClient(socket.socket):
     
     response = Response()
     
-    def _is_disconnected(self, in_secs=None):
+    def is_disconnected(self, in_secs=None):
         if in_secs:
             self.settimeout(in_secs)
         try:
@@ -34,17 +34,8 @@ class LightCacheClient(socket.socket):
             return False
         except socket.error: # peer disconnect signal
             return True
-    
-    def assertDisconnected(self):
-        assert self._is_disconnected() == True
         
-    def assertErrorResponse(self, err, get_response=True):
-        if get_response:
-            self.recv_packet()
-        assert self.response.errcode == err, "Expected %d but got %d." % (err, self.response.errcode)
-
-    def _make_packet(self, **kwargs):
-    
+    def _make_packet(self, **kwargs):    
         cmd = kwargs.pop("command", 0)
         key = kwargs.pop("key", "")
         key_len = kwargs.pop("key_length", len(key))
@@ -112,7 +103,7 @@ class LightCacheClient(socket.socket):
             r = struct.unpack("!Q", resp) # (!) means data comes from network(big-endian)
             return r[0]
             
-    def set(self, key, value, timeout):
+    def set(self, key, value, timeout=3600):
         assert key is not None
         assert value is not None
         assert timeout is not None

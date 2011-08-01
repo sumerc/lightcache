@@ -15,11 +15,11 @@ class FuzyyTests(LightCacheTestBase):
             self.client.send_raw(self._rand_string(N))
         except Exception,e:
             pass # server disconnects while we may be still sending
-        self.client.assertErrorResponse(INVALID_PARAM_SIZE)
+        self.assertErrorResponse(INVALID_PARAM_SIZE)
 
     def test_invalid_command(self):
         self.client.send_packet(command=20)
-        self.client.assertErrorResponse(INVALID_COMMAND)
+        self.assertErrorResponse(INVALID_COMMAND)
 
 if __name__ == '__main__':
     print "Running FuzzyTests..."

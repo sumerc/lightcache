@@ -271,7 +271,24 @@ prepare_response(conn *conn, size_t data_length, int alloc_mem)
     return 1;
 }
 
-void
+static int
+flush_item_enum(_hitem *item, void *arg)
+{
+    if (arg){;}// suppress unused param. warning.
+    
+    LC_DEBUG(("flush_item called.\r\n"));
+    
+    free_request((request *)item->val);
+    
+    if (!item->free) {
+        hfree(cache, item);
+    }
+    
+    return 0;
+}
+
+
+static void
 execute_cmd(struct conn* conn)
 {
     int r;
@@ -374,9 +391,10 @@ execute_cmd(struct conn* conn)
         break;
     case CMD_FLUSH_ALL:
         LC_DEBUG(("CMD_FLUSH_ALL.\r\n"));
+       
+        henum(cache, flush_item_enum, NULL, 1);
         
-        // TODO: henum
-        
+        set_conn_state(conn, READ_HEADER);
         break;      
     case CMD_CHG_SETTING:
     
