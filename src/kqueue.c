@@ -47,7 +47,6 @@ event_del(conn *c)
 int
 event_set(conn *c, int flags)
 {
-    unsigned short eflags;
     struct kevent ke;
 
     /* clear all previous events */
