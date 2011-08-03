@@ -18,7 +18,7 @@ typedef union req_header {
 
 typedef union {
     struct {
-        uint8_t opcode;        
+        uint8_t opcode;
         uint8_t errcode;
         uint32_t data_length;
     } response;

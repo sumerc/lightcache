@@ -239,11 +239,11 @@ static void
 send_err_response(conn *conn, errors err)
 {
     assert(conn->out != NULL);
-    
+
     conn->out->resp_header.response.data_length = 0;
     conn->out->resp_header.response.opcode = conn->in->req_header.request.opcode;
     conn->out->resp_header.response.errcode = err;
-    
+
     conn->out->sdata = NULL;
     conn->out->can_free = 1;
 
@@ -267,23 +267,25 @@ prepare_response(conn *conn, size_t data_length, int alloc_mem)
     conn->out->resp_header.response.data_length = htonl(data_length);
     conn->out->resp_header.response.opcode = conn->in->req_header.request.opcode;
     conn->out->resp_header.response.errcode = SUCCESS;
-    
+
     return 1;
 }
 
 static int
 flush_item_enum(_hitem *item, void *arg)
 {
-    if (arg){;}// suppress unused param. warning.
-    
+    if (arg) {
+        ;   // suppress unused param. warning.
+    }
+
     LC_DEBUG(("flush_item called.\r\n"));
-    
+
     free_request((request *)item->val);
-    
+
     if (!item->free) {
         hfree(cache, item);
     }
-    
+
     return 0;
 }
 
@@ -303,12 +305,12 @@ execute_cmd(struct conn* conn)
     /* here, the complete request is received from the connection */
     conn->in->received = CURRENT_TIME;
     cmd = conn->in->req_header.request.opcode;
-    
+
     /* No need for the validation of conn->in->rkey as it is mandatory for the
        protocol. */
     switch(cmd) {
     case CMD_GET:
-    
+
         /* get item */
         LC_DEBUG(("CMD_GET [key: %s]\r\n", conn->in->rkey));
         tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
@@ -339,9 +341,9 @@ execute_cmd(struct conn* conn)
 
         set_conn_state(conn, SEND_HEADER);
         break;
-    
+
     case CMD_SET:
-        
+
         LC_DEBUG(("CMD_SET\r\n"));
 
         /* validate params */
@@ -372,7 +374,7 @@ execute_cmd(struct conn* conn)
         set_conn_state(conn, READ_HEADER);
         break;
     case CMD_DELETE:
-        
+
         LC_DEBUG(("CMD_DELETE request for key: %s\r\n", conn->in->rkey));
         tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
         if (!tab_item) {
@@ -380,33 +382,33 @@ execute_cmd(struct conn* conn)
             send_err_response(conn, KEY_NOTEXISTS);
             return;
         }
-        
+
         cached_req = (request *)tab_item->val;
         cached_req->can_free = 1;
         free_request(cached_req);
-        
-        hfree(cache, tab_item); 
-        
+
+        hfree(cache, tab_item);
+
         set_conn_state(conn, READ_HEADER);
         break;
     case CMD_FLUSH_ALL:
         LC_DEBUG(("CMD_FLUSH_ALL.\r\n"));
-       
+
         henum(cache, flush_item_enum, NULL, 1);
-        
+
         set_conn_state(conn, READ_HEADER);
-        break;      
+        break;
     case CMD_CHG_SETTING:
-    
+
         LC_DEBUG(("CMD_CHG_SETTING.\r\n"));
-        
-        /* validate params */        
+
+        /* validate params */
         if (!conn->in->rdata) {
             LC_DEBUG(("(null) data param in CMD_CHG_SETTING\r\n"));
             send_err_response(conn, INVALID_PARAM);
             break;
         }
-        
+
         /* process */
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!atoull(conn->in->rdata, &val)) {
@@ -432,9 +434,9 @@ execute_cmd(struct conn* conn)
         set_conn_state(conn, READ_HEADER);
         break;
     case CMD_GET_SETTING:
-    
+
         LC_DEBUG(("CMD_GET_SETTING request\r\n"));
-        
+
         /* validate params */
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!prepare_response(conn, sizeof(uint64_t), 1)) {
@@ -455,18 +457,18 @@ execute_cmd(struct conn* conn)
         }
         break;
     case CMD_GET_STATS:
-        
+
         LC_DEBUG(("CMD_GET_STATS request\r\n"));
-        
+
         if (!prepare_response(conn, LIGHTCACHE_STATS_SIZE, 1)) {
             return;
         }
-        sprintf(conn->out->sdata, 
-            "mem_used:%llu\r\nuptime:%lu\r\nversion: %0.1f Build.%d\r\n", 
-            (long long unsigned int)stats.mem_used,
-            (long unsigned int)CURRENT_TIME-stats.start_time,
-            LIGHTCACHE_VERSION, 
-            LIGHTCACHE_BUILD);
+        sprintf(conn->out->sdata,
+                "mem_used:%llu\r\nuptime:%lu\r\nversion: %0.1f Build.%d\r\n",
+                (long long unsigned int)stats.mem_used,
+                (long unsigned int)CURRENT_TIME-stats.start_time,
+                LIGHTCACHE_VERSION,
+                LIGHTCACHE_BUILD);
         set_conn_state(conn, SEND_HEADER);
         break;
     default:
@@ -474,7 +476,7 @@ execute_cmd(struct conn* conn)
         send_err_response(conn, INVALID_COMMAND);
         break;
     }
-    
+
     return;
 
 }
@@ -559,7 +561,7 @@ try_read_request(conn* conn)
 
         ret = read_nbytes(conn, conn->in->rkey, conn->in->req_header.request.key_length);
 
-        if (ret == READ_COMPLETED) {            
+        if (ret == READ_COMPLETED) {
             if (conn->in->req_header.request.data_length == 0) {
                 set_conn_state(conn, CMD_RECEIVED);
                 execute_cmd(conn);
@@ -623,7 +625,7 @@ send_nbytes(conn*conn, char *bytes, size_t total)
         conn->out->sbytes = 0;
         return SEND_COMPLETED;
     }
-    
+
     return NEED_MORE;
 }
 
@@ -637,7 +639,7 @@ try_send_response(conn *conn)
     case SEND_HEADER:
         ret = send_nbytes(conn, (char *)conn->out->resp_header.bytes, sizeof(resp_header));
         if (ret == SEND_COMPLETED) {
-            if (ntohl(conn->out->resp_header.response.data_length) != 0) {                
+            if (ntohl(conn->out->resp_header.response.data_length) != 0) {
                 set_conn_state(conn, SEND_DATA);
             } else {
                 set_conn_state(conn, CMD_SENT);
@@ -747,7 +749,7 @@ init_server_socket(void)
         // of S_ISSOCK() here is needed but not ANSI compliant.
         if (stat(settings.socket_path, &tstat) == 0) {
             unlink(settings.socket_path);
-                
+
         }
 
         if ((s=socket(AF_UNIX, SOCK_STREAM, 0))==-1) {
@@ -774,7 +776,7 @@ init_server_socket(void)
     if (ret != 0) {
         syslog(LOG_ERR, "setsockopt(SO_LINGER) error.(%s)", strerror(errno));
     }
-    
+
     // only for TCP sockets.
     if (!settings.socket_path) {
         ret = setsockopt(s, IPPROTO_TCP, TCP_NODELAY, &optval, sizeof(optval));
@@ -810,7 +812,7 @@ init_server_socket(void)
     if (make_nonblocking(s)) {
         LC_DEBUG(("make_nonblocking failed.\r\n"));
     }
-    
+
     if (listen(s, LIGHTCACHE_LISTEN_BACKLOG) == -1) {
         syslog(LOG_ERR, "%s (%s)", "socket listen error.", strerror(errno));
         close(s);
@@ -869,12 +871,12 @@ main(int argc, char **argv)
     } else {
         // When debugging with gprof, we run app in TTY and exit with CTRL+C(SIGINT)
         // this is to gracefully exit the app. Otherwise, profiling information
-        // cannot be emited. 
+        // cannot be emited.
         signal(SIGINT, sig_handler);
     }
-    
+
     signal(SIGPIPE, SIG_IGN);
-    
+
     ret = event_init(event_handler);
     if (!ret) {
         goto err;
@@ -884,7 +886,7 @@ main(int argc, char **argv)
     if (!init_server_socket()) {
         goto err;
     }
-    
+
     /* create the in-memory hash table. Constant is not important here.
      * Hash table is an exponantially growing as more and more items being
      * added.
@@ -895,7 +897,7 @@ main(int argc, char **argv)
     }
 
     LC_DEBUG(("lightcache started.[%s]\r\n", settings.socket_path));
-    
+
     ptime = 0;
     for (;;) {
 

@@ -40,8 +40,8 @@ event_set(conn *c, int flags)
     struct epoll_event ev;
 
     memset(&ev, 0, sizeof(struct epoll_event));
-    
-    
+
+
     if (flags & EVENT_READ) {
         ev.events |= EPOLLIN;
     }
@@ -69,8 +69,8 @@ event_process(void)
 {
     int nfds, n;
     conn *conn;
-    
-    
+
+
     nfds = epoll_wait(epollfd, events, POLL_MAX_EVENTS, POLL_TIMEOUT);
     if (nfds == -1) {
         syslog(LOG_ERR, "%s (%s)", "epoll wait error.", strerror(errno));
