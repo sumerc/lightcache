@@ -144,7 +144,9 @@ v0.2
                                (see doc/threads.txt)
 [*] hget() can be optimized more as strcmp() can be optimized. 
     GCC is already optimized.
-[-] send success codes for every msg???
+[+] send success codes for every msg???
+[-] maybe prepare_response can be merged into send_response() function for better
+    design.
 [-] TEST: dynamic alloc. failures.(OUT_OF_MEMORY)
 [-] slab_alloc() for dynamic allocations.                       
 [-] TEST: more delete related tests especially in memleaks.
