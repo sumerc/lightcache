@@ -53,14 +53,14 @@ init_stats(void)
 {
     stats.mem_used = 0;
     stats.mem_request_count = 0;
-    stats.req_per_sec = 0;
-    stats.resp_per_sec = 0;
     stats.start_time = CURRENT_TIME;
     stats.curr_connections = 0;
     stats.cmd_get = 0;
     stats.cmd_set = 0;
     stats.get_hits = 0;
     stats.get_misses = 0;
+    stats.bytes_read = 0;
+    stats.bytes_written = 0;
 }
 
 struct conn*
@@ -186,63 +186,6 @@ disconnect_conn(conn* conn)
     set_conn_state(conn, CONN_CLOSED);
 }
 
-
-
-void
-set_conn_state(struct conn* conn, conn_states state)
-{
-    switch(state) {
-    case READ_HEADER:
-        if (!init_resources(conn)) {
-            disconnect_conn(conn);
-            return;
-        }
-
-        conn->in->rbytes = 0;
-        event_set(conn, EVENT_READ);
-        break;
-    case READ_KEY:
-        conn->in->rkey = (char *)li_malloc(conn->in->req_header.request.key_length + 1);
-        if (!conn->in->rkey) {
-            disconnect_conn(conn);
-            return;
-        }
-        conn->in->rkey[conn->in->req_header.request.key_length] = (char)0;
-        break;
-    case READ_DATA:
-        conn->in->rdata = (char *)li_malloc(conn->in->req_header.request.data_length + 1);
-        if (!conn->in->rdata) {
-            disconnect_conn(conn);
-            return;
-        }
-        conn->in->rdata[conn->in->req_header.request.data_length] = (char)0;
-        break;
-    case READ_EXTRA:
-        conn->in->rextra = (char *)li_malloc(conn->in->req_header.request.extra_length + 1);
-        if (!conn->in->rextra) {
-            disconnect_conn(conn);
-            return;
-        }
-        conn->in->rextra[conn->in->req_header.request.extra_length] = (char)0;
-        break;
-    case CMD_RECEIVED:
-        stats.req_per_sec++;
-        break;
-    case CMD_SENT:
-        stats.resp_per_sec++;
-        break;
-    case SEND_HEADER:
-        conn->out->sbytes = 0;
-        event_set(conn, EVENT_WRITE);
-        break;
-    default:
-        break;
-    }
-
-    conn->state = state;
-
-}
-
 static void
 send_err_response(conn *conn, errors err)
 {
@@ -260,6 +203,60 @@ send_err_response(conn *conn, errors err)
     set_conn_state(conn, SEND_HEADER);
 }
 
+void
+set_conn_state(struct conn* conn, conn_states state)
+{
+    switch(state) {
+    case READ_HEADER:
+        if (!init_resources(conn)) {
+            disconnect_conn(conn);
+            return;
+        }
+
+        conn->in->rbytes = 0;
+        event_set(conn, EVENT_READ);
+        break;
+    case READ_KEY:
+        conn->in->rkey = (char *)li_malloc(conn->in->req_header.request.key_length + 1);
+        if (!conn->in->rkey) {
+            send_err_response(conn, OUT_OF_MEMORY);
+            return;
+        }
+        conn->in->rkey[conn->in->req_header.request.key_length] = (char)0;
+        break;
+    case READ_DATA:
+        conn->in->rdata = (char *)li_malloc(conn->in->req_header.request.data_length + 1);
+        if (!conn->in->rdata) {
+            send_err_response(conn, OUT_OF_MEMORY);
+            return;
+        }
+        conn->in->rdata[conn->in->req_header.request.data_length] = (char)0;
+        break;
+    case READ_EXTRA:
+        conn->in->rextra = (char *)li_malloc(conn->in->req_header.request.extra_length + 1);
+        if (!conn->in->rextra) {
+            send_err_response(conn, OUT_OF_MEMORY);
+            return;
+        }
+        conn->in->rextra[conn->in->req_header.request.extra_length] = (char)0;
+        break;
+    case CMD_RECEIVED:
+        break;
+    case CMD_SENT:
+        break;
+    case SEND_HEADER:
+        conn->out->sbytes = 0;
+        event_set(conn, EVENT_WRITE);
+        break;
+    default:
+        break;
+    }
+
+    conn->state = state;
+
+}
+
+
 static int
 prepare_response(conn *conn, size_t data_length, int alloc_mem)
 {
@@ -268,7 +265,6 @@ prepare_response(conn *conn, size_t data_length, int alloc_mem)
     if (alloc_mem) {
         conn->out->sdata = (char *)li_malloc(data_length);
         if (!conn->out->sdata) {
-            disconnect_conn(conn);
             return 0;
         }
     }
@@ -345,9 +341,8 @@ execute_cmd(struct conn* conn)
         
         stats.get_hits++;
         
-        if (!prepare_response(conn, cached_req->req_header.request.data_length, 0)) { // do not alloc mem
-            return;
-        }
+        prepare_response(conn, cached_req->req_header.request.data_length, 0); // do not alloc mem
+            
         conn->out->sdata = cached_req->rdata;
         conn->out->can_free = 0;
         
@@ -455,12 +450,14 @@ execute_cmd(struct conn* conn)
         /* validate params */
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!prepare_response(conn, sizeof(uint64_t), 1)) {
+                send_err_response(conn, OUT_OF_MEMORY);
                 return;
             }
             *(uint64_t *)conn->out->sdata = htonll(settings.idle_conn_timeout);
             set_conn_state(conn, SEND_HEADER);
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
             if (!prepare_response(conn, sizeof(uint64_t), 1)) {
+                send_err_response(conn, OUT_OF_MEMORY);
                 return;
             }
             *(uint64_t *)conn->out->sdata = htonll(settings.mem_avail / 1024 / 1024);
@@ -476,6 +473,7 @@ execute_cmd(struct conn* conn)
         LC_DEBUG(("GET_STATS\r\n"));
 
         if (!prepare_response(conn, LIGHTCACHE_STATS_SIZE, 1)) {
+            send_err_response(conn, OUT_OF_MEMORY);
             return;
         }
         sprintf(conn->out->sdata,
@@ -945,9 +943,6 @@ main(int argc, char **argv)
         event_process();
 
         if (ctime-ptime > 1) {
-
-            stats.req_per_sec = 0;
-            stats.resp_per_sec = 0;
 
             // Note: This code is executed per-sec roughly. Audits below can hold another variable to count
             // how many seconds elapsed to invoke themselves or not.
