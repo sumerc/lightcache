@@ -142,8 +142,11 @@ v0.2
                                use for storage. 
     threads           32u      Number of worker threads requested.
                                (see doc/threads.txt)
+[*] hget() can be optimized more as strcmp() can be optimized. 
+    GCC is already optimized.
+[-] send success codes for every msg???
+[-] TEST: dynamic alloc. failures.(OUT_OF_MEMORY)
 [-] slab_alloc() for dynamic allocations.                       
-[-] hget() can be optimized more as strcmp() can be optimized.
 [-] TEST: more delete related tests especially in memleaks.
 [-] write a php client, there is an unpack function for PHP4-5.
 [-] ruby client. there is an unpack() cmd.

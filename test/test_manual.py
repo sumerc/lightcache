@@ -51,6 +51,8 @@ if __name__ == '__main__':
                 args["extra"] = extra                
             client.send_packet(**args)  
             resp = client.recv_packet()
+        print resp
+        print client.response.errcode
         if resp is not None or client.response.errcode is not None:
             print "Received response data: %s, errcode:%s" % (resp, err2str(client.response.errcode))
         
