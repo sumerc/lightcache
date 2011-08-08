@@ -56,6 +56,11 @@ init_stats(void)
     stats.req_per_sec = 0;
     stats.resp_per_sec = 0;
     stats.start_time = CURRENT_TIME;
+    stats.curr_connections = 0;
+    stats.cmd_get = 0;
+    stats.cmd_set = 0;
+    stats.get_hits = 0;
+    stats.get_misses = 0;
 }
 
 struct conn*
@@ -88,6 +93,8 @@ make_conn(int fd) {
     conn->free = 0;
     conn->in = NULL;
     conn->out = NULL;
+    
+    stats.curr_connections++;
 
     return conn;
 }
@@ -173,6 +180,8 @@ disconnect_conn(conn* conn)
 
     conn->free = 1;
     close(conn->fd);
+    
+    stats.curr_connections--;
 
     set_conn_state(conn, CONN_CLOSED);
 }
@@ -310,14 +319,16 @@ execute_cmd(struct conn* conn)
        protocol. */
     switch(cmd) {
     case CMD_GET:
+    
+        LC_DEBUG(("CMD_GET [%s]\r\n", conn->in->rkey));
+        
+        stats.cmd_get++;
 
         /* get item */
-        LC_DEBUG(("CMD_GET [key: %s]\r\n", conn->in->rkey));
         tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
         if (!tab_item) {
-            LC_DEBUG(("key not found:%s\r\n", conn->in->rkey));
-            send_err_response(conn, KEY_NOTEXISTS);
-            return;
+            LC_DEBUG(("Key not found:%s\r\n", conn->in->rkey));
+            goto GET_KEY_NOTEXISTS;
         }
         cached_req = (request *)tab_item->val;
 
@@ -326,35 +337,39 @@ execute_cmd(struct conn* conn)
         assert(r != 0);/* CMD_SET already does this validation but re-check*/
 
         if ((unsigned int)(conn->in->received-cached_req->received) > val) {
-            LC_DEBUG(("time expired for key:%s\r\n", conn->in->rkey));
+            LC_DEBUG(("Time expired for key:%s\r\n", conn->in->rkey));
             cached_req->can_free = 1;
             free_request(cached_req);
             hfree(cache, tab_item); // recycle tab_item
-            send_err_response(conn, KEY_NOTEXISTS);
-            return;
+            goto GET_KEY_NOTEXISTS;
         }
+        
+        stats.get_hits++;
+        
         if (!prepare_response(conn, cached_req->req_header.request.data_length, 0)) { // do not alloc mem
             return;
         }
         conn->out->sdata = cached_req->rdata;
         conn->out->can_free = 0;
-
+        
         set_conn_state(conn, SEND_HEADER);
         break;
 
     case CMD_SET:
 
         LC_DEBUG(("CMD_SET\r\n"));
+        
+        stats.cmd_set++;
 
         /* validate params */
         if (!conn->in->rdata) {
-            LC_DEBUG(("invalid data param in CMD_SET\r\n"));
+            LC_DEBUG(("Invalid data param in CMD_SET\r\n"));
             send_err_response(conn, INVALID_PARAM);
             return;
         }
 
         if (!atoull(conn->in->rextra, &val)) {
-            LC_DEBUG(("invalid timeout param in CMD_SET\r\n"));
+            LC_DEBUG(("Invalid timeout param in CMD_SET\r\n"));
             send_err_response(conn, INVALID_PARAM);
             return;
         }
@@ -375,10 +390,11 @@ execute_cmd(struct conn* conn)
         break;
     case CMD_DELETE:
 
-        LC_DEBUG(("CMD_DELETE request for key: %s\r\n", conn->in->rkey));
+        LC_DEBUG(("CMD_DELETE [%s]\r\n", conn->in->rkey));
+        
         tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
         if (!tab_item) {
-            LC_DEBUG(("key not found:%s\r\n", conn->in->rkey));
+            LC_DEBUG(("Key not found:%s\r\n", conn->in->rkey));
             send_err_response(conn, KEY_NOTEXISTS);
             return;
         }
@@ -392,7 +408,7 @@ execute_cmd(struct conn* conn)
         set_conn_state(conn, READ_HEADER);
         break;
     case CMD_FLUSH_ALL:
-        LC_DEBUG(("CMD_FLUSH_ALL.\r\n"));
+        LC_DEBUG(("CMD_FLUSH_ALL\r\n"));
 
         henum(cache, flush_item_enum, NULL, 1);
 
@@ -400,7 +416,7 @@ execute_cmd(struct conn* conn)
         break;
     case CMD_CHG_SETTING:
 
-        LC_DEBUG(("CMD_CHG_SETTING.\r\n"));
+        LC_DEBUG(("CHG_SETTING\r\n"));
 
         /* validate params */
         if (!conn->in->rdata) {
@@ -412,7 +428,7 @@ execute_cmd(struct conn* conn)
         /* process */
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!atoull(conn->in->rdata, &val)) {
-                LC_DEBUG(("invalid idle conn timeout param.\r\n"));
+                LC_DEBUG(("Invalid idle conn timeout param.\r\n"));
                 send_err_response(conn, INVALID_PARAM);
                 return;
             }
@@ -420,7 +436,7 @@ execute_cmd(struct conn* conn)
             settings.idle_conn_timeout = val;
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
             if (!atoull(conn->in->rdata, &val)) {
-                LC_DEBUG(("invalid mem avail param.\r\n"));
+                LC_DEBUG(("Invalid mem avail param.\r\n"));
                 send_err_response(conn, INVALID_PARAM);
                 return;
             }
@@ -435,7 +451,7 @@ execute_cmd(struct conn* conn)
         break;
     case CMD_GET_SETTING:
 
-        LC_DEBUG(("CMD_GET_SETTING request\r\n"));
+        LC_DEBUG(("GET_SETTING\r\n"));
 
         /* validate params */
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
@@ -458,17 +474,31 @@ execute_cmd(struct conn* conn)
         break;
     case CMD_GET_STATS:
 
-        LC_DEBUG(("CMD_GET_STATS request\r\n"));
+        LC_DEBUG(("GET_STATS\r\n"));
 
         if (!prepare_response(conn, LIGHTCACHE_STATS_SIZE, 1)) {
             return;
         }
         sprintf(conn->out->sdata,
-                "mem_used:%llu\r\nuptime:%lu\r\nversion: %0.1f Build.%d\r\n",
-                (long long unsigned int)stats.mem_used,
+                "mem_used:%llu\r\nmem_avail:%llu\r\nuptime:%lu\r\nversion: %0.1f Build.%d\r\n"
+                "pid:%d\r\ntime:%lu\r\ncurr_items:%d\r\ncurr_connections:%llu\r\n"
+                "cmd_get:%llu\r\ncmd_set:%llu\r\nget_misses:%llu\r\nget_hits:%llu\r\n"
+                "bytes_read:%llu\r\nbytes_written:%llu\r\n",
+                stats.mem_used,
+                settings.mem_avail,
                 (long unsigned int)CURRENT_TIME-stats.start_time,
                 LIGHTCACHE_VERSION,
-                LIGHTCACHE_BUILD);
+                LIGHTCACHE_BUILD,
+                getpid(),
+                CURRENT_TIME,
+                hcount(cache),
+                stats.curr_connections,
+                stats.cmd_get,
+                stats.cmd_set,
+                stats.get_misses,
+                stats.get_hits,
+                stats.bytes_read,
+                stats.bytes_written);
         set_conn_state(conn, SEND_HEADER);
         break;
     default:
@@ -478,7 +508,11 @@ execute_cmd(struct conn* conn)
     }
 
     return;
-
+    
+GET_KEY_NOTEXISTS:
+    stats.get_misses++;
+    send_err_response(conn, KEY_NOTEXISTS);
+    return;
 }
 
 void
@@ -514,6 +548,9 @@ read_nbytes(conn*conn, char *bytes, size_t total)
             return NEED_MORE;
         }
     }
+    
+    stats.bytes_read += nbytes;
+    
     conn->in->rbytes += nbytes;
     if (conn->in->rbytes == total) {
         conn->in->rbytes = 0;
@@ -620,6 +657,9 @@ send_nbytes(conn*conn, char *bytes, size_t total)
         syslog(LOG_ERR, "%s (%s)", "socket write error.", strerror(errno));
         return SEND_ERR;
     }
+    
+    stats.bytes_written += nbytes;
+    
     conn->out->sbytes += nbytes;
     if (conn->out->sbytes == total) {
         conn->out->sbytes = 0;

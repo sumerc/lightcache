@@ -1,6 +1,6 @@
 cd ../src/
 make
 cd ../etc/
-python run.py
+python scripts/run.py
 sleep 10000
 

@@ -44,6 +44,13 @@ struct stats {
     uint64_t req_per_sec;
     uint64_t resp_per_sec;
     time_t start_time;
+    uint64_t curr_connections;
+    uint64_t cmd_get;
+    uint64_t cmd_set;
+    uint64_t get_hits;
+    uint64_t get_misses;
+    uint64_t bytes_read;
+    uint64_t bytes_written;
 };
 
 #define LIGHTCACHE_PORT 13131
