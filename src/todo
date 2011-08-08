@@ -103,8 +103,7 @@ v0.2
 [+] delete command.
 [+] flush_all command. memcache uses an optional timeout to flush the data but IMHO in LC we dont need that in current versions. 
 [+] TEST: flush all. add more related tests. Maybe to clear all keys on some tests, may be needed dunno.
-[-] TEST: more delete related tests especially in memleaks.
-[-] add more stats mimic memcached.
+[+] add more stats mimic memcached.
     Name              Type     Meaning
     ----------------------------------
     pid               32u      Process id of this server process
@@ -143,6 +142,9 @@ v0.2
                                use for storage. 
     threads           32u      Number of worker threads requested.
                                (see doc/threads.txt)
+[-] slab_alloc() for dynamic allocations.                       
+[-] hget() can be optimized more as strcmp() can be optimized.
+[-] TEST: more delete related tests especially in memleaks.
 [-] write a php client, there is an unpack function for PHP4-5.
 [-] ruby client. there is an unpack() cmd.
 [-] solve distribution problem on client side. http://amix.dk/blog/post/19370.

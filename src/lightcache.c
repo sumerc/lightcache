@@ -193,7 +193,6 @@ set_conn_state(struct conn* conn, conn_states state)
 {
     switch(state) {
     case READ_HEADER:
-
         if (!init_resources(conn)) {
             disconnect_conn(conn);
             return;
@@ -761,15 +760,16 @@ event_handler(conn *conn, event ev)
     return;
 }
 
-/* Demands for memory that is freed but used. This may be an expired cached request
- * or a freed connection, or in freelist items. This function will be called when
- * application memory usage reaches a certain ratio of the total available mem. The
- * logic is to use every chance to respond to SET requests properly.
- * */
+
+/* Demands for memory that is statically allocated(such as frelists). 
+   This function will be called when application memory usage reaches a certain 
+   ratio of the total available mem. Here, we will shrink static resources to gain
+   more memory for dynamic resources.
+  */
 void
 collect_unused_memory(void)
 {
-    // TODO: Implement.
+    // todo:   
 }
 
 
@@ -789,7 +789,6 @@ init_server_socket(void)
         // of S_ISSOCK() here is needed but not ANSI compliant.
         if (stat(settings.socket_path, &tstat) == 0) {
             unlink(settings.socket_path);
-
         }
 
         if ((s=socket(AF_UNIX, SOCK_STREAM, 0))==-1) {
