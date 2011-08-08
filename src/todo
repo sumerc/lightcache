@@ -148,7 +148,10 @@ v0.2
 [-] maybe prepare_response can be merged into send_response() function for better
     design.
 [-] TEST: dynamic alloc. failures.(OUT_OF_MEMORY)
-[-] slab_alloc() for dynamic allocations.                       
+[-] slab_alloc() for dynamic allocations and free list should be implemented according to
+    wikipedia: http://en.wikipedia.org/wiki/Free_list.
+    Slab allocation solves the fragmentation problem. Redis makes a contest to stress the mem.
+    fragmentation. Can we have such chance to observe fragmentation via some tests? 
 [-] TEST: more delete related tests especially in memleaks.
 [-] write a php client, there is an unpack function for PHP4-5.
 [-] ruby client. there is an unpack() cmd.
