@@ -14,14 +14,12 @@ class LightCacheTestBase(unittest.TestCase):
     def assertDisconnected(self, in_secs=None):
         assert self.client.is_disconnected(in_secs) == True
         
-    def assertErrorResponse(self, err, get_response=True):
-        if get_response:
-            self.client.recv_packet()
+    def assertErrorResponse(self, err):
         assert self.client.response.errcode == err, "Expected %d but got %d." % (err, self.client.response.errcode)
     
     def assertKeyNotExists(self, key):
         self.assertEqual(self.client.get(key), None)
-        self.assertErrorResponse(KEY_NOTEXISTS, False)
+        self.assertErrorResponse(KEY_NOTEXISTS)
     
     def _stats2dict(self, stats):
         result = {}

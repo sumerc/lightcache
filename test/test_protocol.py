@@ -4,10 +4,14 @@ from testbase import LightCacheTestBase
 from protocolconf import *
 
 class ProtocolTests(LightCacheTestBase):
+    def test_get_overflowed_timeout(self):
+        self.client.set("key5", "value5", 101010101010010101001010101001)
+        self.assertErrorResponse(INVALID_PARAM)
     
     def test_send_overflow_data(self):
         data = "A" *  (PROTOCOL_MAX_DATA_SIZE+1)
         self.client.send_packet(data=data)
+        self.client.recv_packet()
         self.assertErrorResponse(INVALID_PARAM_SIZE)
     
     # TODO: Sometimes failing locally, too. Even if we are disconnecting
@@ -19,19 +23,18 @@ class ProtocolTests(LightCacheTestBase):
     
     def test_send_overflow_header(self):
         self.client.send_raw("OVERFLOWHEADER")
+        self.client.recv_packet()
         self.assertErrorResponse(INVALID_PARAM_SIZE)
     
     def test_send_overflow_key(self):
         data = "DENEME"
-        self.client.send_packet(data=data, key_length=PROTOCOL_MAX_KEY_SIZE)    
+        self.client.send_packet(data=data, key_length=PROTOCOL_MAX_KEY_SIZE) 
+        self.client.recv_packet()   
         self.assertErrorResponse(INVALID_PARAM_SIZE)  
-        
-    def test_invalid_packets(self):
-        self.client.send_packet(data="data_value", key_length=10, 
-        command=CMD_CHG_SETTING, data_length=12)   
-   
+    
     def test_set(self):
         self.client.set("key1", "value1", 11)
+        self.assertEqual(self.client.get("key1"), "value1")
     
     def test_get_stats(self):
         stats = self._stats2dict(self.client.get_stats())
@@ -46,10 +49,6 @@ class ProtocolTests(LightCacheTestBase):
         self.assertEqual(self.client.get("key"), "value")
         self.client.set("key", "value2", 5)
         self.assertEqual(self.client.get("key"), "value2")    
-        
-    def test_get_overflowed_timeout(self):
-        self.client.set("key5", "value5", 101010101010010101001010101001)
-        self.assertErrorResponse(INVALID_PARAM)
                 
     def test_get_invalid_timeout(self):
         self.client.set("key5", "value5", "invalid_value")
@@ -63,7 +62,7 @@ class ProtocolTests(LightCacheTestBase):
         
     def test_get_setting_invalid(self):
         self.client.get_setting("invalid_setting")
-        self.assertErrorResponse(INVALID_PARAM, False) # response is already gotten
+        self.assertErrorResponse(INVALID_PARAM)
 
     def test_chg_setting(self):
         self.client.chg_setting("idle_conn_timeout", 2)
@@ -100,10 +99,6 @@ class ProtocolTests(LightCacheTestBase):
         self.assertEqual(self.client.get("key2"), "value3")
         time.sleep(2)
         self.assertKeyNotExists("key2")
-    
-    def test_send_overflow_header(self):
-        self.client.send_raw("OVERFLOWHEADER")
-        self.assertErrorResponse(INVALID_PARAM_SIZE)
         
     def test_delete(self):
         self.client.set("key5", "value5", 2)
@@ -126,7 +121,6 @@ class ProtocolTests(LightCacheTestBase):
         self.assertKeyNotExists("k1")
         self.assertKeyNotExists("k2")
         self.assertKeyNotExists("k3")
-        
         
 if __name__ == '__main__':
     print "Running ProtocolTests..."

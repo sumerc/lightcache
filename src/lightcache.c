@@ -187,7 +187,7 @@ disconnect_conn(conn* conn)
 }
 
 static void
-send_err_response(conn *conn, errors err)
+send_response(conn *conn, errors err)
 {
     assert(conn->out != NULL);
 
@@ -198,9 +198,25 @@ send_err_response(conn *conn, errors err)
     conn->out->sdata = NULL;
     conn->out->can_free = 1;
 
-    //LC_DEBUG(("sending err response:%d [fd:%d]\r\n", err, conn->fd));
-
     set_conn_state(conn, SEND_HEADER);
+}
+
+static int
+prepare_response(conn *conn, size_t data_length, int alloc_mem)
+{
+    assert(conn->out != NULL);
+
+    if (alloc_mem) {
+        conn->out->sdata = (char *)li_malloc(data_length);
+        if (!conn->out->sdata) {
+            return 0;
+        }
+    }
+    conn->out->resp_header.response.data_length = htonl(data_length);
+    conn->out->resp_header.response.opcode = conn->in->req_header.request.opcode;
+    conn->out->resp_header.response.errcode = SUCCESS;
+
+    return 1;
 }
 
 void
@@ -219,7 +235,7 @@ set_conn_state(struct conn* conn, conn_states state)
     case READ_KEY:
         conn->in->rkey = (char *)li_malloc(conn->in->req_header.request.key_length + 1);
         if (!conn->in->rkey) {
-            send_err_response(conn, OUT_OF_MEMORY);
+            send_response(conn, OUT_OF_MEMORY);
             return;
         }
         conn->in->rkey[conn->in->req_header.request.key_length] = (char)0;
@@ -227,7 +243,7 @@ set_conn_state(struct conn* conn, conn_states state)
     case READ_DATA:
         conn->in->rdata = (char *)li_malloc(conn->in->req_header.request.data_length + 1);
         if (!conn->in->rdata) {
-            send_err_response(conn, OUT_OF_MEMORY);
+            send_response(conn, OUT_OF_MEMORY);
             return;
         }
         conn->in->rdata[conn->in->req_header.request.data_length] = (char)0;
@@ -235,7 +251,7 @@ set_conn_state(struct conn* conn, conn_states state)
     case READ_EXTRA:
         conn->in->rextra = (char *)li_malloc(conn->in->req_header.request.extra_length + 1);
         if (!conn->in->rextra) {
-            send_err_response(conn, OUT_OF_MEMORY);
+            send_response(conn, OUT_OF_MEMORY);
             return;
         }
         conn->in->rextra[conn->in->req_header.request.extra_length] = (char)0;
@@ -254,25 +270,6 @@ set_conn_state(struct conn* conn, conn_states state)
 
     conn->state = state;
 
-}
-
-
-static int
-prepare_response(conn *conn, size_t data_length, int alloc_mem)
-{
-    assert(conn->out != NULL);
-
-    if (alloc_mem) {
-        conn->out->sdata = (char *)li_malloc(data_length);
-        if (!conn->out->sdata) {
-            return 0;
-        }
-    }
-    conn->out->resp_header.response.data_length = htonl(data_length);
-    conn->out->resp_header.response.opcode = conn->in->req_header.request.opcode;
-    conn->out->resp_header.response.errcode = SUCCESS;
-
-    return 1;
 }
 
 static int
@@ -358,13 +355,13 @@ execute_cmd(struct conn* conn)
         /* validate params */
         if (!conn->in->rdata) {
             LC_DEBUG(("Invalid data param in CMD_SET\r\n"));
-            send_err_response(conn, INVALID_PARAM);
+            send_response(conn, INVALID_PARAM);
             return;
         }
 
         if (!atoull(conn->in->rextra, &val)) {
             LC_DEBUG(("Invalid timeout param in CMD_SET\r\n"));
-            send_err_response(conn, INVALID_PARAM);
+            send_response(conn, INVALID_PARAM);
             return;
         }
 
@@ -380,7 +377,8 @@ execute_cmd(struct conn* conn)
             tab_item->val = conn->in;
         }
         conn->in->can_free = 0;
-        set_conn_state(conn, READ_HEADER);
+        
+        send_response(conn, SUCCESS);
         break;
     case CMD_DELETE:
 
@@ -389,7 +387,7 @@ execute_cmd(struct conn* conn)
         tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
         if (!tab_item) {
             LC_DEBUG(("Key not found:%s\r\n", conn->in->rkey));
-            send_err_response(conn, KEY_NOTEXISTS);
+            send_response(conn, KEY_NOTEXISTS);
             return;
         }
 
@@ -399,14 +397,14 @@ execute_cmd(struct conn* conn)
 
         hfree(cache, tab_item);
 
-        set_conn_state(conn, READ_HEADER);
+        send_response(conn, SUCCESS);
         break;
     case CMD_FLUSH_ALL:
         LC_DEBUG(("CMD_FLUSH_ALL\r\n"));
 
         henum(cache, flush_item_enum, NULL, 1);
 
-        set_conn_state(conn, READ_HEADER);
+        send_response(conn, SUCCESS);
         break;
     case CMD_CHG_SETTING:
 
@@ -415,7 +413,7 @@ execute_cmd(struct conn* conn)
         /* validate params */
         if (!conn->in->rdata) {
             LC_DEBUG(("(null) data param in CMD_CHG_SETTING\r\n"));
-            send_err_response(conn, INVALID_PARAM);
+            send_response(conn, INVALID_PARAM);
             break;
         }
 
@@ -423,7 +421,7 @@ execute_cmd(struct conn* conn)
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!atoull(conn->in->rdata, &val)) {
                 LC_DEBUG(("Invalid idle conn timeout param.\r\n"));
-                send_err_response(conn, INVALID_PARAM);
+                send_response(conn, INVALID_PARAM);
                 return;
             }
             LC_DEBUG(("SET idle conn timeout :%llu\r\n", (long long unsigned int)val));
@@ -431,17 +429,17 @@ execute_cmd(struct conn* conn)
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
             if (!atoull(conn->in->rdata, &val)) {
                 LC_DEBUG(("Invalid mem avail param.\r\n"));
-                send_err_response(conn, INVALID_PARAM);
+                send_response(conn, INVALID_PARAM);
                 return;
             }
             LC_DEBUG(("SET mem avail :%llu", (long long unsigned int)val));
             settings.mem_avail = val * 1024 * 1024; /*todo:can overflow*/
         } else {
             LC_DEBUG(("Invalid setting received :%s\r\n", conn->in->rkey));
-            send_err_response(conn, INVALID_PARAM);
+            send_response(conn, INVALID_PARAM);
             return;
         }
-        set_conn_state(conn, READ_HEADER);
+        send_response(conn, SUCCESS);
         break;
     case CMD_GET_SETTING:
 
@@ -450,21 +448,21 @@ execute_cmd(struct conn* conn)
         /* validate params */
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             if (!prepare_response(conn, sizeof(uint64_t), 1)) {
-                send_err_response(conn, OUT_OF_MEMORY);
+                send_response(conn, OUT_OF_MEMORY);
                 return;
             }
             *(uint64_t *)conn->out->sdata = htonll(settings.idle_conn_timeout);
             set_conn_state(conn, SEND_HEADER);
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
             if (!prepare_response(conn, sizeof(uint64_t), 1)) {
-                send_err_response(conn, OUT_OF_MEMORY);
+                send_response(conn, OUT_OF_MEMORY);
                 return;
             }
             *(uint64_t *)conn->out->sdata = htonll(settings.mem_avail / 1024 / 1024);
             set_conn_state(conn, SEND_HEADER);
         } else {
             LC_DEBUG(("Invalid setting received :%s\r\n", conn->in->rkey));
-            send_err_response(conn, INVALID_PARAM);
+            send_response(conn, INVALID_PARAM);
             return;
         }
         break;
@@ -473,7 +471,7 @@ execute_cmd(struct conn* conn)
         LC_DEBUG(("GET_STATS\r\n"));
 
         if (!prepare_response(conn, LIGHTCACHE_STATS_SIZE, 1)) {
-            send_err_response(conn, OUT_OF_MEMORY);
+            send_response(conn, OUT_OF_MEMORY);
             return;
         }
         sprintf(conn->out->sdata,
@@ -500,7 +498,7 @@ execute_cmd(struct conn* conn)
         break;
     default:
         LC_DEBUG(("Unrecognized command.[%d]\r\n", cmd));
-        send_err_response(conn, INVALID_COMMAND);
+        send_response(conn, INVALID_COMMAND);
         break;
     }
 
@@ -508,7 +506,7 @@ execute_cmd(struct conn* conn)
     
 GET_KEY_NOTEXISTS:
     stats.get_misses++;
-    send_err_response(conn, KEY_NOTEXISTS);
+    send_response(conn, KEY_NOTEXISTS);
     return;
 }
 
@@ -575,7 +573,7 @@ try_read_request(conn* conn)
                     (conn->in->req_header.request.key_length >= PROTOCOL_MAX_KEY_SIZE) ||
                     (conn->in->req_header.request.extra_length >= PROTOCOL_MAX_EXTRA_SIZE) ) {
                 LC_DEBUG(("request data or key length exceeded maximum allowed\r\n"));
-                send_err_response(conn, INVALID_PARAM_SIZE);
+                send_response(conn, INVALID_PARAM_SIZE);
                 return FAILED;
             }
 
@@ -630,7 +628,7 @@ try_read_request(conn* conn)
     default:
         LC_DEBUG(("Invalid state in try_read_request\r\n"));
         ret = FAILED;
-        send_err_response(conn, INVALID_STATE);
+        send_response(conn, INVALID_STATE);
         break;
     } // switch(conn->state)
 
@@ -694,7 +692,7 @@ try_send_response(conn *conn)
     default:
         LC_DEBUG(("Invalid state in try_send_response %d\r\n", conn->state));
         ret = FAILED;
-        send_err_response(conn, INVALID_STATE);
+        send_response(conn, INVALID_STATE);
         break;
     }
 

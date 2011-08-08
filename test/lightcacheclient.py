@@ -92,7 +92,8 @@ class LightCacheClient(socket.socket):
         assert key is not None
         assert value is not None
         
-        self.send_packet(key=key, data=value, command=CMD_CHG_SETTING)    
+        self.send_packet(key=key, data=value, command=CMD_CHG_SETTING)   
+        self.recv_packet() 
    
     def get_setting(self, key):  
         assert key is not None
@@ -108,12 +109,14 @@ class LightCacheClient(socket.socket):
         assert value is not None
         assert timeout is not None
         
-        self.send_packet(key=key, data=value, command=CMD_SET, extra=timeout)       
+        self.send_packet(key=key, data=value, command=CMD_SET, extra=timeout)
+        self.recv_packet()       
 
     def delete(self, key):
         assert key is not None
         
         self.send_packet(key=key, command=CMD_DELETE)
+        self.recv_packet()
         
     def get(self, key):
         assert key is not None
@@ -127,6 +130,7 @@ class LightCacheClient(socket.socket):
         
     def flush_all(self):
         self.send_packet(command=CMD_FLUSH_ALL)
+        self.recv_packet()
         
         
     
