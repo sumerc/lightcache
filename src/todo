@@ -145,9 +145,13 @@ v0.2
 [*] hget() can be optimized more as strcmp() can be optimized. 
     GCC is already optimized.
 [+] send success codes for every msg???
+[-] lightcache clients shall be moved to clients folder. Maybe later make another rep.
+    for all of them. tests will have dependencies on them.
+[-] MAKE: Makefile shall contain make tests which will run autotests.sh with TCP and domain sockets.
+[-] MAKE: LITTLE_ENDIAN flag should somehow be passed to Makefile. With configure script maybe?
 [-] maybe prepare_response can be merged into send_response() function for better
     design.
-[-] TEST: dynamic alloc. failures.(OUT_OF_MEMORY)
+[-] TEST/INSPECT: dynamic alloc. failures.(OUT_OF_MEMORY)
 [-] slab_alloc() for dynamic allocations and free list should be implemented according to
     wikipedia: http://en.wikipedia.org/wiki/Free_list.
     Slab allocation solves the fragmentation problem. Redis makes a contest to stress the mem.
