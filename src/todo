@@ -145,6 +145,8 @@ v0.2
 [*] hget() can be optimized more as strcmp() can be optimized. 
     GCC is already optimized.
 [+] send success codes for every msg???
+[-] Implement GETQ/SETQ.
+[-] TEST: GETQ/SETQ
 [-] lightcache clients shall be moved to clients folder. Maybe later make another rep.
     for all of them. tests will have dependencies on them.
 [-] MAKE: Makefile shall contain make tests which will run autotests.sh with TCP and domain sockets.
