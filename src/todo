@@ -151,6 +151,7 @@ v0.2
     for all of them. tests will have dependencies on them.
 [-] MAKE: Makefile shall contain make tests which will run autotests.sh with TCP and domain sockets.
 [-] MAKE: LITTLE_ENDIAN flag should somehow be passed to Makefile. With configure script maybe?
+
 [-] maybe prepare_response can be merged into send_response() function for better
     design.
 [-] TEST/INSPECT: dynamic alloc. failures.(OUT_OF_MEMORY)
