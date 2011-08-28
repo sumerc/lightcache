@@ -6,22 +6,24 @@
 
 #include "stdio.h"
 
-typedef uint32_t word_t; // todo: change for 64 bit?
+// 32 or 64 does not matter from performance perspective. Also endianness 
+// does not affect bit operations.
+typedef uint32_t word_t; 
 
 #define SLAB_SIZE (1024*1024)
-#define MIN_SLAB_CHUNK_SIZE 100
-#define CHUNK_ALIGN_BYTES 8
-#define MAX_BITSET_SIZE (SLAB_SIZE / MIN_SLAB_CHUNK_SIZE / (sizeof(word_t)*8))
+#define MIN_SLAB_CHUNK_SIZE (100)
+#define CHUNK_ALIGN_BYTES (8)
+#define BITSET_SIZE (SLAB_SIZE / MIN_SLAB_CHUNK_SIZE / (sizeof(word_t) * 8))
 
 typedef struct { 
-    word_t words[MAX_BITSET_SIZE];  
+    word_t words[BITSET_SIZE];  
 } bitset_t;
 
-typedef struct slab_ctl_s {
+typedef struct slab_ctl_t {
     unsigned int nused;
-    bitset_t *slots;
-    struct slab_ctl_s *next;
-    struct slab_ctl_s *prev;
+    bitset_t slots;
+    struct slab_ctl_t *next;
+    struct slab_ctl_t *prev;
 } slab_ctl_t;
 
 typedef struct {
@@ -41,15 +43,37 @@ typedef struct {
     
     slab_ctl_t *slabs_free_head;
     slab_ctl_t *slabs_free_tail;
+    
+    void *slabs;
 } cache_manager_t;
 
+// Globals
 static cache_manager_t *cm;
+
+static inline unsigned int
+ffus(bitset_t *bts)
+{
+    return 0;
+}
+
+// TODO: do not make func. if only called once.
+static inline size_t
+align_bytes(size_t size)
+{
+    size_t sz;
+    
+    sz = size % CHUNK_ALIGN_BYTES;
+    if (sz)
+        size += CHUNK_ALIGN_BYTES - sz;    
+    return size;
+}
 
 static int
 init_cache_manager(size_t memory_limit, double chunk_size_factor)
 {
     unsigned int size,i;
     size_t mem_used;
+    slab_ctl_t *prev_slab,*cslab;
     
     mem_used = 0;
     memory_limit *= 1024*1024; // memory_limit is in MB
@@ -65,12 +89,13 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
     
     
     cm->caches = malloc(sizeof(cache_t)*cm->cache_count);
+    memset(cm->caches, 0, sizeof(cache_t)*cm->cache_count);
     mem_used += sizeof(cache_t)*cm->cache_count;
     
     for(i=0,size=MIN_SLAB_CHUNK_SIZE; size < SLAB_SIZE; size*=chunk_size_factor, i++)
     {
-        if (size % CHUNK_ALIGN_BYTES)
-            size += CHUNK_ALIGN_BYTES - (size % CHUNK_ALIGN_BYTES);
+        size = align_bytes(size);
+        
         cm->caches[i].chunk_size = size;
         
         fprintf(stderr, "cache %u) size:%u\r\n", i, 
@@ -79,55 +104,68 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
     
     fprintf(stderr, "memory_limit:%u, mem_used:%u\r\n", memory_limit, mem_used);
     
-    // calculate the remaining slab count after all the slab allocator metadata 
-    // structures.
+    // allocate slab_ctl and slabs
     cm->slabctl_count = memory_limit / (SLAB_SIZE+sizeof(slab_ctl_t));
-    
-    fprintf(stderr, "slab_available:%u\r\n", cm->slabctl_count);
-    
+    if (cm->slabctl_count <= 1){
+        // TODO: log err.
+        fprintf(stderr, "not enough mem to create a slab\r\n");
+        return 0;
+    }
     cm->slab_ctls = malloc(sizeof(slab_ctl_t)*cm->slabctl_count);
+    memset(cm->slab_ctls, 0, sizeof(slab_ctl_t)*cm->slabctl_count);
     mem_used += sizeof(slab_ctl_t)*cm->slabctl_count;
+    cm->slabs = malloc(SLAB_SIZE*cm->slabctl_count);
+    memset(cm->slabs, 0, SLAB_SIZE*cm->slabctl_count);
     
-    
+    // initialize slab_ctl structures
     cm->slabs_free_head = cm->slab_ctls;
+    cm->slabs_free_head->prev = NULL;
     cm->slabs_free_tail = &cm->slab_ctls[cm->slabctl_count-1];
+    cm->slabs_free_tail->next = NULL;
+    
+    prev_slab = NULL;
+    for(i=0;i < cm->slabctl_count-1; i++) {
+        cm->slab_ctls[i].prev = prev_slab;
+        cm->slab_ctls[i].next = &cm->slab_ctls[i+1];    
+        prev_slab = &cm->slab_ctls[i];
+    }
+    
+    //for(cslab = cm->slabs_free_head; cslab != NULL; cslab = cslab->next) {  
+    //    fprintf(stderr, "nused of the slab:%u\r\n", cslab->nused);  
+    //}
     
     fprintf(stderr, "memory_limit:%u, mem_used:%u\r\n", memory_limit, mem_used);
-    
     fprintf(stderr, "mem_avail_for_slabs:%u\r\n", memory_limit-mem_used);
-    
+      
     return 1;
 }
-
-static cache_t*
-size_to_cache(size_t size)
-{
-    unsigned int i;
-    
-    // TODO: Make below O(logn) via binary search? 
-    
-    for(i=0; i < cm->cache_count; i++) {
-        if (cm->caches[i]->chunk_size >= size) {    
-            return cm->caches[i];
-        }
-    }
-}
-
 
 void *
 scmalloc(size_t size)
 {
+    unsigned int i;
     cache_t *ca;
     
-    ca = size_to_cache(size)
-    if (ca == NULL){
-        // TODO: log err?
-        return NULL;
+    // find relevant cache, TODO: maybe change with binsearch later on.
+    for(i = 0; i < cm->cache_count; i++) {
+        if (size <= cm->caches[i].chunk_size) {
+            ca = &cm->caches[i];
+            break;
+        }
     }
     
-    if (ca->slabs_partial_head == NULL){
-        ca->slabs_partial_head = cm->slabs_free_head;
+    // need to allocate a slab_ctl?
+    if (ca->slabs_partial_head == NULL) {
+        ;// TODO: ake a free slab_ctl from free_slabs
     }
+    
+    i = ffus(&ca->slabs_partial_head->slots);
+    
+    ca->slabs_partial_head->nused++;
+    
+    
+    fprintf(stderr, "malloc request:%u, cache->size:%u\r\n", size, ca->chunk_size);
+    
     
     return NULL;
 }
@@ -135,19 +173,19 @@ scmalloc(size_t size)
 void
 scfree(void *ptr)
 {
-    return;
+    ;
 }
-
 
 int
 main(void)
 {
-    void *p;
+    void *tmp;
     
     init_cache_manager(5, 1.25);
     
-    p = scmalloc(5);
-    scfree(p);
+    tmp = scmalloc(50);
+    
+    scfree(tmp);
     
     return 0;
 }
