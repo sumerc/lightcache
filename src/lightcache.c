@@ -295,6 +295,7 @@ static void
 execute_cmd(struct conn* conn)
 {
     int r;
+    int quiet;
     hresult ret;
     uint8_t cmd;
     uint64_t val;
@@ -306,13 +307,16 @@ execute_cmd(struct conn* conn)
     /* here, the complete request is received from the connection */
     conn->in->received = CURRENT_TIME;
     cmd = conn->in->req_header.request.opcode;
+    quiet = 0;
 
     /* No need for the validation of conn->in->rkey as it is mandatory for the
        protocol. */
     switch(cmd) {
+    case CMD_GETQ:
+    	quiet = 1;
     case CMD_GET:
     
-        LC_DEBUG(("CMD_GET [%s]\r\n", conn->in->rkey));
+        LC_DEBUG(("CMD_GET (Q:%d) [%s]\r\n", quiet, conn->in->rkey));
         
         stats.cmd_get++;
 
@@ -345,10 +349,11 @@ execute_cmd(struct conn* conn)
         
         set_conn_state(conn, SEND_HEADER);
         break;
-
+    case CMD_SETQ:
+        quiet = 1;
     case CMD_SET:
 
-        LC_DEBUG(("CMD_SET\r\n"));
+        LC_DEBUG(("CMD_SET (Q:%d) \r\n", quiet));
         
         stats.cmd_set++;
 
@@ -479,21 +484,21 @@ execute_cmd(struct conn* conn)
                 "pid:%d\r\ntime:%lu\r\ncurr_items:%d\r\ncurr_connections:%llu\r\n"
                 "cmd_get:%llu\r\ncmd_set:%llu\r\nget_misses:%llu\r\nget_hits:%llu\r\n"
                 "bytes_read:%llu\r\nbytes_written:%llu\r\n",
-                stats.mem_used,
-                settings.mem_avail,
+                (long long unsigned int)stats.mem_used,
+                (long long unsigned int)settings.mem_avail,
                 (long unsigned int)CURRENT_TIME-stats.start_time,
                 LIGHTCACHE_VERSION,
                 LIGHTCACHE_BUILD,
                 getpid(),
                 CURRENT_TIME,
                 hcount(cache),
-                stats.curr_connections,
-                stats.cmd_get,
-                stats.cmd_set,
-                stats.get_misses,
-                stats.get_hits,
-                stats.bytes_read,
-                stats.bytes_written);
+                (long long unsigned int)stats.curr_connections,
+                (long long unsigned int)stats.cmd_get,
+                (long long unsigned int)stats.cmd_set,
+                (long long unsigned int)stats.get_misses,
+                (long long unsigned int)stats.get_hits,
+                (long long unsigned int)stats.bytes_read,
+                (long long unsigned int)stats.bytes_written);
         set_conn_state(conn, SEND_HEADER);
         break;
     default:
@@ -894,6 +899,7 @@ main(int argc, char **argv)
             break;
         }
     }
+
 
     init_stats();
 

@@ -1,9 +1,7 @@
 
 OPTIMIZATION?=-O3
-CFLAGS?=  -std=c99 -pedantic $(OPTIMIZATION) -Wall -W
-
-CCOPT= $(CFLAGS)
 DEBUG?= -pg -g -rdynamic -ggdb -D LITTLE_ENDIAN -D DEBUG
+CFLAGS?= -std=c99 -pedantic -Wall -W
 
 INSTALL_TOP= /usr/local
 INSTALL_BIN= $(INSTALL_TOP)/bin
@@ -13,15 +11,18 @@ FILES = lightcache.c event.c socket.c hashtab.c mem.c freelist.c util.c
 
 PRGNAME = lightcache
 
-all: lightcache_server
+all: debug
 
-lightcache_server :
-	$(CC) $(CCOPT) $(DEBUG) $(FILES) -o $(PRGNAME)
+debug :
+	$(CC) $(CFLAGS) $(DEBUG) $(FILES) -o $(PRGNAME)
 
+release:
+	$(CC) $(CFLAGS) $(OPTIMIZATION)  $(FILES) -o $(PRGNAME)
+	
 clean:
 	rm $(PRGNAME)
 	rm gmon.out
-	$(CC) $(CCOPT) $(DEBUG) $(FILES) -o $(PRGNAME)
+	$(CC) $(CFLAGS) $(DEBUG) $(FILES) -o $(PRGNAME)
 
 install: all
 	$(INSTALL) $(PRGNAME) $(INSTALL_BIN)
