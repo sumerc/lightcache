@@ -8,7 +8,7 @@
 
 // 32 or 64 does not matter from performance perspective. Also endianness 
 // does not affect bit operations.
-typedef uint32_t word_t; 
+typedef int word_t; 
 
 #define SLAB_SIZE (1024*1024)
 #define MIN_SLAB_CHUNK_SIZE (100)
@@ -25,9 +25,10 @@ typedef struct slab_ctl_t {
     bitset_t slots;
     struct slab_ctl_t *next;
     struct slab_ctl_t *prev;
+    struct cache_t *cache;
 } slab_ctl_t;
 
-typedef struct {
+typedef struct cache_t {
     unsigned int chunk_size;    
     unsigned int chunk_count;
     slab_ctl_t *slabs_full_head;
@@ -50,12 +51,21 @@ typedef struct {
 
 // Globals
 static cache_manager_t *cm;
+size_t mem_used;
+size_t mem_limit;
 
 static inline unsigned int
-ffus(bitset_t *bts)
+ffsetbit(bitset_t *bts)
 {
-    return 0;
+    return 1;
 }
+
+static inline unsigned int
+setbit(bitset_t *bts, unsigned int index, int bit)
+{
+    return 1;
+}
+
 
 // TODO: do not make func. if only called once.
 static inline size_t
@@ -73,11 +83,10 @@ static int
 init_cache_manager(size_t memory_limit, double chunk_size_factor)
 {
     unsigned int size,i;
-    size_t mem_used;
     slab_ctl_t *prev_slab,*cslab;
     
     mem_used = 0;
-    memory_limit *= 1024*1024; // memory_limit is in MB
+    mem_limit = memory_limit * 1024*1024; // memory_limit is in MB
     
     cm = malloc(sizeof(cache_manager_t));
     memset(cm, 0, sizeof(cache_manager_t));
@@ -103,10 +112,10 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
             cm->caches[i].chunk_size);
     }
     
-    fprintf(stderr, "memory_limit:%u, mem_used:%u\r\n", memory_limit, mem_used);
+    fprintf(stderr, "memory_limit:%u, mem_used:%u\r\n", mem_limit, mem_used);
     
     // allocate slab_ctl and slabs
-    cm->slabctl_count = memory_limit / (SLAB_SIZE+sizeof(slab_ctl_t));
+    cm->slabctl_count = mem_limit / (SLAB_SIZE+sizeof(slab_ctl_t));
     if (cm->slabctl_count <= 1){
         // TODO: log err.
         fprintf(stderr, "not enough mem to create a slab\r\n");
@@ -120,25 +129,30 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
     
     // initialize slab_ctl structures
     cm->slabs_free_head = cm->slab_ctls;
-    cm->slabs_free_head->prev = NULL;
     cm->slabs_free_tail = &cm->slab_ctls[cm->slabctl_count-1];
+    cm->slabs_free_tail->prev = &cm->slab_ctls[cm->slabctl_count-2];
     cm->slabs_free_tail->next = NULL;
+    cm->slabs_free_tail->nindex = cm->slabctl_count-1;
     
     prev_slab = NULL;
     for(i=0;i < cm->slabctl_count-1; i++) {
-        cm->slab_ctls[i].nindex = i;
         cm->slab_ctls[i].prev = prev_slab;
         cm->slab_ctls[i].next = &cm->slab_ctls[i+1];    
+        cm->slab_ctls[i].nindex = i;
+        
         prev_slab = &cm->slab_ctls[i];
     }
-    cm->slab_ctls[i].nindex = i;
     
     for(cslab = cm->slabs_free_head; cslab != NULL; cslab = cslab->next) {  
         fprintf(stderr, "nindex of the slab:%u\r\n", cslab->nindex);  
     }
     
-    fprintf(stderr, "memory_limit:%u, mem_used:%u\r\n", memory_limit, mem_used);
-    fprintf(stderr, "mem_avail_for_slabs:%u\r\n", memory_limit-mem_used);
+    for(cslab = cm->slabs_free_tail; cslab != NULL; cslab = cslab->prev) {  
+        fprintf(stderr, "nindex of the slab:%u\r\n", cslab->nindex);  
+    }
+    
+    fprintf(stderr, "mem_limit:%u, mem_used:%u\r\n", mem_limit, mem_used);
+    fprintf(stderr, "mem_avail_for_slabs:%u\r\n", mem_limit-mem_used);
       
     return 1;
 }
@@ -149,7 +163,7 @@ scmalloc(size_t size)
     unsigned int i, ffindex;
     cache_t *ccache;
     void *result;
-    slab_ctl *cslab;
+    slab_ctl_t *cslab;
     
     // find relevant cache, TODO: maybe change with binsearch later on.
     for(i = 0; i < cm->cache_count; i++) {
@@ -166,13 +180,18 @@ scmalloc(size_t size)
         cslab = ccache->slabs_partial_head;
     }
     
-    ffindex = ffus(&cslab->slots);
+    cslab->cache = ccache;
+    
+    ffindex = ffsetbit(&cslab->slots);
     if (++cslab->nused == ccache->chunk_count) {
         ; // TODO: move to full from partial
     } 
+    setbit(&cslab->slots, ffindex, 1);
     
     result = cm->slabs + cslab->nindex * SLAB_SIZE;
     result += ccache->chunk_size * ffindex;
+    
+    mem_used += ccache->chunk_size;
     
     fprintf(stderr, "malloc request:%u"
         " cache->size:%u"
@@ -189,7 +208,19 @@ scmalloc(size_t size)
 void
 scfree(void *ptr)
 {
-    ;
+    unsigned int sidx, cidx;
+    ptrdiff_t pdiff;
+    
+    pdiff = ptr - cm->slabs;    
+    sidx = pdiff / SLAB_SIZE;
+    cidx = (pdiff % SLAB_SIZE) / cm->slab_ctls[sidx].cache->chunk_size;
+    
+    fprintf(stderr, "sidx:%u, cidx:%u\r\n", sidx, cidx);
+    setbit(&cm->slab_ctls[sidx].slots, cidx, 0);
+    
+    if (--cm->slab_ctls[sidx].nused == 0) {
+        // TODO: move from partial or full to free.
+    }
 }
 
 int
