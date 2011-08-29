@@ -21,6 +21,7 @@ typedef struct {
 
 typedef struct slab_ctl_t {
     unsigned int nused;
+    unsigned int nindex; // index into the slab_ctls. in sync with slabs.
     bitset_t slots;
     struct slab_ctl_t *next;
     struct slab_ctl_t *prev;
@@ -125,14 +126,16 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
     
     prev_slab = NULL;
     for(i=0;i < cm->slabctl_count-1; i++) {
+        cm->slab_ctls[i].nindex = i;
         cm->slab_ctls[i].prev = prev_slab;
         cm->slab_ctls[i].next = &cm->slab_ctls[i+1];    
         prev_slab = &cm->slab_ctls[i];
     }
+    cm->slab_ctls[i].nindex = i;
     
-    //for(cslab = cm->slabs_free_head; cslab != NULL; cslab = cslab->next) {  
-    //    fprintf(stderr, "nused of the slab:%u\r\n", cslab->nused);  
-    //}
+    for(cslab = cm->slabs_free_head; cslab != NULL; cslab = cslab->next) {  
+        fprintf(stderr, "nindex of the slab:%u\r\n", cslab->nindex);  
+    }
     
     fprintf(stderr, "memory_limit:%u, mem_used:%u\r\n", memory_limit, mem_used);
     fprintf(stderr, "mem_avail_for_slabs:%u\r\n", memory_limit-mem_used);
@@ -143,31 +146,44 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
 void *
 scmalloc(size_t size)
 {
-    unsigned int i;
-    cache_t *ca;
+    unsigned int i, ffindex;
+    cache_t *ccache;
+    void *result;
+    slab_ctl *cslab;
     
     // find relevant cache, TODO: maybe change with binsearch later on.
     for(i = 0; i < cm->cache_count; i++) {
         if (size <= cm->caches[i].chunk_size) {
-            ca = &cm->caches[i];
+            ccache = &cm->caches[i];
             break;
         }
     }
     
     // need to allocate a slab_ctl?
-    if (ca->slabs_partial_head == NULL) {
-        ;// TODO: ake a free slab_ctl from free_slabs
+    if (ccache->slabs_partial_head == NULL) {
+        ;// TODO: move to our partial from free, return NO_MEM if no free found.
+        ccache->slabs_partial_head = cm->slabs_free_head;
+        cslab = ccache->slabs_partial_head;
     }
     
-    i = ffus(&ca->slabs_partial_head->slots);
+    ffindex = ffus(&cslab->slots);
+    if (++cslab->nused == ccache->chunk_count) {
+        ; // TODO: move to full from partial
+    } 
     
-    ca->slabs_partial_head->nused++;
+    result = cm->slabs + cslab->nindex * SLAB_SIZE;
+    result += ccache->chunk_size * ffindex;
     
+    fprintf(stderr, "malloc request:%u"
+        " cache->size:%u"
+        " ptr:%p"
+        "\r\n", 
+        size, 
+        ccache->chunk_size,
+        result
+        );
     
-    fprintf(stderr, "malloc request:%u, cache->size:%u\r\n", size, ca->chunk_size);
-    
-    
-    return NULL;
+    return result;
 }
 
 void
