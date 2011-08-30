@@ -169,9 +169,12 @@ rem(list_t *li, slab_ctl_t *item)
             if (cit == li->head) {
                 pop(li);
             } else if (cit == li->tail) {
+                
                 // we SHALL have tail->prev here. Because if not, then
-                // shall be li->head == li->tail and if so, cit == li->head
+                // li->head == li->tail and if so, above if (cit == li->head)
                 // will capture that.
+                assert(li->tail->prev != NULL);
+                
                 li->tail->prev->next = NULL;
                 li->tail = li->tail->prev;
                 }
