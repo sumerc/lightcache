@@ -12,12 +12,13 @@
 typedef unsigned int word_t; 
 
 #define SLAB_SIZE (1024*1024)
+// TODO: bsearch fails when SLAB_SIZE is 150, caches have 1 item.
 #define MIN_SLAB_CHUNK_SIZE (100)
 #define CHUNK_ALIGN_BYTES (8)
 
 #define CHAR_BIT (8)
 #define WORD_SIZE_IN_BITS (sizeof(word_t) * CHAR_BIT)   // in bits
-#define WORD_COUNT (SLAB_SIZE / MIN_SLAB_CHUNK_SIZE / WORD_SIZE_IN_BITS)
+#define WORD_COUNT (SLAB_SIZE / MIN_SLAB_CHUNK_SIZE / WORD_SIZE_IN_BITS)+1
 
 // TODO: calculate external/internal fragmentation.
 
@@ -72,10 +73,16 @@ malloci(size_t size)
     return ptr;
 }
 
+void
+freei(void *ptr)
+{
+    free(ptr);
+}
+
 inline double
 logbn(double base, double x) 
 {
-    //logb (x) = (loga(x)) / (loga(B))
+    //logB(x)=(loga(x))/(loga(B))
     return log(x) / log(base);
 }
 
@@ -220,6 +227,42 @@ align_bytes(size_t size)
     return size;
 }
 
+// A binary search routine for mapping the requested size to a proper cache.
+// Implemented to reduce the mapping complexity to O(logn) in scmalloc()'s.
+cache_t *
+size_to_cache(cache_t *arr, unsigned int arr_size, unsigned int key)
+{
+    unsigned int l, m, r, msize;
+    cache_t *result;
+    
+    l = 0;
+    r = arr_size-1;
+    while(l <= r && m)
+    {
+        m = (l+r) / 2;
+        printf("l:%u, r:%u, m:%u\r\n", l, r, m); 
+                
+        msize = arr[m].chunk_size;
+
+        if (key > msize){ 
+            l = m+1;
+        } else if (key < msize){
+            r = m-1;
+        } else {
+            break;
+        }
+    }
+    
+    // m is not the smallest elem? Then maybe the previous
+    // one have less space.
+    //if (m > 0) {
+    //    if (arr[m-1].chunk_size > key) {
+    //        return &arr[m-1];
+    //    }
+    //}
+    return &arr[m];
+}
+
 static int
 init_cache_manager(size_t memory_limit, double chunk_size_factor)
 {
@@ -254,6 +297,8 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
     // calculate remaining memory for slabs.
     cm->slabctl_count = mem_limit / (SLAB_SIZE+sizeof(slab_ctl_t));
     if (cm->slabctl_count <= 1){
+        // TODO: free allocated resources, otherwise subsequent scmalloc()/scfree()
+        // will fail.
         fprintf(stderr, "not enough mem to create a slab\r\n");
         return 0;
     }
@@ -285,7 +330,7 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
 }
 
 void *
-scmalloc(size_t size)
+scmalloc(unsigned int size)
 {
     unsigned int i, ffindex;
     cache_t *ccache;
@@ -293,14 +338,17 @@ scmalloc(size_t size)
     slab_ctl_t *cslab;
     
     // find relevant cache 
-    // TODO: change with binsearch later, iequalities can also be efficient.
-    // O(log((n)) + O(1) time
     for(i = 0; i < cm->cache_count; i++) {
         if (size <= cm->caches[i].chunk_size) {
             ccache = &cm->caches[i];
             break;
         }
     }
+    //printf("scmalloc using chunk_size %u, bsearch:%u\r\n", 
+    //    ccache->chunk_size, 
+    //    size_to_cache(cm->caches, cm->cache_count, size)->chunk_size);
+    // TODO: before using below code, verify it works for all input.
+    assert(ccache == size_to_cache(cm->caches, cm->cache_count, size));
     
     // need to allocate a slab_ctl?
     cslab = peek(&ccache->slabs_partial);
@@ -321,7 +369,6 @@ scmalloc(size_t size)
         cslab = pop(&ccache->slabs_partial);
         push(&ccache->slabs_full, cslab);
     } 
-    
     ffindex = ff_setbit(&cslab->slots);
     assert(ffindex != -1); // we take cslab from partial, so ffindex should be valid.
     clear_bit(&cslab->slots, ffindex);
@@ -331,19 +378,6 @@ scmalloc(size_t size)
     
     mem_used += ccache->chunk_size;
     
-    //fprintf(stderr, "alloc slab nindex:%u  %u slot is alloc'd\r\n", 
-    //   cslab->nindex, ffindex);
-    
-    /*
-    fprintf(stderr, "malloc request:%u"
-        " cache->size:%u"
-        " ptr:%p"
-        "\r\n", 
-        size, 
-        ccache->chunk_size,
-        result
-        );
-    */
     return result;
 }
 
@@ -458,15 +492,15 @@ test_slab_allocator(void)
     unsigned d;
     long long t0;
     
-    init_cache_manager(5, 1.25); 
+    init_cache_manager(200, 1.25); 
     
     t0 = tickcount();
-    for(d=0;d<10000000;d++) {
+    //for(d=0;d<10000000;d++) {
         tmp = scmalloc(50);
         scfree(tmp);
         //tmp = malloc(50);
         //free(tmp);
-    }
+    //}
     
         //tmp = malloc(50);
     printf("Elapsed:%0.12f \r\n", (tickcount()-t0)*0.000001);
@@ -484,7 +518,7 @@ int
 main(void)
 {
     
-    test_bit_set();
+    //test_bit_set();
     test_slab_allocator();
     
     return 0;
