@@ -57,9 +57,27 @@ typedef struct {
 } cache_manager_t;
 
 // Globals
-static cache_manager_t *cm;
-size_t mem_used;
-size_t mem_limit;
+static cache_manager_t *cm = NULL;
+size_t mem_used = 0;
+size_t mem_limit = 0;
+
+void *
+malloci(size_t size) 
+{
+    void *ptr;
+    
+    ptr = malloc(size);
+    memset(ptr, 0x00, size);
+    mem_used += size;
+    return ptr;
+}
+
+inline double
+logbn(double base, double x) 
+{
+    //logb (x) = (loga(x)) / (loga(B))
+    return log(x) / log(base);
+}
 
 inline unsigned int 
 bindex(unsigned int b) { 
@@ -208,50 +226,43 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
     unsigned int size,i;
     slab_ctl_t *prev_slab,*cslab;
     
+    assert(cm == NULL);
+    assert(mem_used == 0);
+    assert(mem_limit == 0);
+    
+    // initialize globals
     mem_used = 0;
     mem_limit = memory_limit * 1024*1024; // memory_limit is in MB
+    cm = malloci(sizeof(cache_manager_t));
     
-    cm = malloc(sizeof(cache_manager_t));
-    memset(cm, 0, sizeof(cache_manager_t));
-    mem_used += sizeof(cache_manager_t);
+    // cache_count is calculated by starting from the MIN_SLAB_CHUNK_SIZE and
+    // multiplying it with chunk_size_factor for every iteration till we reach
+    // SLAB_SIZE. This idea is being used on memcached() and proved to be well
+    // on real-world.
+    cm->cache_count = (unsigned int)ceil(logbn(chunk_size_factor, 
+        SLAB_SIZE/MIN_SLAB_CHUNK_SIZE));
+    //fprintf(stderr, "ccount:%u\r\n", cm->cache_count);
     
-    // calculate the requested cache count dynamically.
-    for(size=MIN_SLAB_CHUNK_SIZE; size < SLAB_SIZE; size*=chunk_size_factor)
-    {
-        cm->cache_count++;
-    }
-    
-    cm->caches = malloc(sizeof(cache_t)*cm->cache_count);
-    memset(cm->caches, 0, sizeof(cache_t)*cm->cache_count);
-    mem_used += sizeof(cache_t)*cm->cache_count;
-    
-    for(i=0,size=MIN_SLAB_CHUNK_SIZE; size < SLAB_SIZE; size*=chunk_size_factor, i++)
+    // alloc&initialize caches
+    cm->caches = malloci(sizeof(cache_t)*cm->cache_count);
+    for(i=0,size=MIN_SLAB_CHUNK_SIZE; i < cm->cache_count; size*=chunk_size_factor, i++)
     {
         size = align_bytes(size);        
         cm->caches[i].chunk_size = size;
-        //fprintf(stderr, "cache %u) size:%u\r\n", i, 
-        //    cm->caches[i].chunk_size);
     }
     
-    //fprintf(stderr, "memory_limit:%u, mem_used:%u\r\n", mem_limit, mem_used);
-    
-    // allocate slab_ctl and slabs
+    // calculate remaining memory for slabs.
     cm->slabctl_count = mem_limit / (SLAB_SIZE+sizeof(slab_ctl_t));
     if (cm->slabctl_count <= 1){
-        // TODO: log err.
         fprintf(stderr, "not enough mem to create a slab\r\n");
         return 0;
     }
-    cm->slab_ctls = malloc(sizeof(slab_ctl_t)*cm->slabctl_count);
-    memset(cm->slab_ctls, 0, sizeof(slab_ctl_t)*cm->slabctl_count);
-    mem_used += sizeof(slab_ctl_t)*cm->slabctl_count;
-    cm->slabs = malloc(SLAB_SIZE*cm->slabctl_count);
-    memset(cm->slabs, 0, SLAB_SIZE*cm->slabctl_count);
     
-    // initialize slab_ctl structures
+    // alloc&initialize slab_ctl and slabs
+    cm->slab_ctls = malloci(sizeof(slab_ctl_t)*cm->slabctl_count);
+    cm->slabs = malloci(SLAB_SIZE*cm->slabctl_count);
     cm->slabs_free.head = cm->slab_ctls;
-    cm->slabs_free.tail = &cm->slab_ctls[cm->slabctl_count-1];
-    
+    cm->slabs_free.tail = &cm->slab_ctls[cm->slabctl_count-1];    
     prev_slab = NULL;
     for(i=0;i < cm->slabctl_count; i++) {
         cm->slab_ctls[i].prev = prev_slab;
@@ -269,15 +280,6 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
         
         prev_slab = &cm->slab_ctls[i];
     }
-    
-    //for(cslab = cm->slabs_free.head; cslab != NULL; cslab = cslab->next) {  
-    //    fprintf(stderr, "nindex of the slab:%u\r\n", cslab->nindex);  
-    //}
-    
-    //for(cslab = cm->slabs_free.tail; cslab != NULL; cslab = cslab->prev) {  
-    //    fprintf(stderr, "nindex of the slab:%u\r\n", cslab->nindex);  
-    //}
-    
     
     return 1;
 }
@@ -386,7 +388,6 @@ scfree(void *ptr)
     }
     
     mem_used -= cslab->cache->chunk_size;
-    
 }
 
 void 
