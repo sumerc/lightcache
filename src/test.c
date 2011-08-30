@@ -86,13 +86,13 @@ set_bit(bitset_t *bts, unsigned int b)
 {
     assert(b < WORD_COUNT*WORD_SIZE_IN_BITS);
     
-    bts->words[bindex(b)] |= 1 << (boffset(b)); 
+    bts->words[bindex(b)] |= (word_t)1 << (boffset(b)); 
 }
 void 
 clear_bit(bitset_t *bts, unsigned int b) { 
     assert(b < WORD_COUNT*WORD_SIZE_IN_BITS);
     
-    bts->words[bindex(b)] &= ~(1 << (boffset(b)));
+    bts->words[bindex(b)] &= ~((word_t)1 << (boffset(b)));
 }
 
 unsigned int 
@@ -102,7 +102,7 @@ get_bit(bitset_t *bts, unsigned int b) {
     return (bts->words[bindex(b)] >> boffset(b)) & 1;
 }
 
-// TODO: Use ffsll() for more performance.
+// Using ffsll() on an 64-bit machine gains no performance at all.
 static int
 ff_setbit(bitset_t *bts)
 {
@@ -112,6 +112,8 @@ ff_setbit(bitset_t *bts)
     for(i=0; i<WORD_COUNT; i++) {
         j = ffs(bts->words[i]);
         if (j) {
+            //printf("ff_setbit:%d, %d, %d\r\n", j, (j + (i*WORD_SIZE_IN_BITS))-1,
+            //    WORD_SIZE_IN_BITS);
             return (j + (i*WORD_SIZE_IN_BITS))-1;
         }
     }
@@ -352,14 +354,23 @@ scfree(void *ptr)
     int res;
     
     pdiff = ptr - cm->slabs;    
+    
+    // ptr shall be in valid memory
+    if (pdiff > cm->slabctl_count*SLAB_SIZE) {
+        fprintf(stderr, "Invalid ptr.(%p)", ptr);
+        return;
+    }
+    
     sidx = pdiff / SLAB_SIZE;    
-    assert(sidx < cm->slabctl_count);
     cslab = &cm->slab_ctls[sidx];
     cidx = (pdiff % SLAB_SIZE) / cslab->cache->chunk_size;
-    //fprintf(stderr, "free slab nindex:%u, cidx:%u\r\n", cslab->nindex, cidx);
     
-    // freed ptr must be allocated, of course.
-    assert(get_bit(&cslab->slots, cidx) == 0);
+    // check if ptr is really allocated?
+    if (get_bit(&cslab->slots, cidx) != 0) {
+        fprintf(stderr, "ptr not allocated.(%p)", ptr);
+        return;
+    }
+    
     set_bit(&cslab->slots, cidx);
     if (--cslab->nused == 0) {
         // we shall have no unfree chunk here
@@ -387,6 +398,12 @@ test_bit_set(void)
     // change below compile-time params accordingly.
     assert(69 < WORD_SIZE_IN_BITS * WORD_COUNT);
     
+    //memset(&y, 0x00, sizeof(bitset_t));    
+    //set_bit(&y, 96);
+    //dump_bitset(&y);
+    //ff_setbit(&y);
+    
+    //return;
     memset(&y, 0x00, sizeof(bitset_t));    
     assert(get_bit(&y, 69) == 0);
     set_bit(&y, 69);
