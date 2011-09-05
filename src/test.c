@@ -5,6 +5,7 @@
 #include "string.h"
 #include "assert.h"
 #include "math.h"
+#include "limits.h"
 
 #include "stdio.h"
 #include "sys/time.h"
@@ -16,9 +17,8 @@ typedef unsigned int word_t;
 #define MIN_SLAB_CHUNK_SIZE (100)
 #define CHUNK_ALIGN_BYTES (8)
 
-#define CHAR_BIT (8)
 #define WORD_SIZE_IN_BITS (sizeof(word_t) * CHAR_BIT)   // in bits
-#define WORD_COUNT (SLAB_SIZE / MIN_SLAB_CHUNK_SIZE / WORD_SIZE_IN_BITS)+1
+#define WORD_COUNT ((SLAB_SIZE / MIN_SLAB_CHUNK_SIZE / WORD_SIZE_IN_BITS)+1)
 
 // TODO: calculate external/internal fragmentation.
 
@@ -231,41 +231,73 @@ align_bytes(size_t size)
     return size;
 }
 
-// A binary search routine for mapping the requested size to a proper cache.
+// A binary search like routine for ceiling the requested size to a cache with proper size.
 // Implemented to reduce the mapping complexity to O(logn) in scmalloc()'s.
 cache_t *
 size_to_cache(cache_t *arr, unsigned int arr_size, unsigned int key)
 {
-    unsigned int l, m, r, msize;
-    cache_t *result;
+    int l, m, r;
+    unsigned int msize;
+    
+    // validate params
+    if ((arr == NULL) || (arr_size >= INT_MAX) || (arr_size < 1)) {
+        return NULL;
+    }
 
-    l = 0;
+    l = m = 0;
     r = arr_size-1;
-    while(l <= r && m) {
+    while(l < r) {
         m = (l+r) / 2;
-        printf("l:%u, r:%u, m:%u\r\n", l, r, m);
-
         msize = arr[m].chunk_size;
-
         if (key > msize) {
             l = m+1;
         } else if (key < msize) {
             r = m-1;
         } else {
-            break;
+            return &arr[m];
         }
     }
-
-    // m is not the smallest elem? Then maybe the previous
-    // one have less space.
-    //if (m > 0) {
-    //    if (arr[m-1].chunk_size > key) {
-    //        return &arr[m-1];
-    //    }
-    //}
-    return &arr[m];
+    
+    // will ceil the inequality. Either r or r+1 will hold the ceil value
+    // according to where we approach the inequality from. This is not very easy
+    // to understand.
+    if (r < 0) {
+        r = 0;
+    }
+    if (key <= arr[r].chunk_size) {
+        return &arr[r];
+    } else if (r < arr_size-1) {
+        if (key <= arr[r+1].chunk_size) {
+            return &arr[r+1];
+        }
+    } 
+    
+    return NULL;
 }
 
+static void
+deinit_cache_manager(void)
+{
+    if (cm == NULL) {
+        return;
+    } 
+    
+    if (cm->caches != NULL){
+        freei(cm->caches);
+    }
+    if (cm->slab_ctls != NULL){
+        freei(cm->slab_ctls);
+    }
+    if (cm->slabs != NULL){
+        freei(cm->slabs);
+    }
+    freei(cm);
+    
+    mem_used = 0;
+    mem_limit = 0;
+}
+
+// TODO: Do we need to check return value of malloc here?
 static int
 init_cache_manager(size_t memory_limit, double chunk_size_factor)
 {
@@ -287,7 +319,6 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
     // on real-world.
     cm->cache_count = (unsigned int)ceil(logbn(chunk_size_factor,
                                          SLAB_SIZE/MIN_SLAB_CHUNK_SIZE));
-    //fprintf(stderr, "ccount:%u\r\n", cm->cache_count);
 
     // alloc&initialize caches
     cm->caches = malloci(sizeof(cache_t)*cm->cache_count);
@@ -299,8 +330,7 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
     // calculate remaining memory for slabs.
     cm->slabctl_count = mem_limit / (SLAB_SIZE+sizeof(slab_ctl_t));
     if (cm->slabctl_count <= 1) {
-        // TODO: free allocated resources, otherwise subsequent scmalloc()/scfree()
-        // will fail.
+        deinit_cache_manager();
         fprintf(stderr, "not enough mem to create a slab\r\n");
         return 0;
     }
@@ -334,10 +364,17 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
 void *
 scmalloc(unsigned int size)
 {
-    unsigned int i, ffindex;
+    unsigned int i, ffindex, largest_chunk_size;
     cache_t *ccache;
     void *result;
     slab_ctl_t *cslab;
+    
+    //size in bounds?
+    largest_chunk_size = cm->caches[cm->cache_count-1].chunk_size;
+    if (size > largest_chunk_size) {
+        fprintf(stderr, "Invalid size.(%u)\r\n", size);
+        return NULL;
+    }
 
     // find relevant cache
     for(i = 0; i < cm->cache_count; i++) {
@@ -391,11 +428,10 @@ scfree(void *ptr)
     slab_ctl_t *cslab;
     int res;
 
-    pdiff = ptr - cm->slabs;
-
     // ptr shall be in valid memory
+    pdiff = ptr - cm->slabs;
     if (pdiff > cm->slabctl_count*SLAB_SIZE) {
-        fprintf(stderr, "Invalid ptr.(%p)", ptr);
+        fprintf(stderr, "Invalid ptr.(%p)\r\n", ptr);
         return;
     }
 
@@ -426,10 +462,28 @@ scfree(void *ptr)
     mem_used -= cslab->cache->chunk_size;
 }
 
+// TESTS....
+
+long long
+tickcount(void)
+{
+    struct timeval tv;
+    long long rc;
+
+    gettimeofday(&tv, (struct timezone *)NULL);
+
+    rc = tv.tv_sec;
+    rc = rc * 1000000 + tv.tv_usec;
+    return rc;
+}
+
+
 void
 test_bit_set(void)
 {
-    bitset_t y;
+    bitset_t y;    
+    long long t0;
+    t0 = tickcount();
 
     // for this test to work this assertion must be true.
     // change below compile-time params accordingly.
@@ -471,22 +525,12 @@ test_bit_set(void)
     clear_bit(&y, 60);
     assert(ff_setbit(&y) == -1);
 
-    fprintf(stderr, "[+]    test_bit_set. (ok)\r\n");
+    fprintf(stderr, 
+        "[+]    test_bit_set. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
 }
 
-long long
-tickcount(void)
-{
-    struct timeval tv;
-    long long rc;
-
-    gettimeofday(&tv, (struct timezone *)NULL);
-
-    rc = tv.tv_sec;
-    rc = rc * 1000000 + tv.tv_usec;
-    return rc;
-}
-
+// TODO: Test different slab states. Distribute slabs to different caches.
+// Think deep:)     
 void
 test_slab_allocator(void)
 {
@@ -497,31 +541,89 @@ test_slab_allocator(void)
     init_cache_manager(200, 1.25);
 
     t0 = tickcount();
-    //for(d=0;d<10000000;d++) {
-    tmp = scmalloc(50);
-    scfree(tmp);
+    for(d=0;d<10000000;d++) {
+        tmp = scmalloc(50);
+        scfree(tmp);
+    }
+    
     //tmp = malloc(50);
     //free(tmp);
     //}
-
-    //tmp = malloc(50);
-    printf("Elapsed:%0.12f \r\n", (tickcount()-t0)*0.000001);
-
-    //scfree(tmp);
-
-    fprintf(stderr, "mem_limit:%u, mem_used:%u\r\n", mem_limit, mem_used);
-    fprintf(stderr, "mem_avail_for_slabs:%u\r\n", mem_limit-mem_used);
-
+    
+    //printf("Elapsed:%0.6f \r\n", (tickcount()-t0)*0.000001);
+    //fprintf(stderr, "mem_limit:%u, mem_used:%u\r\n", mem_limit, mem_used);
+    //fprintf(stderr, "mem_avail_for_slabs:%u\r\n", mem_limit-mem_used);
+    
+    deinit_cache_manager();
+    
+    fprintf(stderr, 
+        "[+]    test_slab_allocator. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
 }
 
-
+void
+test_size_to_cache(void)
+{
+    long long t0;
+    cache_t *cc;
+    
+    t0 = tickcount();
+    cache_t caches[9] = {0};
+    
+    caches[0].chunk_size = 2;
+    caches[1].chunk_size = 4;
+    cc = size_to_cache(caches, 2, 1);
+    //printf("bibk:%u\r\n", cc->chunk_size);
+    assert(cc->chunk_size == 2);
+    cc = size_to_cache(caches, 2, 5);
+    assert(cc == NULL);
+    caches[2].chunk_size = 6;
+    cc = size_to_cache(caches, 3, 3);
+    assert(cc->chunk_size == 4);
+    cc = size_to_cache(caches, 3, 5);
+    assert(cc->chunk_size == 6);
+    cc = size_to_cache(caches, 3, 6);
+    assert(cc->chunk_size == 6);    
+    cc = size_to_cache(caches, 1, 1);
+    assert(cc->chunk_size == 2);    
+    cc = size_to_cache(caches, 1, 3);
+    assert(cc == NULL);    
+    cc = size_to_cache(caches, 0, 3);
+    assert(cc == NULL);    
+    cc = size_to_cache(NULL, 1, 3);
+    assert(cc == NULL);    
+    cc = size_to_cache(caches, INT_MAX, 3);
+    assert(cc == NULL);
+    
+    caches[3].chunk_size = 8;
+    caches[4].chunk_size = 10;
+    
+    cc = size_to_cache(caches, 5, 7);
+    assert(cc->chunk_size == 8);    
+    cc = size_to_cache(caches, 5, 9);
+    assert(cc->chunk_size == 10);  
+    cc = size_to_cache(caches, 5, 3);
+    assert(cc->chunk_size == 4);
+    cc = size_to_cache(caches, 5, 5);
+    assert(cc->chunk_size == 6);  
+    
+    caches[5].chunk_size = 12;
+    caches[6].chunk_size = 14;
+    caches[7].chunk_size = 16;
+    caches[8].chunk_size = 18;
+    
+    cc = size_to_cache(caches, 9, 7);
+    assert(cc->chunk_size == 8);  
+    
+    fprintf(stderr, 
+        "[+]    test_size_to_cache. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
+}
 
 int
 main(void)
 {
-
-    //test_bit_set();
+    test_bit_set();
     test_slab_allocator();
+    test_size_to_cache();
 
     return 0;
 }
