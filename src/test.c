@@ -263,7 +263,7 @@ size_to_cache(cache_t *arr, unsigned int arr_size, unsigned int key)
     // will ceil the inequality. Either r or r+1 will hold the ceil value
     // according to where we approach the inequality from. This is not very easy
     // to understand.
-    // TODO: Do Better?
+    // TODO: Refactor below?
     if (r < 0) {
         r = 0;
     }
@@ -451,6 +451,7 @@ scfree(void *ptr)
         return;
     }
     //fprintf(stderr, "sidx:%u, cidx:%u.\r\n", sidx, cidx);
+    // TODO: Refactor below?
     set_bit(&cslab->slots, cidx);
     if (--cslab->nused == 0) {
         // we shall have no unfree chunk here
