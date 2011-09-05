@@ -141,8 +141,6 @@ ff_setbit(bitset_t *bts)
     for(i=0; i<WORD_COUNT; i++) {
         j = ffs(bts->words[i]);
         if (j) {
-            //printf("ff_setbit:%d, %d, %d\r\n", j, (j + (i*WORD_SIZE_IN_BITS))-1,
-            //    WORD_SIZE_IN_BITS);
             return (j + (i*WORD_SIZE_IN_BITS))-1;
         }
     }
@@ -150,6 +148,7 @@ ff_setbit(bitset_t *bts)
     return -1;
 }
 
+// TODO: Need any tests for the doubly linked list?
 slab_ctl_t *
 peek(list_t *li)
 {
@@ -377,17 +376,7 @@ scmalloc(unsigned int size)
     }
 
     // find relevant cache
-    for(i = 0; i < cm->cache_count; i++) {
-        if (size <= cm->caches[i].chunk_size) {
-            ccache = &cm->caches[i];
-            break;
-        }
-    }
-    //printf("scmalloc using chunk_size %u, bsearch:%u\r\n",
-    //    ccache->chunk_size,
-    //    size_to_cache(cm->caches, cm->cache_count, size)->chunk_size);
-    // TODO: before using below code, verify it works for all input.
-    assert(ccache == size_to_cache(cm->caches, cm->cache_count, size));
+    ccache = size_to_cache(cm->caches, cm->cache_count, size);
 
     // need to allocate a slab_ctl?
     cslab = peek(&ccache->slabs_partial);
@@ -463,8 +452,7 @@ scfree(void *ptr)
 }
 
 // TESTS....
-
-long long
+inline long long
 tickcount(void)
 {
     struct timeval tv;
@@ -489,12 +477,6 @@ test_bit_set(void)
     // change below compile-time params accordingly.
     assert(69 < WORD_SIZE_IN_BITS * WORD_COUNT);
 
-    //memset(&y, 0x00, sizeof(bitset_t));
-    //set_bit(&y, 96);
-    //dump_bitset(&y);
-    //ff_setbit(&y);
-
-    //return;
     memset(&y, 0x00, sizeof(bitset_t));
     assert(get_bit(&y, 69) == 0);
     set_bit(&y, 69);
@@ -541,11 +523,13 @@ test_slab_allocator(void)
     init_cache_manager(200, 1.25);
 
     t0 = tickcount();
-    for(d=0; d<10000000; d++) {
-        tmp = scmalloc(50);
-        scfree(tmp);
+    
+    // sum all objects to a single cache, and check properties
+    while(scmalloc(50) != NULL) {
     }
-
+    printf("1:%d\r\n", mem_used);
+    assert(cm->slabs_free.head == NULL);
+    
     //tmp = malloc(50);
     //free(tmp);
     //}
@@ -621,9 +605,9 @@ test_size_to_cache(void)
 int
 main(void)
 {
-    test_bit_set();
+    //test_bit_set();
     test_slab_allocator();
-    test_size_to_cache();
+    //test_size_to_cache();
 
     return 0;
 }
