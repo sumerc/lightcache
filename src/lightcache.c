@@ -93,7 +93,7 @@ make_conn(int fd) {
     conn->free = 0;
     conn->in = NULL;
     conn->out = NULL;
-    
+
     stats.curr_connections++;
 
     return conn;
@@ -180,7 +180,7 @@ disconnect_conn(conn* conn)
 
     conn->free = 1;
     close(conn->fd);
-    
+
     stats.curr_connections--;
 
     set_conn_state(conn, CONN_CLOSED);
@@ -311,9 +311,9 @@ execute_cmd(struct conn* conn)
        protocol. */
     switch(cmd) {
     case CMD_GET:
-    
+
         LC_DEBUG(("CMD_GET [%s]\r\n", conn->in->rkey));
-        
+
         stats.cmd_get++;
 
         /* get item */
@@ -335,21 +335,21 @@ execute_cmd(struct conn* conn)
             hfree(cache, tab_item); // recycle tab_item
             goto GET_KEY_NOTEXISTS;
         }
-        
+
         stats.get_hits++;
-        
+
         prepare_response(conn, cached_req->req_header.request.data_length, 0); // do not alloc mem
-            
+
         conn->out->sdata = cached_req->rdata;
         conn->out->can_free = 0;
-        
+
         set_conn_state(conn, SEND_HEADER);
         break;
 
     case CMD_SET:
 
         LC_DEBUG(("CMD_SET\r\n"));
-        
+
         stats.cmd_set++;
 
         /* validate params */
@@ -377,13 +377,13 @@ execute_cmd(struct conn* conn)
             tab_item->val = conn->in;
         }
         conn->in->can_free = 0;
-        
+
         send_response(conn, SUCCESS);
         break;
     case CMD_DELETE:
 
         LC_DEBUG(("CMD_DELETE [%s]\r\n", conn->in->rkey));
-        
+
         tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
         if (!tab_item) {
             LC_DEBUG(("Key not found:%s\r\n", conn->in->rkey));
@@ -503,7 +503,7 @@ execute_cmd(struct conn* conn)
     }
 
     return;
-    
+
 GET_KEY_NOTEXISTS:
     stats.get_misses++;
     send_response(conn, KEY_NOTEXISTS);
@@ -543,9 +543,9 @@ read_nbytes(conn*conn, char *bytes, size_t total)
             return NEED_MORE;
         }
     }
-    
+
     stats.bytes_read += nbytes;
-    
+
     conn->in->rbytes += nbytes;
     if (conn->in->rbytes == total) {
         conn->in->rbytes = 0;
@@ -652,9 +652,9 @@ send_nbytes(conn*conn, char *bytes, size_t total)
         syslog(LOG_ERR, "%s (%s)", "socket write error.", strerror(errno));
         return SEND_ERR;
     }
-    
+
     stats.bytes_written += nbytes;
-    
+
     conn->out->sbytes += nbytes;
     if (conn->out->sbytes == total) {
         conn->out->sbytes = 0;
@@ -757,15 +757,15 @@ event_handler(conn *conn, event ev)
 }
 
 
-/* Demands for memory that is statically allocated(such as frelists). 
-   This function will be called when application memory usage reaches a certain 
+/* Demands for memory that is statically allocated(such as frelists).
+   This function will be called when application memory usage reaches a certain
    ratio of the total available mem. Here, we will shrink static resources to gain
    more memory for dynamic resources.
   */
 void
 collect_unused_memory(void)
 {
-    // todo:   
+    // todo:
 }
 
 
