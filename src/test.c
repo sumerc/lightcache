@@ -238,7 +238,7 @@ size_to_cache(cache_t *arr, unsigned int arr_size, unsigned int key)
 {
     int l, m, r;
     unsigned int msize;
-    
+
     // validate params
     if ((arr == NULL) || (arr_size >= INT_MAX) || (arr_size < 1)) {
         return NULL;
@@ -257,7 +257,7 @@ size_to_cache(cache_t *arr, unsigned int arr_size, unsigned int key)
             return &arr[m];
         }
     }
-    
+
     // will ceil the inequality. Either r or r+1 will hold the ceil value
     // according to where we approach the inequality from. This is not very easy
     // to understand.
@@ -270,8 +270,8 @@ size_to_cache(cache_t *arr, unsigned int arr_size, unsigned int key)
         if (key <= arr[r+1].chunk_size) {
             return &arr[r+1];
         }
-    } 
-    
+    }
+
     return NULL;
 }
 
@@ -280,19 +280,19 @@ deinit_cache_manager(void)
 {
     if (cm == NULL) {
         return;
-    } 
-    
-    if (cm->caches != NULL){
+    }
+
+    if (cm->caches != NULL) {
         freei(cm->caches);
     }
-    if (cm->slab_ctls != NULL){
+    if (cm->slab_ctls != NULL) {
         freei(cm->slab_ctls);
     }
-    if (cm->slabs != NULL){
+    if (cm->slabs != NULL) {
         freei(cm->slabs);
     }
     freei(cm);
-    
+
     mem_used = 0;
     mem_limit = 0;
 }
@@ -368,7 +368,7 @@ scmalloc(unsigned int size)
     cache_t *ccache;
     void *result;
     slab_ctl_t *cslab;
-    
+
     //size in bounds?
     largest_chunk_size = cm->caches[cm->cache_count-1].chunk_size;
     if (size > largest_chunk_size) {
@@ -481,7 +481,7 @@ tickcount(void)
 void
 test_bit_set(void)
 {
-    bitset_t y;    
+    bitset_t y;
     long long t0;
     t0 = tickcount();
 
@@ -525,12 +525,12 @@ test_bit_set(void)
     clear_bit(&y, 60);
     assert(ff_setbit(&y) == -1);
 
-    fprintf(stderr, 
-        "[+]    test_bit_set. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
+    fprintf(stderr,
+            "[+]    test_bit_set. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
 }
 
 // TODO: Test different slab states. Distribute slabs to different caches.
-// Think deep:)     
+// Think deep:)
 void
 test_slab_allocator(void)
 {
@@ -541,23 +541,23 @@ test_slab_allocator(void)
     init_cache_manager(200, 1.25);
 
     t0 = tickcount();
-    for(d=0;d<10000000;d++) {
+    for(d=0; d<10000000; d++) {
         tmp = scmalloc(50);
         scfree(tmp);
     }
-    
+
     //tmp = malloc(50);
     //free(tmp);
     //}
-    
+
     //printf("Elapsed:%0.6f \r\n", (tickcount()-t0)*0.000001);
     //fprintf(stderr, "mem_limit:%u, mem_used:%u\r\n", mem_limit, mem_used);
     //fprintf(stderr, "mem_avail_for_slabs:%u\r\n", mem_limit-mem_used);
-    
+
     deinit_cache_manager();
-    
-    fprintf(stderr, 
-        "[+]    test_slab_allocator. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
+
+    fprintf(stderr,
+            "[+]    test_slab_allocator. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
 }
 
 void
@@ -565,10 +565,10 @@ test_size_to_cache(void)
 {
     long long t0;
     cache_t *cc;
-    
+
     t0 = tickcount();
     cache_t caches[9] = {0};
-    
+
     caches[0].chunk_size = 2;
     caches[1].chunk_size = 4;
     cc = size_to_cache(caches, 2, 1);
@@ -582,40 +582,40 @@ test_size_to_cache(void)
     cc = size_to_cache(caches, 3, 5);
     assert(cc->chunk_size == 6);
     cc = size_to_cache(caches, 3, 6);
-    assert(cc->chunk_size == 6);    
+    assert(cc->chunk_size == 6);
     cc = size_to_cache(caches, 1, 1);
-    assert(cc->chunk_size == 2);    
+    assert(cc->chunk_size == 2);
     cc = size_to_cache(caches, 1, 3);
-    assert(cc == NULL);    
+    assert(cc == NULL);
     cc = size_to_cache(caches, 0, 3);
-    assert(cc == NULL);    
+    assert(cc == NULL);
     cc = size_to_cache(NULL, 1, 3);
-    assert(cc == NULL);    
+    assert(cc == NULL);
     cc = size_to_cache(caches, INT_MAX, 3);
     assert(cc == NULL);
-    
+
     caches[3].chunk_size = 8;
     caches[4].chunk_size = 10;
-    
+
     cc = size_to_cache(caches, 5, 7);
-    assert(cc->chunk_size == 8);    
+    assert(cc->chunk_size == 8);
     cc = size_to_cache(caches, 5, 9);
-    assert(cc->chunk_size == 10);  
+    assert(cc->chunk_size == 10);
     cc = size_to_cache(caches, 5, 3);
     assert(cc->chunk_size == 4);
     cc = size_to_cache(caches, 5, 5);
-    assert(cc->chunk_size == 6);  
-    
+    assert(cc->chunk_size == 6);
+
     caches[5].chunk_size = 12;
     caches[6].chunk_size = 14;
     caches[7].chunk_size = 16;
     caches[8].chunk_size = 18;
-    
+
     cc = size_to_cache(caches, 9, 7);
-    assert(cc->chunk_size == 8);  
-    
-    fprintf(stderr, 
-        "[+]    test_size_to_cache. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
+    assert(cc->chunk_size == 8);
+
+    fprintf(stderr,
+            "[+]    test_size_to_cache. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
 }
 
 int
