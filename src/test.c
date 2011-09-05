@@ -146,7 +146,7 @@ ff_setbit(bitset_t *bts)
             return (j + (i*WORD_SIZE_IN_BITS))-1;
         }
     }
-
+    
     return -1;
 }
 
@@ -263,7 +263,7 @@ size_to_cache(cache_t *arr, unsigned int arr_size, unsigned int key)
     // will ceil the inequality. Either r or r+1 will hold the ceil value
     // according to where we approach the inequality from. This is not very easy
     // to understand.
-    // TODO: Refactor below?
+    // TODO: Do Better?
     if (r < 0) {
         r = 0;
     }
@@ -323,7 +323,7 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
     // SLAB_SIZE. This idea is being used on memcached() and proved to be well
     // on real-world.
     cm->cache_count = (unsigned int)ceil(logbn(chunk_size_factor,
-                                         SLAB_SIZE/MIN_SLAB_CHUNK_SIZE));
+                                         SLAB_SIZE/MIN_SLAB_CHUNK_SIZE))-1;
 
     // alloc&initialize caches
     cm->caches = malloci(sizeof(cache_t)*cm->cache_count);
@@ -451,7 +451,6 @@ scfree(void *ptr)
         return;
     }
     //fprintf(stderr, "sidx:%u, cidx:%u.\r\n", sidx, cidx);
-    // TODO: Refactor below?
     set_bit(&cslab->slots, cidx);
     if (--cslab->nused == 0) {
         // we shall have no unfree chunk here
@@ -488,7 +487,6 @@ tickcount(void)
     return rc;
 }
 
-
 void
 test_bit_set(void)
 {
@@ -499,8 +497,9 @@ test_bit_set(void)
     // for this test to work this assertion must be true.
     // change below compile-time params accordingly.
     assert(69 < WORD_SIZE_IN_BITS * WORD_COUNT);
-
     memset(&y, 0x00, sizeof(bitset_t));
+    
+    // test ffs
     assert(get_bit(&y, 69) == 0);
     set_bit(&y, 69);
     assert(get_bit(&y, 69) == 1);
@@ -529,7 +528,7 @@ test_bit_set(void)
     assert(ff_setbit(&y) == 60);
     clear_bit(&y, 60);
     assert(ff_setbit(&y) == -1);
-
+    
     fprintf(stderr,
             "[+]    test_bit_set. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
 }
@@ -600,17 +599,17 @@ test_slab_allocator(void)
     long long t0;
     cache_t *cc;
     void *p;
+    int i;
 
     t0 = tickcount();
     
     assert(init_cache_manager(200, 1.25) == 1);
-    assert(cm->cache_count == 42);
-    // sum all objects to a single cache, and check properties
+    assert(cm->cache_count == 41);
+    
+    // distribute all slabs to a single cache, and check properties
     p = scmalloc(50);
     while(scmalloc(50) != NULL) {
     }
-    printf("1:%u , 2:%u, 3:%u\r\n", cm->cache_count, 
-        mem_used, mem_mallocd);
     assert(cm->slabs_free.head == NULL); // no free slab
     
     cc = size_to_cache(cm->caches, cm->cache_count, 50);
@@ -627,8 +626,40 @@ test_slab_allocator(void)
     assert(cm == NULL);
     
     assert(init_cache_manager(3, 1.25) == 1);
+    assert(scmalloc(cm->caches[0].chunk_size) != NULL);
+    assert(scmalloc(cm->caches[1].chunk_size) != NULL);
+    assert(scmalloc(cm->caches[2].chunk_size) == NULL);
     
-    //scmalloc()
+    // distribute slabs uniformly
+    deinit_cache_manager();
+    assert(init_cache_manager(42, 1.25) == 1);
+    for(i=0; i < cm->cache_count; i++) {            
+        p = scmalloc(cm->caches[i].chunk_size);
+        assert(p != NULL);
+    }
+    // try to fill the last slab  
+    for(i=1; i < (SLAB_SIZE / cm->caches[40].chunk_size); i++) {
+        p = scmalloc(cm->caches[40].chunk_size);
+        assert(p != NULL);
+    }
+    p = scmalloc(cm->caches[40].chunk_size);
+    assert(p == NULL);
+
+    // fill a large chunk size slab
+    for(i=1; i < (SLAB_SIZE / cm->caches[37].chunk_size); i++) {
+        p = scmalloc(cm->caches[37].chunk_size);
+        assert(p != NULL);
+    }
+    p = scmalloc(cm->caches[37].chunk_size);
+    assert(p == NULL);
+
+    // then fill the first slab, that has more elements
+    for(i=1; i < (SLAB_SIZE / cm->caches[0].chunk_size); i++) {
+        p = scmalloc(1);
+        assert(p != NULL);
+    }
+    p = scmalloc(1);
+    assert(p == NULL);
     
     fprintf(stderr,
             "[+]    test_slab_allocator. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
@@ -638,9 +669,9 @@ test_slab_allocator(void)
 int
 main(void)
 {
-    //test_bit_set();
+    test_bit_set();
     test_slab_allocator();
-    //test_size_to_cache();
+    test_size_to_cache();
 
     return 0;
 }
