@@ -73,7 +73,7 @@ malloci(size_t size)
 {
     void *ptr;
     size_t real_size;
-    
+
     real_size = size+sizeof(uint64_t);
     ptr = malloc(real_size);
     memset(ptr, 0x00, real_size);
@@ -140,14 +140,14 @@ get_bit(bitset_t *bts, unsigned int b)
 // O(1) operation as can be seen and very efficient.
 // http://keithandkatie.com/keith/papers/debruijn.pdf can be read for
 // more info.
-static inline int 
-nlz32(register uint32_t x) 
+static inline int
+nlz32(register uint32_t x)
 {
     static const int debruij_tab[32] = {
-      0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
-      31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9 
+        0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
+        31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
     };
-      
+
     return debruij_tab[((uint32_t)((x & -x) * 0x077CB531U)) >> 27];
 }
 
@@ -166,7 +166,7 @@ ff_setbit(bitset_t *bts)
             return (j + (i*WORD_SIZE_IN_BITS));
         }
     }
-    
+
     return -1;
 }
 
@@ -246,7 +246,7 @@ static inline size_t
 align_bytes(size_t size)
 {
     size_t sz;
-    
+
     sz = size % CHUNK_ALIGN_BYTES;
     if (sz)
         size += CHUNK_ALIGN_BYTES - sz;
@@ -321,10 +321,10 @@ deinit_cache_manager(void)
         freei(cm->slabs);
     }
     freei(cm);
-    
+
     cm = NULL;
     mem_used = mem_limit = 0;
-    
+
     assert(mem_mallocd == 0);// all real-mallocd chunks shall be freed here.
 }
 
@@ -339,7 +339,7 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
         fprintf(stderr, "slab allocator is already initialized.\r\n");
         return 0;
     }
-    
+
     // initialize globals
     mem_limit = memory_limit * 1024*1024; // memory_limit is in MB
     cm = malloci(sizeof(cache_manager_t));
@@ -358,12 +358,12 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
         cm->caches[i].chunk_size = size;
     }
 
-    // calculate remaining memory for slabs. sizeof(uint64_t) is the bytes 
+    // calculate remaining memory for slabs. sizeof(uint64_t) is the bytes
     // allocated at every malloced chunk. As we will allocate slab_ctls and
     // slabs further, just calculate them too.
     // TODO: Any chance testing bounds on below calculation?
-    cm->slabctl_count = (mem_limit-mem_mallocd-(2*sizeof(uint64_t))) / 
-        (SLAB_SIZE+sizeof(slab_ctl_t));
+    cm->slabctl_count = (mem_limit-mem_mallocd-(2*sizeof(uint64_t))) /
+                        (SLAB_SIZE+sizeof(slab_ctl_t));
     if (cm->slabctl_count <= 1) {
         deinit_cache_manager();
         fprintf(stderr, "not enough mem to create a slab\r\n");
@@ -392,10 +392,10 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
 
         prev_slab = &cm->slab_ctls[i];
     }
-    
+
     // mem_alloc shall always be smaller than mem_limit
     assert(mem_mallocd <= mem_limit);
-    
+
     return 1;
 }
 
@@ -438,17 +438,17 @@ scmalloc(size_t size)
     if (++cslab->nused == (SLAB_SIZE / ccache->chunk_size)) {
         cslab = pop(&ccache->slabs_partial);
         push(&ccache->slabs_full, cslab);
-        // TODO: assert slots is empty via caculating the ffindex is greater than 
+        // TODO: assert slots is empty via caculating the ffindex is greater than
         // the alloc'd bits.
     }
-    
+
     result = cm->slabs + cslab->nindex * SLAB_SIZE;
     result += ccache->chunk_size * ffindex;
 
     mem_used += ccache->chunk_size;
-    
+
     assert(mem_used <= mem_mallocd);
-    
+
     return result;
 }
 
@@ -486,7 +486,7 @@ scfree(void *ptr)
             res = rem(&cslab->cache->slabs_full, cslab);
             assert(res == 1); // somebody must own the slab.
         }
-        push(&cm->slabs_free, cslab);    
+        push(&cm->slabs_free, cslab);
     }  // move from full to partial
     else if (cslab->nused == (SLAB_SIZE / cslab->cache->chunk_size)-1) {
         res = rem(&cslab->cache->slabs_full, cslab);
@@ -525,7 +525,7 @@ test_bit_set(void)
     // change below compile-time params accordingly.
     assert(69 < WORD_SIZE_IN_BITS * WORD_COUNT);
     memset(y, 0x00, sizeof(bitset_t));
-    
+
     // test ffs
     assert(get_bit(y, 69) == 0);
     set_bit(y, 69);
@@ -555,9 +555,9 @@ test_bit_set(void)
     assert(ff_setbit(y) == 60);
     clear_bit(y, 60);
     assert(ff_setbit(y) == -1);
-    
+
     memset(y, 0x00 ,sizeof(bitset_t));
-    
+
     set_bit(y, 32); // MSB of second word
     set_bit(y, 63);
     assert(y->words[1] == 0x80000001);
@@ -571,12 +571,12 @@ test_bit_set(void)
     set_bit(y, 96);
     set_bit(y, 97);
     set_bit(y, 104);
-    
+
     assert(ff_setbit(y) == 96);
     clear_bit(y, 96);
     clear_bit(y, 97);
     assert(ff_setbit(y) == 104);
-    
+
     fprintf(stderr,
             "[+]    test_bit_set. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
 }
@@ -650,42 +650,42 @@ test_slab_allocator(void)
     int i;
 
     t0 = tickcount();
-    
+
     assert(init_cache_manager(200, 1.25) == 1);
     assert(cm->cache_count == 41);
-    
+
     // distribute all slabs to a single cache, and check properties
     p = scmalloc(50);
     while(scmalloc(50) != NULL) {
     }
     assert(cm->slabs_free.head == NULL); // no free slab
-    
+
     cc = size_to_cache(cm->caches, cm->cache_count, 50);
     assert(cc != NULL);
-    assert(cc->slabs_partial.head == NULL);  
+    assert(cc->slabs_partial.head == NULL);
     scfree(p);
     assert(scmalloc(50) != NULL);
     assert(scmalloc(50) == NULL);
-    
+
     deinit_cache_manager();
     assert(mem_used == 0);
     assert(mem_mallocd == 0);
     assert(mem_limit == 0);
     assert(cm == NULL);
-    
+
     assert(init_cache_manager(3, 1.25) == 1);
     assert(scmalloc(cm->caches[0].chunk_size) != NULL);
     assert(scmalloc(cm->caches[1].chunk_size) != NULL);
     assert(scmalloc(cm->caches[2].chunk_size) == NULL);
-    
+
     // distribute slabs uniformly
     deinit_cache_manager();
     assert(init_cache_manager(42, 1.25) == 1);
-    for(i=0; i < cm->cache_count; i++) {            
+    for(i=0; i < cm->cache_count; i++) {
         p = scmalloc(cm->caches[i].chunk_size);
         assert(p != NULL);
     }
-    // try to fill the last slab  
+    // try to fill the last slab
     for(i=1; i < (SLAB_SIZE / cm->caches[40].chunk_size); i++) {
         p = scmalloc(cm->caches[40].chunk_size);
         assert(p != NULL);
@@ -708,7 +708,7 @@ test_slab_allocator(void)
     }
     p = scmalloc(1);
     assert(p == NULL);
-    
+
     fprintf(stderr,
             "[+]    test_slab_allocator. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
 }
