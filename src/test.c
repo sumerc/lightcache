@@ -10,7 +10,13 @@
 #include "stdio.h"
 #include "sys/time.h"
 
-typedef unsigned int word_t;
+// To change this, ensure nlz will work. Current nlz algorithm
+// assumes 32 bit machine words. There is no performance gain
+// when 64 bit is used in my tests, by the way. (Tested ffsll()
+// to verfiy this.)
+// TODO: Web site http://graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightLinear
+// says 64-bit can be used with the nlz() alg. Test the behaviour.
+typedef uint32_t word_t;
 
 #define SLAB_SIZE (1024*1024)
 #define MIN_SLAB_CHUNK_SIZE (100)
@@ -83,12 +89,6 @@ freei(void *ptr)
     free(ptr);
 }
 
-inline double
-logbn(double base, double x)
-{
-    return log(x) / log(base);
-}
-
 inline unsigned int
 bindex(unsigned int b)
 {
@@ -96,9 +96,10 @@ bindex(unsigned int b)
 }
 
 inline unsigned int
-boffset(unsigned int b)
+bloffset(unsigned int b)
 {
-    return b % WORD_SIZE_IN_BITS;
+    //return WORD_SIZE_IN_BITS - (b % WORD_SIZE_IN_BITS) - 1;
+    return (b % WORD_SIZE_IN_BITS);
 }
 
 void
@@ -116,14 +117,14 @@ set_bit(bitset_t *bts, unsigned int b)
 {
     assert(b < WORD_COUNT*WORD_SIZE_IN_BITS);
 
-    bts->words[bindex(b)] |= (word_t)1 << (boffset(b));
+    bts->words[bindex(b)] |= (word_t)1 << (bloffset(b));
 }
 void
 clear_bit(bitset_t *bts, unsigned int b)
 {
     assert(b < WORD_COUNT*WORD_SIZE_IN_BITS);
 
-    bts->words[bindex(b)] &= ~((word_t)1 << (boffset(b)));
+    bts->words[bindex(b)] &= ~((word_t)1 << (bloffset(b)));
 }
 
 unsigned int
@@ -131,19 +132,38 @@ get_bit(bitset_t *bts, unsigned int b)
 {
     assert(b < WORD_COUNT*WORD_SIZE_IN_BITS);
 
-    return (bts->words[bindex(b)] >> boffset(b)) & 1;
+    return (bts->words[bindex(b)] >> (bloffset(b))) & 1;
 }
 
-// Using ffsll() on an 64-bit machine gains no performance at all.
+// Among other tested alternatives this is the fastest. The only problem
+// is we may have a cache miss because of the table usage. But this is a
+// O(1) operation as can be seen and very efficient.
+// http://keithandkatie.com/keith/papers/debruijn.pdf can be read for
+// more info.
+static inline int 
+nlz32(register uint32_t x) 
+{
+    static const int debruij_tab[32] = {
+      0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
+      31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9 
+    };
+      
+    return debruij_tab[((uint32_t)((x & -x) * 0x077CB531U)) >> 27];
+}
+
+
 static int
 ff_setbit(bitset_t *bts)
 {
     int i, j;
+    word_t w;
 
     for(i=0; i<WORD_COUNT; i++) {
-        j = ffs(bts->words[i]);
-        if (j) {
-            return (j + (i*WORD_SIZE_IN_BITS))-1;
+        w = bts->words[i];
+        if(w) {
+            j = nlz32((uint32_t)w);
+            //printf("dd:%d, %d, %d\r\n", j, i, j + (i*WORD_SIZE_IN_BITS));
+            return (j + (i*WORD_SIZE_IN_BITS));
         }
     }
     
@@ -231,6 +251,12 @@ align_bytes(size_t size)
     if (sz)
         size += CHUNK_ALIGN_BYTES - sz;
     return size;
+}
+
+static inline double
+logbn(double base, double x)
+{
+    return log(x) / log(base);
 }
 
 // A binary search like routine for ceiling the requested size to a cache with proper size.
@@ -490,44 +516,66 @@ tickcount(void)
 void
 test_bit_set(void)
 {
-    bitset_t y;
+    bitset_t *y;
     long long t0;
     t0 = tickcount();
 
+    y = malloc(sizeof(bitset_t));
     // for this test to work this assertion must be true.
     // change below compile-time params accordingly.
     assert(69 < WORD_SIZE_IN_BITS * WORD_COUNT);
-    memset(&y, 0x00, sizeof(bitset_t));
+    memset(y, 0x00, sizeof(bitset_t));
     
     // test ffs
-    assert(get_bit(&y, 69) == 0);
-    set_bit(&y, 69);
-    assert(get_bit(&y, 69) == 1);
+    assert(get_bit(y, 69) == 0);
+    set_bit(y, 69);
+    assert(get_bit(y, 69) == 1);
 
-    set_bit(&y, 64);
-    assert(ff_setbit(&y) == 64);
+    set_bit(y, 64);
+    assert(ff_setbit(y) == 64);
 
-    memset(&y, 0x00, sizeof(bitset_t));
-    assert(ff_setbit(&y) == -1);
-    set_bit(&y, 67);
-    assert(ff_setbit(&y) == 67);
-    assert(get_bit(&y, 67) == 1);
-    clear_bit(&y, 67);
-    assert(get_bit(&y, 67) == 0);
+    memset(y, 0x00, sizeof(bitset_t));
+    assert(ff_setbit(y) == -1);
+    set_bit(y, 67);
+    assert(ff_setbit(y) == 67);
+    assert(get_bit(y, 67) == 1);
+    clear_bit(y, 67);
+    assert(get_bit(y, 67) == 0);
 
-    memset(&y, 0x00, sizeof(bitset_t));
-    set_bit(&y, 57);
-    set_bit(&y, 58);
-    assert(ff_setbit(&y) == 57);
-    set_bit(&y, 56);
-    assert(ff_setbit(&y) == 56);
-    clear_bit(&y, 57);
-    clear_bit(&y, 58);
-    clear_bit(&y, 56);
-    set_bit(&y, 60);
-    assert(ff_setbit(&y) == 60);
-    clear_bit(&y, 60);
-    assert(ff_setbit(&y) == -1);
+    memset(y, 0x00, sizeof(bitset_t));
+    set_bit(y, 57);
+    set_bit(y, 58);
+    assert(ff_setbit(y) == 57);
+    set_bit(y, 56);
+    assert(ff_setbit(y) == 56);
+    clear_bit(y, 57);
+    clear_bit(y, 58);
+    clear_bit(y, 56);
+    set_bit(y, 60);
+    assert(ff_setbit(y) == 60);
+    clear_bit(y, 60);
+    assert(ff_setbit(y) == -1);
+    
+    memset(y, 0x00 ,sizeof(bitset_t));
+    
+    set_bit(y, 32); // MSB of second word
+    set_bit(y, 63);
+    assert(y->words[1] == 0x80000001);
+    ff_setbit(y);
+    clear_bit(y, 32);
+    clear_bit(y, 63);
+    set_bit(y, 35);
+    assert(ff_setbit(y) == 35);
+    memset(y, 0x00 ,sizeof(bitset_t));
+    assert(ff_setbit(y) == -1);
+    set_bit(y, 96);
+    set_bit(y, 97);
+    set_bit(y, 104);
+    
+    assert(ff_setbit(y) == 96);
+    clear_bit(y, 96);
+    clear_bit(y, 97);
+    assert(ff_setbit(y) == 104);
     
     fprintf(stderr,
             "[+]    test_bit_set. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
