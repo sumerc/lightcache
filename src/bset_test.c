@@ -39,9 +39,9 @@ void
 dump_bitset(bitset_t *bts)
 {
     int i,j;
-    
+
     for(i=0; i<WORD_COUNT; i++) {
-        for(j=0;j<sizeof(word_t);j+=sizeof(unsigned int)) {            
+        for(j=0; j<sizeof(word_t); j+=sizeof(unsigned int)) {
             printf("word %d is 0x%x\r\n", i, *(unsigned int *)(&bts->words[i]+j));
         }
     }
@@ -81,18 +81,18 @@ nlz32(register uint32_t x)
     return debruij_tab[(((x&-x) * 0x077CB531U)) >> 27];
 }
 
-int 
-nlz64(uint64_t x) {
-    static const unsigned int debruij_tab[64] =
-    {
+int
+nlz64(uint64_t x)
+{
+    static const unsigned int debruij_tab[64] = {
         0,  1,  2, 53,  3,  7, 54, 27,
         4, 38, 41,  8, 34, 55, 48, 28,
-       62,  5, 39, 46, 44, 42, 22,  9,
-       24, 35, 59, 56, 49, 18, 29, 11,
-       63, 52,  6, 26, 37, 40, 33, 47,
-       61, 45, 43, 21, 23, 58, 17, 10,
-       51, 25, 36, 32, 60, 20, 57, 16,
-       50, 31, 19, 15, 30, 14, 13, 12,
+        62,  5, 39, 46, 44, 42, 22,  9,
+        24, 35, 59, 56, 49, 18, 29, 11,
+        63, 52,  6, 26, 37, 40, 33, 47,
+        61, 45, 43, 21, 23, 58, 17, 10,
+        51, 25, 36, 32, 60, 20, 57, 16,
+        50, 31, 19, 15, 30, 14, 13, 12,
     };
     return debruij_tab[((x&-x)*0x022fdd63cc95386d) >> 58];
 }
@@ -115,7 +115,7 @@ ff_setbit(bitset_t *bts)
             return (j + (i*WORD_SIZE_IN_BITS));
         }
     }
-    
+
     return -1;
 }
 
@@ -123,7 +123,7 @@ void
 test_bs(void)
 {
     bitset_t *bs;
-    
+
     bs = malloc(sizeof(bitset_t));
     memset(bs, 0x00 ,sizeof(bitset_t));
     //bs->words[0] = 0xFFFFEEEEDDDDEEEE;
@@ -146,7 +146,7 @@ test_bs(void)
     set_bit(bs, 96);
     set_bit(bs, 97);
     set_bit(bs, 104);
-    
+
     assert(ff_setbit(bs) == 96);
     clear_bit(bs, 96);
     clear_bit(bs, 97);
@@ -166,12 +166,12 @@ main(void)
 /*
 // TODO: When below is used instead of ffs, runtime increases %25.
 // 1) Removed if check to the loop, now we have same performance as ffs()
-// 2) Using x/n as a register ensures run-time consistency. Now it is 
+// 2) Using x/n as a register ensures run-time consistency. Now it is
 //    always the best case.
-static inline int 
+static inline int
 nlz(register word_t x) {
    register int n;
-   
+
    n = 0;
    if (x <= 0x0000FFFF) {n = n +16; x = x <<16;}
    if (x <= 0x00FFFFFF) {n = n + 8; x = x << 8;}
@@ -186,7 +186,7 @@ ff_setbit(bitset_t *bts)
 {
     int i, j;
     word_t w;
-    
+
     for(i=0; i<WORD_COUNT; i++) {
         w = bts->words[i];
         if (w) {
@@ -194,16 +194,16 @@ ff_setbit(bitset_t *bts)
            return (j + (i * WORD_SIZE_IN_BITS));
         }
     }
-    
+
     return -1;
 }
 
-int 
-nlz2(register unsigned int v) 
+int
+nlz2(register unsigned int v)
 {
     register unsigned int c;
-    
-    if (v & 0x1) 
+
+    if (v & 0x1)
 {
   // special case for odd v (assumed to happen half of the time)
   c = 0;
@@ -211,28 +211,28 @@ nlz2(register unsigned int v)
 else
 {
   c = 1;
-  if ((v & 0xffff) == 0) 
-  {  
-    v >>= 16;  
+  if ((v & 0xffff) == 0)
+  {
+    v >>= 16;
     c += 16;
   }
-  if ((v & 0xff) == 0) 
-  {  
-    v >>= 8;  
+  if ((v & 0xff) == 0)
+  {
+    v >>= 8;
     c += 8;
   }
-  if ((v & 0xf) == 0) 
-  {  
+  if ((v & 0xf) == 0)
+  {
     v >>= 4;
     c += 4;
   }
-  if ((v & 0x3) == 0) 
-  {  
+  if ((v & 0x3) == 0)
+  {
     v >>= 2;
     c += 2;
   }
   c -= v & 0x1;
-}	
+}
 return c;
 }
 */

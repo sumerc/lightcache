@@ -99,9 +99,9 @@ void
 dump_bitset(bitset_t *bts)
 {
     int i,j;
-    
+
     for(i=0; i<WORD_COUNT; i++) {
-        for(j=0;j<sizeof(word_t);j+=sizeof(unsigned int)) {            
+        for(j=0; j<sizeof(word_t); j+=sizeof(unsigned int)) {
             printf("word %d is 0x%x\r\n", i, *(unsigned int *)(&bts->words[i]+j));
         }
     }
@@ -135,21 +135,21 @@ get_bit(bitset_t *bts, unsigned int b)
 // O(1) operation as can be seen and very efficient.
 // http://keithandkatie.com/keith/papers/debruijn.pdf can be read for
 // more info. Paper indicates 64 bit mul. can be slower than 32 bit, however
-// for our case with many words, it seems using 64 bit is roughly %20 faster in 
+// for our case with many words, it seems using 64 bit is roughly %20 faster in
 // 64-bit machines. Using below with 32 bit, however, contradicting with the paper
 // have roughly same performance with the 32-bit version.
 int
-nlz64(register uint64_t x) {
-    static const unsigned int debruij_tab[64] =
-    {
+nlz64(register uint64_t x)
+{
+    static const unsigned int debruij_tab[64] = {
         0,  1,  2, 53,  3,  7, 54, 27,
         4, 38, 41,  8, 34, 55, 48, 28,
-       62,  5, 39, 46, 44, 42, 22,  9,
-       24, 35, 59, 56, 49, 18, 29, 11,
-       63, 52,  6, 26, 37, 40, 33, 47,
-       61, 45, 43, 21, 23, 58, 17, 10,
-       51, 25, 36, 32, 60, 20, 57, 16,
-       50, 31, 19, 15, 30, 14, 13, 12,
+        62,  5, 39, 46, 44, 42, 22,  9,
+        24, 35, 59, 56, 49, 18, 29, 11,
+        63, 52,  6, 26, 37, 40, 33, 47,
+        61, 45, 43, 21, 23, 58, 17, 10,
+        51, 25, 36, 32, 60, 20, 57, 16,
+        50, 31, 19, 15, 30, 14, 13, 12,
     };
     return debruij_tab[((x&-x)*0x022FDD63CC95386DU) >> 58];
 }
@@ -301,7 +301,7 @@ size_to_cache(cache_t *arr, unsigned int arr_size, unsigned int key)
             return &arr[r+1];
         }
     }
-    
+
     return NULL;
 }
 
@@ -531,10 +531,10 @@ test_bit_set(void)
     assert(get_bit(y, 69) == 0);
     set_bit(y, 69);
     assert(get_bit(y, 69) == 1);
-    
+
     set_bit(y, 64);
     assert(ff_setbit(y) == 64);
-    
+
     memset(y, 0x00, sizeof(bitset_t));
     assert(ff_setbit(y) == -1);
     set_bit(y, 67);
@@ -655,7 +655,7 @@ test_slab_allocator(void)
 
     assert(init_cache_manager(200, 1.25) == 1);
     cache_cnt = cm->cache_count; // allocd mem will not change this value.
-    
+
     // distribute all slabs to a single cache, and check properties
     p = scmalloc(50);
     while(scmalloc(50) != NULL) {
