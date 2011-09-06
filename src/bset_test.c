@@ -38,10 +38,12 @@ bloffset(unsigned int b)
 void
 dump_bitset(bitset_t *bts)
 {
-    int i;
-
+    int i,j;
+    
     for(i=0; i<WORD_COUNT; i++) {
-        printf("word %d is 0x%x\r\n", i, bts->words[i]);
+        for(j=0;j<sizeof(word_t);j+=sizeof(unsigned int)) {            
+            printf("word %d is 0x%x\r\n", i, *(unsigned int *)(&bts->words[i]+j));
+        }
     }
 }
 
@@ -68,18 +70,19 @@ get_bit(bitset_t *bts, unsigned int b)
     return (bts->words[bindex(b)] >> (bloffset(b))) & 1;
 }
 
-int 
-nlz32(uint32_t x) {
-    static const int MultiplyDeBruijnBitPosition[32] = 
-    {
-      0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 
-      31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
+int
+nlz32(register uint32_t x)
+{
+    static const int debruij_tab[32] = {
+        0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
+        31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
     };
-    return MultiplyDeBruijnBitPosition[(((x & -x) * 0x077CB531U)) >> 27];
+
+    return debruij_tab[(((x&-x) * 0x077CB531U)) >> 27];
 }
 
 int 
-nlz64(word_t x) {
+nlz64(uint64_t x) {
     static const unsigned int debruij_tab[64] =
     {
         0,  1,  2, 53,  3,  7, 54, 27,
