@@ -386,9 +386,7 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
         }
         cm->slab_ctls[i].nindex = i;
 
-        // setbit indicates free slot. This is because we have a builtin ffs()
-        // routine to find the first set bit in a desired integral type. The latter
-        // ffz() have little examples and I am not an expert there.
+        // setbit indicates free slot.
         memset(&cm->slab_ctls[i].slots, 0xFF, sizeof(word_t)*WORD_COUNT);
 
         prev_slab = &cm->slab_ctls[i];
