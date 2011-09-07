@@ -145,8 +145,11 @@ v0.2
 [*] hget() can be optimized more as strcmp() can be optimized. 
     GCC is already optimized.
 [+] send success codes for every msg???
-[-] in the current slab allocator pointer artihmteic is used on void * 's .
-    May that cause problem. Inspect that.
+[*] in the current slab allocator pointer artihmteic is used on void * 's .
+    May that cause problem. Inspect that. No it doesnt cause. It is the best way
+    pointer artihmetic is to restrict the arithmetic size. Normally it is one byte
+    we cast to char * to indicate that which is correct of course for our case.
+[-] any way to exclude math.h that requires -lm dependency for the linker?
 [-] lightcache clients shall be moved to clients folder. Maybe later make another rep.
     for all of them. tests will have dependencies on them.
 [-] MAKE: Makefile shall contain make tests which will run autotests.sh with TCP and domain sockets.
