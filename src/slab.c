@@ -15,6 +15,9 @@
 #define WORD_SIZE_IN_BITS (sizeof(word_t) * CHAR_BIT)   // in bits
 #define WORD_COUNT ((SLAB_SIZE / MIN_SLAB_CHUNK_SIZE / WORD_SIZE_IN_BITS)+1)
 
+#define SLAB_INIT_MALLOC_ERR "slab allocator initialization failed: malloc failed.\r\n"
+#define SLAB_ALREADY_INIT_ERR "slab allocator initialization failed: already initialized.\r\n"
+
 typedef uint64_t word_t;
 typedef struct {
     word_t words[WORD_COUNT];
@@ -73,7 +76,7 @@ malloci(size_t size)
     memset(ptr, 0x00, real_size);
     *(uint64_t *)ptr = real_size;
     mem_mallocd += real_size;
-    return ptr+sizeof(uint64_t);
+    return (char *)ptr+sizeof(uint64_t);
 }
 
 static void
@@ -81,7 +84,7 @@ freei(void *ptr)
 {
     assert(ptr != NULL);
 
-    mem_mallocd -= *(uint64_t *)(ptr-sizeof(uint64_t));
+    mem_mallocd -= *(uint64_t *)((char *)ptr-sizeof(uint64_t));
     free(ptr);
 }
 
@@ -161,7 +164,8 @@ nlz64(register uint64_t x)
 static int
 ff_setbit(bitset_t *bts)
 {
-    int i, j;
+    unsigned int i;
+    int j;
     word_t w;
 
     for(i=0; i<WORD_COUNT; i++) {
@@ -310,7 +314,7 @@ size_to_cache(cache_t *arr, unsigned int arr_size, unsigned int key)
     }
     if (key <= arr[r].chunk_size) {
         return &arr[r];
-    } else if (r < arr_size-1) {
+    } else if ((unsigned int)r < arr_size-1) {
         if (key <= arr[r+1].chunk_size) {
             return &arr[r+1];
         }
@@ -347,13 +351,9 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
 {
     unsigned int size,i;
     slab_ctl_t *prev_slab;
-    static const char *slab_init_malloc_err =
-        "slab allocator initialization failed: malloc failed.\r\n";
-    static const char *slab_init_already_init_err =
-        "slab allocator initialization failed: already initialized.\r\n";
-
+    
     if (cm != NULL) {
-        fprintf(stderr, slab_init_already_init_err);
+        fprintf(stderr, SLAB_ALREADY_INIT_ERR);
         goto err;
     }
 
@@ -361,7 +361,7 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
     mem_limit = memory_limit *1024*1024; // memory_limit is in MB
     cm = malloci(sizeof(cache_manager_t));
     if (!cm) {
-        fprintf(stderr, slab_init_malloc_err);
+        fprintf(stderr, SLAB_INIT_MALLOC_ERR);
         goto err;
     }
 
@@ -375,7 +375,7 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
     // alloc/initialize caches
     cm->caches = malloci(sizeof(cache_t)*cm->cache_count);
     if (!cm->caches) {
-        fprintf(stderr, slab_init_malloc_err);
+        fprintf(stderr, SLAB_INIT_MALLOC_ERR);
         goto err;
     }
 
@@ -393,19 +393,19 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
     cm->slabctl_count = (mem_limit-mem_mallocd-(2*sizeof(uint64_t))) /
                         (SLAB_SIZE+sizeof(slab_ctl_t));
     if (cm->slabctl_count <= 1) {
-        fprintf(stderr, slab_init_malloc_err);
+        fprintf(stderr, SLAB_INIT_MALLOC_ERR);
         goto err;
     }
 
     // alloc/initialize slab_ctl and slabs
     cm->slab_ctls = malloci(sizeof(slab_ctl_t)*cm->slabctl_count);
     if (!cm->slab_ctls) {
-        fprintf(stderr, slab_init_malloc_err);
+        fprintf(stderr, SLAB_INIT_MALLOC_ERR);
         goto err;
     }
     cm->slabs = malloci(SLAB_SIZE*cm->slabctl_count);
     if (!cm->slabs) {
-        fprintf(stderr, slab_init_malloc_err);
+        fprintf(stderr, SLAB_INIT_MALLOC_ERR);
         goto err;
     }
     cm->slabs_free.head = cm->slab_ctls;
@@ -437,7 +437,8 @@ err:
 void *
 scmalloc(size_t size)
 {
-    unsigned int ffindex, largest_chunk_size;
+    unsigned int largest_chunk_size;
+    int ffindex;
     cache_t *ccache;
     void *result;
     slab_ctl_t *cslab;
@@ -448,7 +449,7 @@ scmalloc(size_t size)
     //size in bounds?
     largest_chunk_size = cm->caches[cm->cache_count-1].chunk_size;
     if (size > largest_chunk_size) {
-        fprintf(stderr, "Invalid size.(%u)\r\n", size);
+        fprintf(stderr, "Invalid size.(%lu)\r\n", size);
         return NULL;
     }
 
@@ -477,8 +478,8 @@ scmalloc(size_t size)
         pop_and_push(&ccache->slabs_partial, &ccache->slabs_full);
     }
 
-    result = cm->slabs + cslab->nindex * SLAB_SIZE;
-    result += ccache->chunk_size * ffindex;
+    result = (char *)cm->slabs + cslab->nindex * SLAB_SIZE;
+    result = (char *)result + ccache->chunk_size * ffindex;
 
     mem_used += ccache->chunk_size;
 
@@ -496,7 +497,7 @@ scfree(void *ptr)
     int res;
 
     // ptr shall be in valid memory
-    pdiff = ptr - cm->slabs;
+    pdiff = (char *)ptr - (char *)cm->slabs;
     if (pdiff > cm->slabctl_count*SLAB_SIZE) {
         fprintf(stderr, "Invalid ptr.(%p)\r\n", ptr);
         return;

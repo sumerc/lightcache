@@ -145,6 +145,8 @@ v0.2
 [*] hget() can be optimized more as strcmp() can be optimized. 
     GCC is already optimized.
 [+] send success codes for every msg???
+[-] in the current slab allocator pointer artihmteic is used on void * 's .
+    May that cause problem. Inspect that.
 [-] lightcache clients shall be moved to clients folder. Maybe later make another rep.
     for all of them. tests will have dependencies on them.
 [-] MAKE: Makefile shall contain make tests which will run autotests.sh with TCP and domain sockets.
