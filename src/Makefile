@@ -1,6 +1,6 @@
 
 OPTIMIZATION?=-O3
-CFLAGS?=  -std=c99 -pedantic $(OPTIMIZATION) -Wall -W
+CFLAGS?=  -std=c99 -pedantic $(OPTIMIZATION) -Wall -W -lm
 
 CCOPT= $(CFLAGS)
 DEBUG?= -pg -g -rdynamic -ggdb -D LITTLE_ENDIAN -D DEBUG
@@ -9,7 +9,7 @@ INSTALL_TOP= /usr/local
 INSTALL_BIN= $(INSTALL_TOP)/bin
 INSTALL= cp -p
 
-FILES = lightcache.c event.c socket.c hashtab.c mem.c freelist.c util.c
+FILES = lightcache.c event.c socket.c hashtab.c mem.c freelist.c util.c slab.c
 
 PRGNAME = lightcache
 

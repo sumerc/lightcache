@@ -342,7 +342,7 @@ deinit_cache_manager(void)
     assert(mem_mallocd == 0);// all real-mallocd chunks shall be freed here.
 }
 
-static int
+int
 init_cache_manager(size_t memory_limit, double chunk_size_factor)
 {
     unsigned int size,i;
@@ -358,7 +358,7 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
     }
 
     // initialize globals
-    mem_limit = memory_limit * 1024*1024; // memory_limit is in MB
+    mem_limit = memory_limit *1024*1024; // memory_limit is in MB
     cm = malloci(sizeof(cache_manager_t));
     if (!cm) {
         fprintf(stderr, slab_init_malloc_err);
@@ -441,6 +441,9 @@ scmalloc(size_t size)
     cache_t *ccache;
     void *result;
     slab_ctl_t *cslab;
+
+    assert(cm != NULL);
+    assert(cm->caches != NULL);
 
     //size in bounds?
     largest_chunk_size = cm->caches[cm->cache_count-1].chunk_size;

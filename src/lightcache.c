@@ -6,6 +6,7 @@
 #include "event.h"
 #include "mem.h"
 #include "util.h"
+#include "slab.h"
 
 /* forward declarations */
 void set_conn_state(struct conn* conn, conn_states state);
@@ -894,6 +895,8 @@ main(int argc, char **argv)
             break;
         }
     }
+
+    init_cache_manager(settings.mem_avail/1024/1024, 1.25);
 
     init_stats();
 

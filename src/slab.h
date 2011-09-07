@@ -1,11 +1,14 @@
 /*
 
-A General purpose Slab Allocator
+    A General purpose Slab Allocator
 
-- Size ranges can be changed at compile time.
-- Slab re-assignment is possible.
+      - Size ranges can be changed at compile time.
+      - Slab re-assignment is possible.
+      - Every bit is pre-allocated as continigous buffers. 
+        Assuming good CPU cache locality.
 
-Sumer Cip 2011
+    Sumer Cip 2011
+
 */
 
 #ifndef SLAB_H
@@ -13,6 +16,7 @@ Sumer Cip 2011
 
 #include "stddef.h"
 
+int init_cache_manager(size_t memory_limit, double chunk_size_factor);
 void *scmalloc(size_t size);
 void scfree(void *ptr);
 

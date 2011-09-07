@@ -1,11 +1,14 @@
 
 #include "mem.h"
 #include "util.h"
+#include "slab.h"
 
 void *
 li_malloc(size_t size)
 {
     void *p;
+
+    return scmalloc(size);
 
     if (size + stats.mem_used > (settings.mem_avail)) {
         syslog(LOG_ERR, "No memory available![%llu MB]", (long long unsigned int)settings.mem_avail);
@@ -34,6 +37,11 @@ li_free(void *ptr)
     if (!ptr) {
         return;
     }
+
+    scfree(ptr);
+    return;
+
+    
 
     ptr = (char *)ptr - sizeof(size_t); /*suppress WARNING: pointer of type ‘void *’ used in arithmetic */
     size = *(size_t *)ptr;
