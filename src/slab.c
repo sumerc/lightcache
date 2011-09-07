@@ -1,4 +1,4 @@
-
+#include "slab.h"
 #include "stdint.h"
 #include "stddef.h"
 #include "stdlib.h"
@@ -6,7 +6,6 @@
 #include "assert.h"
 #include "math.h"
 #include "limits.h"
-
 #include "stdio.h"
 #include "sys/time.h"
 
@@ -15,8 +14,6 @@
 #define CHUNK_ALIGN_BYTES (8)
 #define WORD_SIZE_IN_BITS (sizeof(word_t) * CHAR_BIT)   // in bits
 #define WORD_COUNT ((SLAB_SIZE / MIN_SLAB_CHUNK_SIZE / WORD_SIZE_IN_BITS)+1)
-
-// TODO: calculate external/internal fragmentation.
 
 typedef uint64_t word_t;
 typedef struct {
@@ -39,6 +36,7 @@ typedef struct {
 
 typedef struct cache_t {
     unsigned int chunk_size;
+    unsigned int chunk_count_perslab; // for efficiency
     list_t slabs_full;
     list_t slabs_partial;
 } cache_t;
@@ -61,7 +59,7 @@ size_t mem_mallocd = 0;
 size_t mem_limit = 0;
 // TODO: some kind of var. holding the internal fragmentation (unused,wasted space)
 
-void *
+static void *
 malloci(size_t size)
 {
     void *ptr;
@@ -69,33 +67,38 @@ malloci(size_t size)
 
     real_size = size+sizeof(uint64_t);
     ptr = malloc(real_size);
+    if (!ptr) {
+        return NULL;
+    }
     memset(ptr, 0x00, real_size);
     *(uint64_t *)ptr = real_size;
     mem_mallocd += real_size;
     return ptr+sizeof(uint64_t);
 }
 
-void
+static void
 freei(void *ptr)
 {
+    assert(ptr != NULL);
+
     mem_mallocd -= *(uint64_t *)(ptr-sizeof(uint64_t));
     free(ptr);
 }
 
-inline unsigned int
+static inline unsigned int
 bindex(unsigned int b)
 {
     return b / WORD_SIZE_IN_BITS;
 }
 
-inline unsigned int
+static inline unsigned int
 bloffset(unsigned int b)
 {
-    //return WORD_SIZE_IN_BITS - (b % WORD_SIZE_IN_BITS) - 1;
     return (b % WORD_SIZE_IN_BITS);
 }
 
-void
+#if 0
+static void
 dump_bitset(bitset_t *bts)
 {
     int i,j;
@@ -106,15 +109,16 @@ dump_bitset(bitset_t *bts)
         }
     }
 }
+#endif
 
-void
+static void
 set_bit(bitset_t *bts, unsigned int b)
 {
     assert(b < WORD_COUNT*WORD_SIZE_IN_BITS);
 
     bts->words[bindex(b)] |= (word_t)1 << (bloffset(b));
 }
-void
+static void
 clear_bit(bitset_t *bts, unsigned int b)
 {
     assert(b < WORD_COUNT*WORD_SIZE_IN_BITS);
@@ -122,7 +126,7 @@ clear_bit(bitset_t *bts, unsigned int b)
     bts->words[bindex(b)] &= ~((word_t)1 << (bloffset(b)));
 }
 
-unsigned int
+static unsigned int
 get_bit(bitset_t *bts, unsigned int b)
 {
     assert(b < WORD_COUNT*WORD_SIZE_IN_BITS);
@@ -138,7 +142,7 @@ get_bit(bitset_t *bts, unsigned int b)
 // for our case with many words, it seems using 64 bit is roughly %20 faster in
 // 64-bit machines. Using below with 32 bit, however, contradicting with the paper
 // have roughly same performance with the 32-bit version.
-int
+static int
 nlz64(register uint64_t x)
 {
     static const unsigned int debruij_tab[64] = {
@@ -164,7 +168,6 @@ ff_setbit(bitset_t *bts)
         w = bts->words[i];
         if(w) {
             j = nlz64(w);
-            //printf("dd:%d, %d, %d\r\n", j, i, j + (i*WORD_SIZE_IN_BITS));
             return (j + (i*WORD_SIZE_IN_BITS));
         }
     }
@@ -172,14 +175,13 @@ ff_setbit(bitset_t *bts)
     return -1;
 }
 
-// TODO: Need any tests for the doubly linked list?
-slab_ctl_t *
+static slab_ctl_t *
 peek(list_t *li)
 {
     return li->head;
 }
 
-void
+static void
 push(list_t *li, slab_ctl_t *item)
 {
     item->next = li->head;
@@ -193,7 +195,7 @@ push(list_t *li, slab_ctl_t *item)
     li->head = item;
 }
 
-slab_ctl_t *
+static slab_ctl_t *
 pop(list_t *li)
 {
     slab_ctl_t *result;
@@ -213,13 +215,12 @@ pop(list_t *li)
     return result;
 }
 
-int
+static int
 rem(list_t *li, slab_ctl_t *item)
 {
     slab_ctl_t *cit;
 
     for(cit=li->head; cit != NULL; cit = cit->next) {
-        //printf("cit:%p\r\n", cit);
         if (cit == item) {
             if (cit == li->head) {
                 pop(li);
@@ -243,16 +244,29 @@ rem(list_t *li, slab_ctl_t *item)
     return 0;
 }
 
-// TODO: do not make func. if only called once.
-static inline size_t
-align_bytes(size_t size)
+static int
+rem_and_push(list_t *src, list_t *dest, slab_ctl_t *item)
 {
-    size_t sz;
+    if(rem(src, item)) {
+        push(dest, item);
+        return 1;
+    }
 
-    sz = size % CHUNK_ALIGN_BYTES;
-    if (sz)
-        size += CHUNK_ALIGN_BYTES - sz;
-    return size;
+    return 0;
+}
+
+static int
+pop_and_push(list_t *src, list_t *dest)
+{
+    slab_ctl_t *item;
+
+    item = pop(src);
+    if(item) {
+        push(dest, item);
+        return 1;
+    }
+
+    return 0;
 }
 
 static inline double
@@ -263,7 +277,7 @@ logbn(double base, double x)
 
 // A binary search like routine for ceiling the requested size to a cache with proper size.
 // Implemented to reduce the mapping complexity to O(logn) in scmalloc()'s.
-cache_t *
+static cache_t *
 size_to_cache(cache_t *arr, unsigned int arr_size, unsigned int key)
 {
     int l, m, r;
@@ -311,7 +325,6 @@ deinit_cache_manager(void)
     if (cm == NULL) {
         return;
     }
-
     if (cm->caches != NULL) {
         freei(cm->caches);
     }
@@ -329,21 +342,28 @@ deinit_cache_manager(void)
     assert(mem_mallocd == 0);// all real-mallocd chunks shall be freed here.
 }
 
-// TODO: Do we need to check return value of malloc here?
 static int
 init_cache_manager(size_t memory_limit, double chunk_size_factor)
 {
     unsigned int size,i;
     slab_ctl_t *prev_slab;
+    static const char *slab_init_malloc_err =
+        "slab allocator initialization failed: malloc failed.\r\n";
+    static const char *slab_init_already_init_err =
+        "slab allocator initialization failed: already initialized.\r\n";
 
     if (cm != NULL) {
-        fprintf(stderr, "slab allocator is already initialized.\r\n");
-        return 0;
+        fprintf(stderr, slab_init_already_init_err);
+        goto err;
     }
 
     // initialize globals
     mem_limit = memory_limit * 1024*1024; // memory_limit is in MB
     cm = malloci(sizeof(cache_manager_t));
+    if (!cm) {
+        fprintf(stderr, slab_init_malloc_err);
+        goto err;
+    }
 
     // cache_count is calculated by starting from the MIN_SLAB_CHUNK_SIZE and
     // multiplying it with chunk_size_factor for every iteration till we reach
@@ -354,48 +374,64 @@ init_cache_manager(size_t memory_limit, double chunk_size_factor)
 
     // alloc/initialize caches
     cm->caches = malloci(sizeof(cache_t)*cm->cache_count);
+    if (!cm->caches) {
+        fprintf(stderr, slab_init_malloc_err);
+        goto err;
+    }
+
     for(i=0,size=MIN_SLAB_CHUNK_SIZE; i < cm->cache_count; size*=chunk_size_factor, i++) {
-        size = align_bytes(size);
+        if (size % CHUNK_ALIGN_BYTES) {
+            size += CHUNK_ALIGN_BYTES - (size % CHUNK_ALIGN_BYTES);
+        }
         cm->caches[i].chunk_size = size;
+        cm->caches[i].chunk_count_perslab = SLAB_SIZE / size;
     }
 
     // calculate remaining memory for slabs. sizeof(uint64_t) is the bytes
-    // allocated at every malloced chunk. As we will allocate slab_ctls and
-    // slabs further, just calculate them too.
+    // allocated at every malloced chunk.
     // TODO: Any chance testing bounds on below calculation?
     cm->slabctl_count = (mem_limit-mem_mallocd-(2*sizeof(uint64_t))) /
                         (SLAB_SIZE+sizeof(slab_ctl_t));
     if (cm->slabctl_count <= 1) {
-        deinit_cache_manager();
-        fprintf(stderr, "not enough mem to create a slab\r\n");
-        return 0;
+        fprintf(stderr, slab_init_malloc_err);
+        goto err;
     }
 
     // alloc/initialize slab_ctl and slabs
     cm->slab_ctls = malloci(sizeof(slab_ctl_t)*cm->slabctl_count);
+    if (!cm->slab_ctls) {
+        fprintf(stderr, slab_init_malloc_err);
+        goto err;
+    }
     cm->slabs = malloci(SLAB_SIZE*cm->slabctl_count);
+    if (!cm->slabs) {
+        fprintf(stderr, slab_init_malloc_err);
+        goto err;
+    }
     cm->slabs_free.head = cm->slab_ctls;
     cm->slabs_free.tail = &cm->slab_ctls[cm->slabctl_count-1];
     prev_slab = NULL;
     for(i=0; i < cm->slabctl_count; i++) {
         cm->slab_ctls[i].prev = prev_slab;
-        if (i == cm->slabctl_count-1) { // last element?
+        if (i == cm->slabctl_count-1) {
             cm->slab_ctls[i].next = NULL;
         } else {
             cm->slab_ctls[i].next = &cm->slab_ctls[i+1];
         }
         cm->slab_ctls[i].nindex = i;
+        prev_slab = &cm->slab_ctls[i];
 
         // setbit indicates free slot.
         memset(&cm->slab_ctls[i].slots, 0xFF, sizeof(word_t)*WORD_COUNT);
-
-        prev_slab = &cm->slab_ctls[i];
     }
 
     // mem_alloc shall always be smaller than mem_limit
     assert(mem_mallocd <= mem_limit);
 
     return 1;
+err:
+    deinit_cache_manager();
+    return 0;
 }
 
 void *
@@ -421,7 +457,7 @@ scmalloc(size_t size)
     if (cslab == NULL) {
         cslab = pop(&cm->slabs_free);
         if (cslab == NULL) {
-            // TODO: log err, NO_MEM.
+            fprintf(stderr, "No memory available.\r\n");
             return NULL;
         }
         push(&ccache->slabs_partial, cslab);
@@ -434,11 +470,8 @@ scmalloc(size_t size)
     ffindex = ff_setbit(&cslab->slots);
     assert(ffindex != -1); // we take cslab from partial, so ffindex should be valid.
     clear_bit(&cslab->slots, ffindex);
-    if (++cslab->nused == (SLAB_SIZE / ccache->chunk_size)) {
-        cslab = pop(&ccache->slabs_partial);
-        push(&ccache->slabs_full, cslab);
-        // TODO: assert slots is empty via caculating the ffindex is greater than
-        // the alloc'd bits.
+    if (++cslab->nused == (ccache->chunk_count_perslab)) {
+        pop_and_push(&ccache->slabs_partial, &ccache->slabs_full);
     }
 
     result = cm->slabs + cslab->nindex * SLAB_SIZE;
@@ -472,25 +505,19 @@ scfree(void *ptr)
 
     // check if ptr is really allocated?
     if (get_bit(&cslab->slots, cidx) != 0) {
-        fprintf(stderr, "ptr not allocated.(%p)", ptr);
+        fprintf(stderr, "ptr not allocated. double free?(%p)", ptr);
         return;
     }
-    //fprintf(stderr, "sidx:%u, cidx:%u.\r\n", sidx, cidx);
     set_bit(&cslab->slots, cidx);
     if (--cslab->nused == 0) {
-        // we shall have no unfree chunk here
-        // TODO: Implement assert(ff_setbit(&cslab->slots) == -1);
-
-        if (!rem(&cslab->cache->slabs_partial, cslab)) {
-            res = rem(&cslab->cache->slabs_full, cslab);
-            assert(res == 1); // somebody must own the slab.
+        res = rem_and_push(&cslab->cache->slabs_partial, &cm->slabs_free, cslab);
+        if (!res) {
+            res = rem_and_push(&cslab->cache->slabs_full, &cm->slabs_free, cslab);
         }
-        push(&cm->slabs_free, cslab);
-    }  // move from full to partial
-    else if (cslab->nused == (SLAB_SIZE / cslab->cache->chunk_size)-1) {
-        res = rem(&cslab->cache->slabs_full, cslab);
+        assert(res == 1); // somebody must own the slab.
+    } else if (cslab->nused == cslab->cache->chunk_count_perslab-1) {
+        res = rem_and_push(&cslab->cache->slabs_full, &cslab->cache->slabs_partial, cslab);
         assert(res == 1); // slabs_full must own the slab.
-        push(&cslab->cache->slabs_partial, cslab);
     } else {
         // TODO: move closer to head for efficiency?
     }
@@ -498,7 +525,7 @@ scfree(void *ptr)
     mem_used -= cslab->cache->chunk_size;
 }
 
-// TESTS....
+#ifdef TEST
 inline long long
 tickcount(void)
 {
@@ -592,7 +619,6 @@ test_size_to_cache(void)
     caches[0].chunk_size = 2;
     caches[1].chunk_size = 4;
     cc = size_to_cache(caches, 2, 1);
-    //printf("bibk:%u\r\n", cc->chunk_size);
     assert(cc->chunk_size == 2);
     cc = size_to_cache(caches, 2, 5);
     assert(cc == NULL);
@@ -654,6 +680,10 @@ test_slab_allocator(void)
     assert(init_cache_manager(200, 1.25) == 1);
     cache_cnt = cm->cache_count; // allocd mem will not change this value.
 
+    // put back to free slabs
+    p = scmalloc(50);
+    scfree(p);
+
     // distribute all slabs to a single cache, and check properties
     p = scmalloc(50);
     while(scmalloc(50) != NULL) {
@@ -713,13 +743,4 @@ test_slab_allocator(void)
             "[+]    test_slab_allocator. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
 }
 
-
-int
-main(void)
-{
-    test_bit_set();
-    test_slab_allocator();
-    test_size_to_cache();
-
-    return 0;
-}
+#endif
