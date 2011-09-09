@@ -62,7 +62,7 @@ size_t mem_mallocd = 0;
 size_t mem_limit = 0;
 // TODO: some kind of var. holding the internal fragmentation (unused,wasted space)
 
-static void * malloci(size_t size)
+static void *malloci(size_t size)
 {
     void *ptr;
     size_t real_size;
@@ -428,7 +428,7 @@ void *scmalloc(size_t size)
     //size in bounds?
     largest_chunk_size = cm->caches[cm->cache_count-1].chunk_size;
     if (size > largest_chunk_size) {
-        fprintf(stderr, "Invalid size.(%lu)\r\n", size);
+        fprintf(stderr, "invalid size.(%lu)\r\n", size);
         return NULL;
     }
 
@@ -440,7 +440,7 @@ void *scmalloc(size_t size)
     if (cslab == NULL) {
         cslab = pop(&cm->slabs_free);
         if (cslab == NULL) {
-            fprintf(stderr, "No memory available.\r\n");
+            fprintf(stderr, "no memory available.\r\n");
             return NULL;
         }
         push(&ccache->slabs_partial, cslab);
@@ -477,7 +477,7 @@ void scfree(void *ptr)
     // ptr shall be in valid memory
     pdiff = (char *)ptr - (char *)cm->slabs;
     if (pdiff > cm->slabctl_count*SLAB_SIZE) {
-        fprintf(stderr, "Invalid ptr.(%p)\r\n", ptr);
+        fprintf(stderr, "invalid ptr.(%p)\r\n", ptr);
         return;
     }
 
