@@ -3,8 +3,7 @@
 #include "util.h"
 #include "slab.h"
 
-void *
-li_malloc(size_t size)
+void *li_malloc(size_t size)
 {
     void *p;
 
@@ -29,8 +28,7 @@ li_malloc(size_t size)
     return p;
 }
 
-void
-li_free(void *ptr)
+void li_free(void *ptr)
 {
     size_t size;
 

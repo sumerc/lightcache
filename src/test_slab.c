@@ -1,8 +1,7 @@
 
 #include "slab.h"
 
-int
-main(void)
+int main(void)
 {
     test_bit_set();
     test_slab_allocator();

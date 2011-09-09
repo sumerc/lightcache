@@ -21,15 +21,13 @@ static _htab *cache = NULL;
 static freelist *response_trash; /* freelist to create response object(s) from. */
 static freelist *request_trash;
 
-void
-init_freelists(void)
+void init_freelists(void)
 {
     response_trash = flcreate(sizeof(response), 1);
     request_trash = flcreate(sizeof(request), 1);
 }
 
-void
-init_settings(void)
+void init_settings(void)
 {
 #ifndef DEBUG
     settings.deamon_mode = 1;
@@ -42,15 +40,13 @@ init_settings(void)
     settings.socket_path = NULL;    // unix domain socket is off by default.
 }
 
-void
-init_log(void)
+void init_log(void)
 {
     openlog("lightcache", LOG_PID, LOG_LOCAL5);
     syslog(LOG_INFO, "lightcache started.");
 }
 
-void
-init_stats(void)
+void init_stats(void)
 {
     stats.mem_used = 0;
     stats.mem_request_count = 0;
@@ -64,8 +60,7 @@ init_stats(void)
     stats.bytes_written = 0;
 }
 
-struct conn*
-make_conn(int fd) {
+struct conn*make_conn(int fd) {
     struct conn *conn, *item;
 
     conn = NULL;
@@ -100,8 +95,7 @@ make_conn(int fd) {
     return conn;
 }
 
-static void
-free_request(request *req)
+static void free_request(request *req)
 {
 
     if (!req) {
@@ -120,8 +114,7 @@ free_request(request *req)
     }
 }
 
-static void
-free_response(response *resp)
+static void free_response(response *resp)
 {
 
     if (!resp) {
@@ -142,8 +135,7 @@ free_response(response *resp)
 }
 
 
-static int
-init_resources(conn *conn)
+static int init_resources(conn *conn)
 {
 
     /* free previous request allocations if we have any */
@@ -169,8 +161,7 @@ init_resources(conn *conn)
     return 1;
 }
 
-static void
-disconnect_conn(conn* conn)
+static void disconnect_conn(conn* conn)
 {
     LC_DEBUG(("disconnect conn called.\r\n"));
 
@@ -187,8 +178,7 @@ disconnect_conn(conn* conn)
     set_conn_state(conn, CONN_CLOSED);
 }
 
-static void
-send_response(conn *conn, errors err)
+static void send_response(conn *conn, errors err)
 {
     assert(conn->out != NULL);
 
@@ -202,8 +192,7 @@ send_response(conn *conn, errors err)
     set_conn_state(conn, SEND_HEADER);
 }
 
-static int
-prepare_response(conn *conn, size_t data_length, int alloc_mem)
+static int prepare_response(conn *conn, size_t data_length, int alloc_mem)
 {
     assert(conn->out != NULL);
 
@@ -220,8 +209,7 @@ prepare_response(conn *conn, size_t data_length, int alloc_mem)
     return 1;
 }
 
-void
-set_conn_state(struct conn* conn, conn_states state)
+void set_conn_state(struct conn* conn, conn_states state)
 {
     switch(state) {
     case READ_HEADER:
@@ -273,8 +261,7 @@ set_conn_state(struct conn* conn, conn_states state)
 
 }
 
-static int
-flush_item_enum(_hitem *item, void *arg)
+static int flush_item_enum(_hitem *item, void *arg)
 {
     if (arg) {
         ;   // suppress unused param. warning.
@@ -292,8 +279,7 @@ flush_item_enum(_hitem *item, void *arg)
 }
 
 
-static void
-execute_cmd(struct conn* conn)
+static void execute_cmd(struct conn* conn)
 {
     int r;
     hresult ret;
@@ -511,8 +497,7 @@ GET_KEY_NOTEXISTS:
     return;
 }
 
-void
-disconnect_idle_conns(void)
+void disconnect_idle_conns(void)
 {
     conn *conn, *next;
 
@@ -528,8 +513,7 @@ disconnect_idle_conns(void)
     }
 }
 
-socket_state
-read_nbytes(conn*conn, char *bytes, size_t total)
+socket_state read_nbytes(conn*conn, char *bytes, size_t total)
 {
     unsigned int needed;
     int nbytes;
@@ -556,8 +540,7 @@ read_nbytes(conn*conn, char *bytes, size_t total)
     return NEED_MORE;
 }
 
-int
-try_read_request(conn* conn)
+int try_read_request(conn* conn)
 {
     socket_state ret;
 
@@ -636,8 +619,7 @@ try_read_request(conn* conn)
     return ret;
 }
 
-socket_state
-send_nbytes(conn*conn, char *bytes, size_t total)
+socket_state send_nbytes(conn*conn, char *bytes, size_t total)
 {
     int needed, nbytes;
 
@@ -665,8 +647,7 @@ send_nbytes(conn*conn, char *bytes, size_t total)
     return NEED_MORE;
 }
 
-int
-try_send_response(conn *conn)
+int try_send_response(conn *conn)
 {
     socket_state ret;
 
@@ -701,8 +682,7 @@ try_send_response(conn *conn)
 
 }
 
-void
-event_handler(conn *conn, event ev)
+void event_handler(conn *conn, event ev)
 {
     int conn_sock;
     unsigned int slen;
@@ -763,15 +743,13 @@ event_handler(conn *conn, event ev)
    ratio of the total available mem. Here, we will shrink static resources to gain
    more memory for dynamic resources.
   */
-void
-collect_unused_memory(void)
+void collect_unused_memory(void)
 {
     // todo:
 }
 
 
-static int
-init_server_socket(void)
+static int init_server_socket(void)
 {
     int s, optval, ret;
     struct sockaddr_in si_me;
@@ -865,8 +843,7 @@ init_server_socket(void)
     return 1;
 }
 
-int
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
     int ret, c;
 

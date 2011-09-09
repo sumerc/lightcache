@@ -62,8 +62,7 @@ size_t mem_mallocd = 0;
 size_t mem_limit = 0;
 // TODO: some kind of var. holding the internal fragmentation (unused,wasted space)
 
-static void *
-malloci(size_t size)
+static void * malloci(size_t size)
 {
     void *ptr;
     size_t real_size;
@@ -79,8 +78,7 @@ malloci(size_t size)
     return (char *)ptr+sizeof(uint64_t);
 }
 
-static void
-freei(void *ptr)
+static void freei(void *ptr)
 {
     assert(ptr != NULL);
 
@@ -88,21 +86,18 @@ freei(void *ptr)
     free(ptr);
 }
 
-static inline unsigned int
-bindex(unsigned int b)
+static inline unsigned int bindex(unsigned int b)
 {
     return b / WORD_SIZE_IN_BITS;
 }
 
-static inline unsigned int
-bloffset(unsigned int b)
+static inline unsigned int bloffset(unsigned int b)
 {
     return (b % WORD_SIZE_IN_BITS);
 }
 
 #if 0
-static void
-dump_bitset(bitset_t *bts)
+static void dump_bitset(bitset_t *bts)
 {
     int i,j;
 
@@ -114,23 +109,20 @@ dump_bitset(bitset_t *bts)
 }
 #endif
 
-static void
-set_bit(bitset_t *bts, unsigned int b)
+static void set_bit(bitset_t *bts, unsigned int b)
 {
     assert(b < WORD_COUNT*WORD_SIZE_IN_BITS);
 
     bts->words[bindex(b)] |= (word_t)1 << (bloffset(b));
 }
-static void
-clear_bit(bitset_t *bts, unsigned int b)
+static void clear_bit(bitset_t *bts, unsigned int b)
 {
     assert(b < WORD_COUNT*WORD_SIZE_IN_BITS);
 
     bts->words[bindex(b)] &= ~((word_t)1 << (bloffset(b)));
 }
 
-static unsigned int
-get_bit(bitset_t *bts, unsigned int b)
+static unsigned int get_bit(bitset_t *bts, unsigned int b)
 {
     assert(b < WORD_COUNT*WORD_SIZE_IN_BITS);
 
@@ -145,8 +137,7 @@ get_bit(bitset_t *bts, unsigned int b)
 // for our case with many words, it seems using 64 bit is roughly %20 faster in
 // 64-bit machines. Using below with 32 bit, however, contradicting with the paper
 // have roughly same performance with the 32-bit version.
-static int
-nlz64(register uint64_t x)
+static int nlz64(register uint64_t x)
 {
     static const unsigned int debruij_tab[64] = {
         0,  1,  2, 53,  3,  7, 54, 27,
@@ -161,8 +152,7 @@ nlz64(register uint64_t x)
     return debruij_tab[((x&-x)*0x022FDD63CC95386DU) >> 58];
 }
 
-static int
-ff_setbit(bitset_t *bts)
+static int ff_setbit(bitset_t *bts)
 {
     unsigned int i;
     int j;
@@ -179,14 +169,12 @@ ff_setbit(bitset_t *bts)
     return -1;
 }
 
-static slab_ctl_t *
-peek(list_t *li)
+static slab_ctl_t *peek(list_t *li)
 {
     return li->head;
 }
 
-static void
-push(list_t *li, slab_ctl_t *item)
+static void push(list_t *li, slab_ctl_t *item)
 {
     item->next = li->head;
     item->prev = NULL;
@@ -199,8 +187,7 @@ push(list_t *li, slab_ctl_t *item)
     li->head = item;
 }
 
-static slab_ctl_t *
-pop(list_t *li)
+static slab_ctl_t *pop(list_t *li)
 {
     slab_ctl_t *result;
 
@@ -219,8 +206,7 @@ pop(list_t *li)
     return result;
 }
 
-static int
-rem(list_t *li, slab_ctl_t *item)
+static int rem(list_t *li, slab_ctl_t *item)
 {
     slab_ctl_t *cit;
 
@@ -248,8 +234,7 @@ rem(list_t *li, slab_ctl_t *item)
     return 0;
 }
 
-static int
-rem_and_push(list_t *src, list_t *dest, slab_ctl_t *item)
+static int rem_and_push(list_t *src, list_t *dest, slab_ctl_t *item)
 {
     if(rem(src, item)) {
         push(dest, item);
@@ -259,8 +244,7 @@ rem_and_push(list_t *src, list_t *dest, slab_ctl_t *item)
     return 0;
 }
 
-static int
-pop_and_push(list_t *src, list_t *dest)
+static int pop_and_push(list_t *src, list_t *dest)
 {
     slab_ctl_t *item;
 
@@ -273,16 +257,14 @@ pop_and_push(list_t *src, list_t *dest)
     return 0;
 }
 
-static inline double
-logbn(double base, double x)
+static inline double logbn(double base, double x)
 {
     return log(x) / log(base);
 }
 
 // A binary search like routine for ceiling the requested size to a cache with proper size.
 // Implemented to reduce the mapping complexity to O(logn) in scmalloc()'s.
-static cache_t *
-size_to_cache(cache_t *arr, unsigned int arr_size, unsigned int key)
+static cache_t *size_to_cache(cache_t *arr, unsigned int arr_size, unsigned int key)
 {
     int l, m, r;
     unsigned int msize;
@@ -323,8 +305,7 @@ size_to_cache(cache_t *arr, unsigned int arr_size, unsigned int key)
     return NULL;
 }
 
-static void
-deinit_cache_manager(void)
+static void deinit_cache_manager(void)
 {
     if (cm == NULL) {
         return;
@@ -346,8 +327,7 @@ deinit_cache_manager(void)
     assert(mem_mallocd == 0);// all real-mallocd chunks shall be freed here.
 }
 
-int
-init_cache_manager(size_t memory_limit, double chunk_size_factor)
+int init_cache_manager(size_t memory_limit, double chunk_size_factor)
 {
     unsigned int size,i;
     slab_ctl_t *prev_slab;
@@ -434,8 +414,7 @@ err:
     return 0;
 }
 
-void *
-scmalloc(size_t size)
+void *scmalloc(size_t size)
 {
     unsigned int largest_chunk_size;
     int ffindex;
@@ -488,8 +467,7 @@ scmalloc(size_t size)
     return result;
 }
 
-void
-scfree(void *ptr)
+void scfree(void *ptr)
 {
     unsigned int sidx, cidx;
     ptrdiff_t pdiff;
@@ -530,8 +508,7 @@ scfree(void *ptr)
 }
 
 #ifdef TEST
-inline long long
-tickcount(void)
+inline long long tickcount(void)
 {
     struct timeval tv;
     long long rc;
@@ -543,8 +520,7 @@ tickcount(void)
     return rc;
 }
 
-void
-test_bit_set(void)
+void test_bit_set(void)
 {
     bitset_t *y;
     long long t0;
@@ -611,8 +587,7 @@ test_bit_set(void)
             "[+]    test_bit_set. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
 }
 
-void
-test_size_to_cache(void)
+void test_size_to_cache(void)
 {
     long long t0;
     cache_t *cc;
@@ -668,10 +643,7 @@ test_size_to_cache(void)
             "[+]    test_size_to_cache. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
 }
 
-// TODO: Test different slab states. Distribute slabs to different caches.
-// Think deep:)
-void
-test_slab_allocator(void)
+void test_slab_allocator(void)
 {
     long long t0;
     cache_t *cc;

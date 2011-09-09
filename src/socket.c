@@ -1,7 +1,6 @@
 #include "socket.h"
 
-int
-make_nonblocking(int sock)
+int make_nonblocking(int sock)
 {
     int flags;
 

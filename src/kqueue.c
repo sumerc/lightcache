@@ -11,8 +11,7 @@ static struct timespec timeout;
 /* constants */
 
 /* functions */
-int
-event_init(void (*ev_handler)(conn *c, event ev))
+int event_init(void (*ev_handler)(conn *c, event ev))
 {
     kqfd = kqueue();
     if (kqfd == -1) {
@@ -28,8 +27,7 @@ event_init(void (*ev_handler)(conn *c, event ev))
     return  kqfd;
 }
 
-int
-event_del(conn *c)
+int event_del(conn *c)
 {
     struct kevent ke;
 
@@ -44,8 +42,7 @@ event_del(conn *c)
     return 1;
 }
 
-int
-event_set(conn *c, int flags)
+int event_set(conn *c, int flags)
 {
     struct kevent ke;
 
@@ -71,8 +68,7 @@ err:
     return 0;
 }
 
-void
-event_process(void)
+void event_process(void)
 {
     int nfds, n;
     struct kevent events[POLL_MAX_EVENTS];

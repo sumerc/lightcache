@@ -1,8 +1,7 @@
 #include "freelist.h"
 #include "mem.h"
 
-static int
-_flgrow(freelist *flp)
+static int _flgrow(freelist *flp)
 {
     int i, newsize;
     void **old;
@@ -31,8 +30,7 @@ _flgrow(freelist *flp)
     return 1;
 }
 
-freelist *
-flcreate(int chunksize, int size)
+freelist *flcreate(int chunksize, int size)
 {
     int i;
     freelist *flp;
@@ -60,8 +58,7 @@ flcreate(int chunksize, int size)
     return flp;
 }
 
-void
-fldestroy(freelist *flp)
+void fldestroy(freelist *flp)
 {
     int i;
 
@@ -72,8 +69,7 @@ fldestroy(freelist *flp)
     li_free(flp);
 }
 
-void *
-flget(freelist *flp)
+void *flget(freelist *flp)
 {
     if (flp->head < 0) {
         if (!_flgrow(flp))
@@ -82,8 +78,7 @@ flget(freelist *flp)
     return flp->items[flp->head--];
 }
 
-int
-flput(freelist *flp, void *p)
+int flput(freelist *flp, void *p)
 {
     if (flp->head > flp->size-2)
         return 0;

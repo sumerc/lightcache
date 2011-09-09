@@ -5,8 +5,7 @@
 #define EXIT_FAILURE 1
 
 // handle signals and exit the application gracefully
-void
-sig_handler(int signum)
+void sig_handler(int signum)
 {
     switch(signum) {
     case SIGALRM:
@@ -25,8 +24,7 @@ sig_handler(int signum)
 }
 
 
-void
-deamonize(void)
+void deamonize(void)
 {
     pid_t pid, sid, parent;
     FILE *dummy;
@@ -97,8 +95,7 @@ deamonize(void)
     //kill( parent, SIGUSR1 );
 }
 
-static uint64_t
-li_swap64(uint64_t in)
+static uint64_t li_swap64(uint64_t in)
 {
 
 #ifdef LITTLE_ENDIAN
@@ -127,8 +124,7 @@ uint64_t htonll(uint64_t val)
     return li_swap64(val);
 }
 
-int
-atoull(const char *s, uint64_t *ret)
+int atoull(const char *s, uint64_t *ret)
 {
     errno = 0;
     *ret = strtoull(s, NULL, 10);

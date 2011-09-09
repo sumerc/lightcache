@@ -11,8 +11,7 @@
 // no funnels. This hash was not in the original Dr. Dobb's article. I implemented it to fill
 // a set of requirements posed by Colin Plumb. Colin ended up using an even simpler (and weaker)
 // hash that was sufficient for his purpose.
-static int
-HHASH(_htab *ht, char *key, int len)
+static int HHASH(_htab *ht, char *key, int len)
 {
     int   hash, i;
     for (hash=0, i=0; i<len; ++i) {
@@ -26,8 +25,7 @@ HHASH(_htab *ht, char *key, int len)
     return (hash & ht->mask);
 }
 
-static int
-_hgrow(_htab *ht)
+static int _hgrow(_htab *ht)
 {
     int i;
     _htab *dummy;
@@ -66,8 +64,7 @@ _hgrow(_htab *ht)
     return 1;
 }
 
-_htab *
-htcreate(int logsize)
+_htab *htcreate(int logsize)
 {
     int i;
     _htab *ht;
@@ -94,8 +91,7 @@ htcreate(int logsize)
 
 // val should be freed with henum(...), because obviously we cannot know if it
 // contains other pointers, too.
-void
-htdestroy(_htab *ht)
+void htdestroy(_htab *ht)
 {
     int i;
     _hitem *p, *next;
@@ -115,8 +111,7 @@ htdestroy(_htab *ht)
 }
 
 
-hresult
-hset(_htab *ht, char* key, int klen, void *val)
+hresult hset(_htab *ht, char* key, int klen, void *val)
 {
     unsigned int h;
     _hitem *new, *p;
@@ -173,8 +168,7 @@ hset(_htab *ht, char* key, int klen, void *val)
     return HSUCCESS;
 }
 
-_hitem *
-hget(_htab *ht, char *key, int klen)
+_hitem *hget(_htab *ht, char *key, int klen)
 {
     _hitem *p;
 
@@ -191,8 +185,7 @@ hget(_htab *ht, char *key, int klen)
 }
 
 // enums non-free items
-void
-henum(_htab *ht, int (*enumfn)(_hitem *item, void *arg), void *arg, int enum_free)
+void henum(_htab *ht, int (*enumfn)(_hitem *item, void *arg), void *arg, int enum_free)
 {
     int rc, i;
     _hitem *p, *next;
@@ -211,14 +204,12 @@ henum(_htab *ht, int (*enumfn)(_hitem *item, void *arg), void *arg, int enum_fre
     }
 }
 
-int
-hcount(_htab *ht)
+int hcount(_htab *ht)
 {
     return (ht->count - ht->freecount);
 }
 
-void
-hfree(_htab *ht, _hitem *item)
+void hfree(_htab *ht, _hitem *item)
 {
     item->free = 1;
     ht->freecount++;
