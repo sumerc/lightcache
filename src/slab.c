@@ -68,6 +68,9 @@ static void *malloci(size_t size)
     size_t real_size;
 
     real_size = size+sizeof(uint64_t);
+    
+    // TODO: check for mem limit
+    
     ptr = malloc(real_size);
     if (!ptr) {
         return NULL;
@@ -338,7 +341,7 @@ int init_cache_manager(size_t memory_limit, double chunk_size_factor)
     }
 
     // initialize globals
-    mem_limit = memory_limit *1024*1024; // memory_limit is in MB
+    mem_limit = memory_limit*1024*1024; // memory_limit is in MB
     cm = malloci(sizeof(cache_manager_t));
     if (!cm) {
         fprintf(stderr, SLAB_INIT_MALLOC_ERR);
@@ -369,7 +372,6 @@ int init_cache_manager(size_t memory_limit, double chunk_size_factor)
 
     // calculate remaining memory for slabs. sizeof(uint64_t) is the bytes
     // allocated at every malloced chunk.
-    // TODO: Any chance testing bounds on below calculation?
     cm->slabctl_count = (mem_limit-mem_mallocd-(2*sizeof(uint64_t))) /
                         (SLAB_SIZE+sizeof(slab_ctl_t));
     if (cm->slabctl_count <= 1) {
@@ -714,6 +716,10 @@ void test_slab_allocator(void)
     }
     p = scmalloc(1);
     assert(p == NULL);
+    
+    // check size bounds
+    deinit_cache_manager();
+    assert(init_cache_manager(1, 1.25) == 1);
 
     fprintf(stderr,
             "[+]    test_slab_allocator. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
