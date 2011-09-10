@@ -38,6 +38,7 @@ void init_settings(void)
 #endif
     settings.mem_avail = 64 * 1024 * 1024; // in bytes -- 64 mb -- default same as memcached
     settings.socket_path = NULL;    // unix domain socket is off by default.
+    settings.use_sys_malloc = 0;
 }
 
 void init_log(void)
@@ -872,9 +873,11 @@ int main(int argc, char **argv)
             break;
         }
     }
-
-    init_cache_manager(settings.mem_avail/1024/1024, 1.25);
-
+    
+    if (!init_cache_manager(settings.mem_avail/1024/1024, SLAB_SIZE_FACTOR)) {
+       goto err;
+    }
+    //  settings.use_sys_malloc = 1;
     init_stats();
 
     init_freelists();
