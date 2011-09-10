@@ -57,9 +57,7 @@ typedef struct {
 
 // Globals
 static cache_manager_t *cm = NULL;
-size_t mem_used = 0;
-size_t mem_mallocd = 0;
-size_t mem_limit = 0;
+slab_stats_t slab_stats;
 // TODO: some kind of var. holding the internal fragmentation (unused,wasted space)
 
 static void *malloci(size_t size)
@@ -77,7 +75,7 @@ static void *malloci(size_t size)
     }
     memset(ptr, 0x00, real_size);
     *(uint64_t *)ptr = real_size;
-    mem_mallocd += real_size;
+    slab_stats.mem_mallocd += real_size;
     return (char *)ptr+sizeof(uint64_t);
 }
 
@@ -85,7 +83,7 @@ static void freei(void *ptr)
 {
     assert(ptr != NULL);
 
-    mem_mallocd -= *(uint64_t *)((char *)ptr-sizeof(uint64_t));
+    slab_stats.mem_mallocd -= *(uint64_t *)((char *)ptr-sizeof(uint64_t));
     free(ptr);
 }
 
@@ -325,9 +323,11 @@ static void deinit_cache_manager(void)
     freei(cm);
 
     cm = NULL;
-    mem_used = mem_limit = 0;
-
-    assert(mem_mallocd == 0);// all real-mallocd chunks shall be freed here.
+    slab_stats.mem_unused = slab_stats.mem_used = slab_stats.mem_limit = 0;
+    slab_stats.cache_count = 0;
+    slab_stats.slab_count = 0;
+    
+    assert(slab_stats.mem_mallocd == 0);// all real-mallocd chunks shall be freed here.
 }
 
 int init_cache_manager(size_t memory_limit, double chunk_size_factor)
@@ -341,7 +341,7 @@ int init_cache_manager(size_t memory_limit, double chunk_size_factor)
     }
 
     // initialize globals
-    mem_limit = memory_limit*1024*1024; // memory_limit is in MB
+    slab_stats.mem_limit = memory_limit*1024*1024; // memory_limit is in MB
     cm = malloci(sizeof(cache_manager_t));
     if (!cm) {
         fprintf(stderr, SLAB_INIT_MALLOC_ERR);
@@ -352,9 +352,11 @@ int init_cache_manager(size_t memory_limit, double chunk_size_factor)
     // multiplying it with chunk_size_factor for every iteration till we reach
     // SLAB_SIZE. This idea is being used on memcached() and proved to be well
     // on real-world.
+    // TODO: !!!check below cannot return below 0.
     cm->cache_count = (unsigned int)ceil(logbn(chunk_size_factor,
                                          SLAB_SIZE/MIN_SLAB_CHUNK_SIZE))-1;
-
+    slab_stats.cache_count = cm->cache_count;
+    
     // alloc/initialize caches
     cm->caches = malloci(sizeof(cache_t)*cm->cache_count);
     if (!cm->caches) {
@@ -371,14 +373,15 @@ int init_cache_manager(size_t memory_limit, double chunk_size_factor)
     }
 
     // calculate remaining memory for slabs. sizeof(uint64_t) is the bytes
-    // allocated at every malloced chunk.
-    cm->slabctl_count = (mem_limit-mem_mallocd-(2*sizeof(uint64_t))) /
+    // allocated at every malloced chunk. Add that, too.
+    cm->slabctl_count = (slab_stats.mem_limit-slab_stats.mem_mallocd-(2*sizeof(uint64_t))) /
                         (SLAB_SIZE+sizeof(slab_ctl_t));
     if (cm->slabctl_count <= 1) {
         fprintf(stderr, SLAB_INIT_MALLOC_ERR);
         goto err;
     }
-
+    slab_stats.slab_count = cm->slabctl_count;
+    
     // alloc/initialize slab_ctl and slabs
     cm->slab_ctls = malloci(sizeof(slab_ctl_t)*cm->slabctl_count);
     if (!cm->slab_ctls) {
@@ -408,7 +411,7 @@ int init_cache_manager(size_t memory_limit, double chunk_size_factor)
     }
 
     // mem_alloc shall always be smaller than mem_limit
-    assert(mem_mallocd <= mem_limit);
+    assert(slab_stats.mem_mallocd <= slab_stats.mem_limit);
 
     return 1;
 err:
@@ -462,9 +465,9 @@ void *scmalloc(size_t size)
     result = (char *)cm->slabs + cslab->nindex * SLAB_SIZE;
     result = (char *)result + ccache->chunk_size * ffindex;
 
-    mem_used += ccache->chunk_size;
+    slab_stats.mem_used += ccache->chunk_size;
 
-    assert(mem_used <= mem_mallocd);
+    assert(slab_stats.mem_used <= slab_stats.mem_mallocd);
 
     return result;
 }
@@ -506,7 +509,7 @@ void scfree(void *ptr)
         // TODO: move closer to head for efficiency?
     }
 
-    mem_used -= cslab->cache->chunk_size;
+    slab_stats.mem_used -= cslab->cache->chunk_size;
 }
 
 #ifdef TEST
@@ -676,9 +679,9 @@ void test_slab_allocator(void)
     assert(scmalloc(50) == NULL);
 
     deinit_cache_manager();
-    assert(mem_used == 0);
-    assert(mem_mallocd == 0);
-    assert(mem_limit == 0);
+    assert(slab_stats.mem_used == 0);
+    assert(slab_stats.mem_mallocd == 0);
+    assert(slab_stats.mem_limit == 0);
     assert(cm == NULL);
 
     assert(init_cache_manager(3, 1.25) == 1);
