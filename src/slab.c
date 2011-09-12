@@ -1,6 +1,4 @@
 #include "slab.h"
-#include "stdint.h"
-#include "stddef.h"
 #include "stdlib.h"
 #include "string.h"
 #include "assert.h"
@@ -406,7 +404,7 @@ int init_cache_manager(size_t memory_limit, double chunk_size_factor)
         cm->slab_ctls[i].nindex = i;
         prev_slab = &cm->slab_ctls[i];
 
-        // setbit indicates free slot.
+        // setbit indicates free slot. so set all.
         memset(&cm->slab_ctls[i].slots, 0xFF, sizeof(word_t)*WORD_COUNT);
     }
 

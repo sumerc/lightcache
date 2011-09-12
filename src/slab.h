@@ -15,12 +15,13 @@
 #define SLAB_H
 
 #include "stddef.h"
+#include "stdint.h"
 
 typedef struct slab_stats_t {
-    size_t mem_used;
-    size_t mem_mallocd;
-    size_t mem_limit;
-    size_t mem_unused; // todo.
+    uint64_t mem_used;
+    uint64_t mem_mallocd;
+    uint64_t mem_limit;
+    uint64_t mem_unused; // todo.
     unsigned int cache_count;
     unsigned int slab_count;
 } slab_stats_t;

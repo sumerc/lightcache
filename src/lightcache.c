@@ -49,8 +49,6 @@ void init_log(void)
 
 void init_stats(void)
 {
-    stats.mem_used = 0;
-    stats.mem_request_count = 0;
     stats.start_time = CURRENT_TIME;
     stats.curr_connections = 0;
     stats.cmd_get = 0;
@@ -467,21 +465,21 @@ static void execute_cmd(struct conn* conn)
                 "pid:%d\r\ntime:%lu\r\ncurr_items:%d\r\ncurr_connections:%llu\r\n"
                 "cmd_get:%llu\r\ncmd_set:%llu\r\nget_misses:%llu\r\nget_hits:%llu\r\n"
                 "bytes_read:%llu\r\nbytes_written:%llu\r\n",
-                stats.mem_used,
-                settings.mem_avail,
+                (long long unsigned int)li_memused(),
+                (long long unsigned int)settings.mem_avail,
                 (long unsigned int)CURRENT_TIME-stats.start_time,
                 LIGHTCACHE_VERSION,
                 LIGHTCACHE_BUILD,
                 getpid(),
                 CURRENT_TIME,
                 hcount(cache),
-                stats.curr_connections,
-                stats.cmd_get,
-                stats.cmd_set,
-                stats.get_misses,
-                stats.get_hits,
-                stats.bytes_read,
-                stats.bytes_written);
+                (long long unsigned int)stats.curr_connections,
+                (long long unsigned int)stats.cmd_get,
+                (long long unsigned int)stats.cmd_set,
+                (long long unsigned int)stats.get_misses,
+                (long long unsigned int)stats.get_hits,
+                (long long unsigned int)stats.bytes_read,
+                (long long unsigned int)stats.bytes_written);
         set_conn_state(conn, SEND_HEADER);
         break;
     default:
@@ -739,7 +737,7 @@ void event_handler(conn *conn, event ev)
 }
 
 
-/* Demands for memory that is statically allocated(such as frelists).
+/* 
    This function will be called when application memory usage reaches a certain
    ratio of the total available mem. Here, we will shrink static resources to gain
    more memory for dynamic resources.
@@ -884,6 +882,9 @@ int main(int argc, char **argv)
             slab_stats.slab_count, slab_stats.cache_count, 
             (unsigned long long)settings.mem_avail/1024/1024); // inform user.
         settings.use_sys_malloc = 1;
+    } else {
+        LC_DEBUG(("using slab allocator with %llu MB of memory.\r\n", 
+            (unsigned long long int)settings.mem_avail/1024/1024));
     }
       
     init_stats();
@@ -938,7 +939,7 @@ int main(int argc, char **argv)
 
             disconnect_idle_conns();
 
-            if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD) {
+            if ( (li_memused() * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD) {
                 collect_unused_memory();
             }
 

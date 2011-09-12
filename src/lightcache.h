@@ -40,8 +40,6 @@ struct settings {
 };
 
 struct stats {
-    uint64_t mem_used;
-    uint64_t mem_request_count; /* TODO(After pre-alloc optimizations):number of times mem is demanded from OS */
     uint64_t req_per_sec;
     uint64_t resp_per_sec;
     time_t start_time;
