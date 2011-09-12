@@ -877,7 +877,15 @@ int main(int argc, char **argv)
     if (!init_cache_manager(settings.mem_avail/1024/1024, SLAB_SIZE_FACTOR)) {
        goto err;
     }
-    //  settings.use_sys_malloc = 1;
+    // if slabs cannot uniformly distributed to all caches, then fallback to
+    // system's malloc 
+    if (slab_stats.slab_count < slab_stats.cache_count) {
+        fprintf(stderr, "WARNING: not enough memory to use slab allocator.[%u,%u:%llu]", 
+            slab_stats.slab_count, slab_stats.cache_count, 
+            (unsigned long long)settings.mem_avail/1024/1024); // inform user.
+        settings.use_sys_malloc = 1;
+    }
+      
     init_stats();
 
     init_freelists();

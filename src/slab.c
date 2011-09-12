@@ -433,7 +433,7 @@ void *scmalloc(size_t size)
     //size in bounds?
     largest_chunk_size = cm->caches[cm->cache_count-1].chunk_size;
     if (size > largest_chunk_size) {
-        fprintf(stderr, "invalid size.(%lu)\r\n", size);
+        fprintf(stderr, "invalid size.(%lu)\r\n", (unsigned long)size);
         return NULL;
     }
 
@@ -475,13 +475,13 @@ void *scmalloc(size_t size)
 void scfree(void *ptr)
 {
     unsigned int sidx, cidx;
-    ptrdiff_t pdiff;
+    unsigned int pdiff;
     slab_ctl_t *cslab;
     int res;
 
     // ptr shall be in valid memory
     pdiff = (char *)ptr - (char *)cm->slabs;
-    if (pdiff > cm->slabctl_count*SLAB_SIZE) {
+    if (pdiff > (unsigned int)cm->slabctl_count*SLAB_SIZE) {
         fprintf(stderr, "invalid ptr.(%p)\r\n", ptr);
         return;
     }
