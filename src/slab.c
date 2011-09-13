@@ -7,9 +7,6 @@
 #include "stdio.h"
 #include "sys/time.h"
 
-#define SLAB_SIZE (1024*1024)
-#define MIN_SLAB_CHUNK_SIZE (40)
-#define CHUNK_ALIGN_BYTES (8)
 #define WORD_SIZE_IN_BITS (sizeof(word_t) * CHAR_BIT)   // in bits
 #define WORD_COUNT ((SLAB_SIZE / MIN_SLAB_CHUNK_SIZE / WORD_SIZE_IN_BITS)+1)
 
@@ -56,7 +53,6 @@ typedef struct {
 // Globals
 static cache_manager_t *cm = NULL;
 slab_stats_t slab_stats;
-// TODO: some kind of var. holding the internal fragmentation (unused,wasted space)
 
 static void *malloci(size_t size)
 {
@@ -322,8 +318,10 @@ static void deinit_cache_manager(void)
 
     cm = NULL;
     slab_stats.mem_unused = slab_stats.mem_used = slab_stats.mem_limit = 0;
+    slab_stats.mem_used_metadata = slab_stats.mem_fragmented = 0;
     slab_stats.cache_count = 0;
     slab_stats.slab_count = 0;
+    
     
     assert(slab_stats.mem_mallocd == 0);// all real-mallocd chunks shall be freed here.
 }
@@ -386,6 +384,9 @@ int init_cache_manager(size_t memory_limit, double chunk_size_factor)
         fprintf(stderr, SLAB_INIT_MALLOC_ERR);
         goto err;
     }
+    // all metadata is shall be allocated here.
+    slab_stats.mem_used_metadata = slab_stats.mem_mallocd;
+    
     cm->slabs = malloci(SLAB_SIZE*cm->slabctl_count);
     if (!cm->slabs) {
         fprintf(stderr, SLAB_INIT_MALLOC_ERR);
@@ -464,7 +465,7 @@ void *scmalloc(size_t size)
     result = (char *)result + ccache->chunk_size * ffindex;
 
     slab_stats.mem_used += ccache->chunk_size;
-
+    
     assert(slab_stats.mem_used <= slab_stats.mem_mallocd);
 
     return result;

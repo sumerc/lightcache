@@ -150,10 +150,6 @@ v0.2
     pointer artihmetic is to restrict the arithmetic size. Normally it is one byte
     we cast to char * to indicate that which is correct of course for our case.
 [-] shot the rlimit hardlimit of the system like we do in esserver.
-[-] the init_cache_manager() must accept func. prototypes of malloc and free
-    maybe client want to use mmap() or sbrk() or another general purpose allocator.
-    Also this way we will exlude mallocd counter inside the slab allocator which 
-    is not its purpose. Think more.
 [-] any way to exclude math.h that requires -lm dependency for the linker?
 [-] lightcache clients shall be moved to clients folder. Maybe later make another rep.
     for all of them. tests will have dependencies on them.

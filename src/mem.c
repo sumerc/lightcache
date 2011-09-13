@@ -18,6 +18,10 @@ void *li_malloc(size_t size)
 {
     void *p;
     
+    if (!size) {
+        return NULL;
+    }
+    
     if (!settings.use_sys_malloc) {
         p = scmalloc(size);
     } else {
@@ -34,7 +38,6 @@ void *li_malloc(size_t size)
         p = (char *)p + sizeof(size_t);
 
         mem_used += size;
-
     }
     
     return p;
