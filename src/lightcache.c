@@ -93,15 +93,15 @@ static void free_request(request *req)
     }
 
     if (req->can_free) {
-        //LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
+        LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
         li_free(req->rkey);
         li_free(req->rdata);
         li_free(req->rextra);
         req->rkey = NULL;
         req->rdata = NULL;
         req->rextra = NULL;
+        li_free(req);
     }
-    li_free(req);
 }
 
 static void free_response(response *resp)
@@ -149,7 +149,11 @@ static int init_resources(conn *conn)
     conn->out->can_free = 1;
     conn->in->rbytes = 0;
     conn->out->sbytes = 0;
-
+    conn->in->rkey = NULL;
+    conn->in->rdata = NULL;
+    conn->in->rextra = NULL;
+    conn->out->sdata = NULL;
+   
     return 1;
 }
 
@@ -209,6 +213,8 @@ void set_conn_state(struct conn* conn, conn_states state)
             disconnect_conn(conn);
             return;
         }
+        
+        LC_DEBUG(("rkey:%p\r\n", conn->in->rkey));
 
         conn->in->rbytes = 0;
         event_set(conn, EVENT_READ);
@@ -331,7 +337,7 @@ static void execute_cmd(struct conn* conn)
 
         stats.cmd_set++;
 
-        /* validate params */
+        // validate params
         if (!conn->in->rdata) {
             LC_DEBUG(("Invalid data param in CMD_SET\r\n"));
             send_response(conn, INVALID_PARAM);
@@ -344,18 +350,22 @@ static void execute_cmd(struct conn* conn)
             return;
         }
 
-        /* add to cache */
+        // add to cache
         ret = hset(cache, conn->in->rkey, conn->in->req_header.request.key_length, conn->in);
         if (ret == HEXISTS) { // key exists? then force-update the data
             tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
             assert(tab_item != NULL);
 
+            // free the previous data
             cached_req = (request *)tab_item->val;
             cached_req->can_free = 1;
             free_request(cached_req);
+            
             tab_item->val = conn->in;
         }
         conn->in->can_free = 0;
+        
+        LC_DEBUG(("req cannot be freed.\r\n"));
 
         send_response(conn, SUCCESS);
         break;

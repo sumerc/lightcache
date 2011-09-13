@@ -490,7 +490,8 @@ void scfree(void *ptr)
 
     // check if ptr is really allocated?
     if (get_bit(&cslab->slots, cidx) != 0) {
-        fprintf(stderr, "ptr not allocated. double free?(%p)", ptr);
+        fprintf(stderr, "ptr not allocated. double free?(%p)\r\n", ptr);
+        assert(0 == 1);
         return;
     }
     set_bit(&cslab->slots, cidx);
