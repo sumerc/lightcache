@@ -149,6 +149,9 @@ v0.2
     May that cause problem. Inspect that. No it doesnt cause. It is the best way
     pointer artihmetic is to restrict the arithmetic size. Normally it is one byte
     we cast to char * to indicate that which is correct of course for our case.
+[-] BUG: AUTOTESTS fail with new integration. Freelist removal causes double free 
+    on some cases.
+[-] BUG: LC cannot run slab alloc failure with 1 MB of memory.
 [-] shot the rlimit hardlimit of the system like we do in esserver.
 [-] any way to exclude math.h that requires -lm dependency for the linker?
 [-] lightcache clients shall be moved to clients folder. Maybe later make another rep.

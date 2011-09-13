@@ -100,8 +100,8 @@ static void free_request(request *req)
         req->rkey = NULL;
         req->rdata = NULL;
         req->rextra = NULL;
-        li_free(req);
     }
+    li_free(req);
 }
 
 static void free_response(response *resp)
@@ -131,6 +131,8 @@ static int init_resources(conn *conn)
     /* free previous request allocations if we have any */
     free_request(conn->in);
     free_response(conn->out);
+    conn->in = NULL;
+    conn->out = NULL;    
 
     /* allocate req/resp resources */
     conn->in = (request *)li_malloc(sizeof(request));
@@ -535,7 +537,7 @@ int try_read_request(conn* conn)
     socket_state ret;
 
     switch(conn->state) {
-    case READ_HEADER:
+    case READ_HEADER:        
         ret = read_nbytes(conn, (char *)conn->in->req_header.bytes, sizeof(req_header));
         if (ret == READ_COMPLETED) {
 
@@ -701,7 +703,7 @@ void event_handler(conn *conn, event ev)
             if (make_nonblocking(conn_sock)) {
                 LC_DEBUG(("make_nonblocking failed.\r\n"));
             }
-            conn = make_conn(conn_sock);
+            conn = make_conn(conn_sock);            
             if (!conn) {
                 close(conn_sock);
                 return;
@@ -876,8 +878,7 @@ int main(int argc, char **argv)
     } else {
         LC_DEBUG(("using slab allocator with %llu MB of memory.\r\n", 
             (unsigned long long int)settings.mem_avail/1024/1024));
-    }
-      
+    }  
     init_stats();
 
     init_log();
