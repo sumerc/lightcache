@@ -317,12 +317,10 @@ static void deinit_cache_manager(void)
     freei(cm);
 
     cm = NULL;
-    slab_stats.mem_unused = slab_stats.mem_used = slab_stats.mem_limit = 0;
-    slab_stats.mem_used_metadata = slab_stats.mem_fragmented = 0;
+    slab_stats.mem_used_metadata = slab_stats.mem_used = slab_stats.mem_limit = 0;
     slab_stats.cache_count = 0;
     slab_stats.slab_count = 0;
-    
-    
+        
     assert(slab_stats.mem_mallocd == 0);// all real-mallocd chunks shall be freed here.
 }
 
@@ -482,6 +480,7 @@ void scfree(void *ptr)
     pdiff = (char *)ptr - (char *)cm->slabs;
     if (pdiff > (unsigned int)cm->slabctl_count*SLAB_SIZE) {
         fprintf(stderr, "invalid ptr.(%p)\r\n", ptr);
+        assert(0 == 1);
         return;
     }
 

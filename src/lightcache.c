@@ -2,7 +2,6 @@
 #include "protocol.h"
 #include "socket.h"
 #include "hashtab.h"
-#include "freelist.h"
 #include "event.h"
 #include "mem.h"
 #include "util.h"
@@ -18,14 +17,6 @@ struct stats stats;
 /* module globals */
 static conn *conns = NULL; /* linked list head */
 static _htab *cache = NULL;
-static freelist *response_trash; /* freelist to create response object(s) from. */
-static freelist *request_trash;
-
-void init_freelists(void)
-{
-    response_trash = flcreate(sizeof(response), 1);
-    request_trash = flcreate(sizeof(request), 1);
-}
 
 void init_settings(void)
 {
@@ -109,7 +100,7 @@ static void free_request(request *req)
         req->rkey = NULL;
         req->rdata = NULL;
         req->rextra = NULL;
-        flput(request_trash, req);
+        li_free(req);
     }
 }
 
@@ -130,7 +121,7 @@ static void free_response(response *resp)
      * */
     resp->sdata = NULL;
 
-    flput(response_trash, resp);
+    li_free(resp);
 }
 
 
@@ -141,12 +132,12 @@ static int init_resources(conn *conn)
     free_request(conn->in);
     free_response(conn->out);
 
-    /* get req/resp resources from associated freelists */
-    conn->in = (request *)flget(request_trash);
+    /* allocate req/resp resources */
+    conn->in = (request *)li_malloc(sizeof(request));
     if (!conn->in) {
         return 0;
     }
-    conn->out = (response *)flget(response_trash);
+    conn->out = (response *)li_malloc(sizeof(response));
     if (!conn->out) {
         return 0;
     }
@@ -888,8 +879,6 @@ int main(int argc, char **argv)
     }
       
     init_stats();
-
-    init_freelists();
 
     init_log();
 
