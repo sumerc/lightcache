@@ -75,10 +75,12 @@ static void *malloci(size_t size)
 
 static void freei(void *ptr)
 {
+    char *real_ptr;
     assert(ptr != NULL);
-
-    slab_stats.mem_mallocd -= *(uint64_t *)((char *)ptr-sizeof(uint64_t));
-    free(ptr);
+    
+    real_ptr = (char *)ptr - sizeof(uint64_t);
+    slab_stats.mem_mallocd -= *(uint64_t *)(real_ptr);
+    free(real_ptr);
 }
 
 static inline unsigned int bindex(unsigned int b)
@@ -370,7 +372,7 @@ int init_cache_manager(size_t memory_limit, double chunk_size_factor)
     // allocated at every malloced chunk. Add that, too.
     cm->slabctl_count = (slab_stats.mem_limit-slab_stats.mem_mallocd-(2*sizeof(uint64_t))) /
                         (SLAB_SIZE+sizeof(slab_ctl_t));
-    if (cm->slabctl_count <= 1) {
+    if (cm->slabctl_count <= 1) {        
         fprintf(stderr, SLAB_INIT_MALLOC_ERR);
         goto err;
     }

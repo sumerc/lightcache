@@ -151,8 +151,10 @@ v0.2
     we cast to char * to indicate that which is correct of course for our case.
 [+] BUG: AUTOTESTS fail with new integration. Freelist removal causes double free 
     on some cases.
+[+] BUG: LC cannot run slab alloc failure with 1 MB of memory.
+[+] slab_alloc() for dynamic allocations and free list should be implemented according to
+    wikipedia: http://en.wikipedia.org/wiki/Free_list.
 [-] TEST:Valgrind is necessary, especially after we removed the freelist. 
-[-] BUG: LC cannot run slab alloc failure with 1 MB of memory.
 [-] show the rlimit hardlimit of the system like we do in esserver.
 [-] any way to exclude math.h that requires -lm dependency for the linker?
 [-] lightcache clients shall be moved to clients folder. Maybe later make another rep.
@@ -162,9 +164,7 @@ v0.2
 [-] maybe prepare_response can be merged into send_response() function for better
     design.
 [-] TEST/INSPECT: dynamic alloc. failures.(OUT_OF_MEMORY)
-[-] slab_alloc() for dynamic allocations and free list should be implemented according to
-    wikipedia: http://en.wikipedia.org/wiki/Free_list.
-    Slab allocation solves the fragmentation problem. Redis makes a contest to stress the mem.
+[-] Slab allocation solves the fragmentation problem. Redis makes a contest to stress the mem.
     fragmentation. Can we have such chance to observe fragmentation via some tests? 
 [-] TEST: more delete related tests especially in memleaks.
 [-] write a php client, there is an unpack function for PHP4-5.

@@ -874,7 +874,7 @@ int main(int argc, char **argv)
             break;
         }
     }
-    
+
     if (!init_cache_manager(settings.mem_avail/1024/1024, SLAB_SIZE_FACTOR)) {
        goto err;
     }
