@@ -444,7 +444,7 @@ void *scmalloc(size_t size)
     if (cslab == NULL) {
         cslab = pop(&cm->slabs_free);
         if (cslab == NULL) {
-            fprintf(stderr, "no memory available.\r\n");
+            //fprintf(stderr, "no mem available.\r\n");
             return NULL;
         }
         push(&ccache->slabs_partial, cslab);
@@ -654,8 +654,7 @@ void test_slab_allocator(void)
     long long t0;
     cache_t *cc;
     void *p;
-    int i;
-    unsigned int cache_cnt;
+    unsigned int i,cache_cnt;
 
     t0 = tickcount();
 
@@ -720,10 +719,6 @@ void test_slab_allocator(void)
     }
     p = scmalloc(1);
     assert(p == NULL);
-    
-    // check size bounds
-    deinit_cache_manager();
-    assert(init_cache_manager(1, 1.25) == 1);
 
     fprintf(stderr,
             "[+]    test_slab_allocator. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);

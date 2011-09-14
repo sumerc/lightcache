@@ -18,11 +18,18 @@ all: lightcache_server
 lightcache_server :
 	$(CC) $(CCOPT) $(DEBUG) $(FILES) -o $(PRGNAME)
 
+test:
+	rm -f test_slab
+	$(CC) $(CCOPT) test_slab.c slab.c -o test_slab -DTEST -lm && ./test_slab
+	../etc/autotest.sh
+	
 clean:
-	rm $(PRGNAME)
-	rm gmon.out
+	rm -f $(PRGNAME)
+	rm -f gmon.out
 	$(CC) $(CCOPT) $(DEBUG) $(FILES) -o $(PRGNAME)
 
 install: all
 	$(INSTALL) $(PRGNAME) $(INSTALL_BIN)
+
+
 	
