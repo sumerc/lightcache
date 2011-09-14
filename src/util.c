@@ -166,12 +166,26 @@ void test_util_routines(void)
         uint8_t c[8];
     } u64_test = {0x0102030405060708U};
     uint8_t uch;
+    int ret;
 
 #ifdef LC_LITTLE_ENDIAN
     uch = u64_test.c[0];
     u64_test.i = ntohll(u64_test.i);
     assert(uch == u64_test.c[7]);
+#elif LC_BIG_ENDIAN
+    uch = u64_test.c[0];
+    u64_test.i = ntohll(u64_test.i);
+    assert(uch == u64_test.c[0]); // same as before
 #endif
+    ret = atoull("1234567891234567891234", &u64_test.i); //out of bounds
+    assert(ret == 0);
+    
+    // test string conv is correct
+    ret = atoull("18446744073709551615", &u64_test.i); // max uint64
+    assert(ret == 1);
+    uch = u64_test.c[0];
+    u64_test.i = 18446744073709551615U;    
+    assert(uch == u64_test.c[0]); 
 }
 
 
