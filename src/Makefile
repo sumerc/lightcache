@@ -3,7 +3,9 @@ OPTIMIZATION?=-O3
 CFLAGS?=  -std=c99 -pedantic $(OPTIMIZATION) -Wall -W -lm
 
 CCOPT= $(CFLAGS)
-DEBUG?= -pg -g -rdynamic -ggdb -D LITTLE_ENDIAN -D DEBUG
+DEBUG?= -pg -g -rdynamic -ggdb -D DEBUG
+TEST_FILES= test_base.c
+TEST_FLAGS= -D LC_TEST
 
 INSTALL_TOP= /usr/local
 INSTALL_BIN= $(INSTALL_TOP)/bin
@@ -20,8 +22,9 @@ lightcache_server :
 
 test:
 	rm -f test_slab
-	$(CC) $(CCOPT) test_slab.c slab.c -o test_slab -DTEST -lm && ./test_slab
-	../etc/autotest.sh
+	rm -f test_util
+	$(CC) $(CCOPT) $(TEST_FILES) test_slab.c slab.c -o test_slab $(TEST_FLAGS) && ./test_slab
+	$(CC) $(CCOPT) $(TEST_FILES) test_util.c util.c -o test_util $(TEST_FLAGS) && ./test_util
 	
 clean:
 	rm -f $(PRGNAME)

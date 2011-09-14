@@ -18,4 +18,10 @@ uint64_t ntohll(uint64_t val);
 uint64_t htonll(uint64_t val);
 int atoull(const char *s, uint64_t *ret);
 
+
+#ifdef LC_TEST
+void test_endianness(void);
+void test_util_routines(void);
+#endif
+
 #endif

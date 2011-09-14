@@ -5,7 +5,6 @@
 #include "math.h"
 #include "limits.h"
 #include "stdio.h"
-#include "sys/time.h"
 
 #define WORD_SIZE_IN_BITS (sizeof(word_t) * CHAR_BIT)   // in bits
 #define WORD_COUNT ((SLAB_SIZE / MIN_SLAB_CHUNK_SIZE / WORD_SIZE_IN_BITS)+1)
@@ -513,25 +512,11 @@ void scfree(void *ptr)
     slab_stats.mem_used -= cslab->cache->chunk_size;
 }
 
-#ifdef TEST
-inline long long tickcount(void)
-{
-    struct timeval tv;
-    long long rc;
-
-    gettimeofday(&tv, (struct timezone *)NULL);
-
-    rc = tv.tv_sec;
-    rc = rc * 1000000 + tv.tv_usec;
-    return rc;
-}
-
+#ifdef LC_TEST
 void test_bit_set(void)
 {
     bitset_t *y;
-    long long t0;
-    t0 = tickcount();
-
+    
     y = malloc(sizeof(bitset_t));
     // for this test to work this assertion must be true.
     // change below compile-time params accordingly.
@@ -589,16 +574,11 @@ void test_bit_set(void)
     clear_bit(y, 97);
     assert(ff_setbit(y) == 104);
 
-    fprintf(stderr,
-            "[+]    test_bit_set. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
 }
 
 void test_size_to_cache(void)
 {
-    long long t0;
     cache_t *cc;
-
-    t0 = tickcount();
     cache_t caches[9];
 
     caches[0].chunk_size = 2;
@@ -644,19 +624,13 @@ void test_size_to_cache(void)
 
     cc = size_to_cache(caches, 9, 7);
     assert(cc->chunk_size == 8);
-
-    fprintf(stderr,
-            "[+]    test_size_to_cache. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
 }
 
 void test_slab_allocator(void)
 {
-    long long t0;
     cache_t *cc;
     void *p;
     unsigned int i,cache_cnt;
-
-    t0 = tickcount();
 
     assert(init_cache_manager(200, 1.25) == 1);
     cache_cnt = cm->cache_count; // allocd mem will not change this value.
@@ -719,9 +693,6 @@ void test_slab_allocator(void)
     }
     p = scmalloc(1);
     assert(p == NULL);
-
-    fprintf(stderr,
-            "[+]    test_slab_allocator. (ok) (elapsed:%0.6f)\r\n", (tickcount()-t0)*0.000001);
 }
 
 #endif
