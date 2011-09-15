@@ -20,12 +20,6 @@ all: lightcache_server
 lightcache_server :
 	$(CC) $(CCOPT) $(DEBUG) $(FILES) -o $(PRGNAME)
 
-test:
-	rm -f test_slab
-	rm -f test_util
-	$(CC) $(CCOPT) $(TEST_FILES) test_slab.c slab.c -o test_slab $(TEST_FLAGS) && ./test_slab
-	$(CC) $(CCOPT) $(TEST_FILES) test_util.c util.c -o test_util $(TEST_FLAGS) && ./test_util
-	
 clean:
 	rm -f $(PRGNAME)
 	rm -f gmon.out

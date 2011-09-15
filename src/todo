@@ -154,13 +154,14 @@ v0.2
 [+] BUG: LC cannot run slab alloc failure with 1 MB of memory.
 [+] slab_alloc() for dynamic allocations and free list should be implemented according to
     wikipedia: http://en.wikipedia.org/wiki/Free_list.
+[*] MAKE: Makefile shall contain make tests which will run autotests.sh with TCP and domain sockets.
+    Unit tests for C integrated as running under the shell scripts.
+[+] MAKE: LITTLE_ENDIAN flag should somehow be passed to Makefile. With configure script maybe?
 [-] TEST:Valgrind is necessary, especially after we removed the freelist. 
 [-] show the rlimit hardlimit of the system like we do in esserver.
 [-] any way to exclude math.h that requires -lm dependency for the linker?
 [-] lightcache clients shall be moved to clients folder. Maybe later make another rep.
     for all of them. tests will have dependencies on them.
-[-] MAKE: Makefile shall contain make tests which will run autotests.sh with TCP and domain sockets.
-[-] MAKE: LITTLE_ENDIAN flag should somehow be passed to Makefile. With configure script maybe?
 [-] maybe prepare_response can be merged into send_response() function for better
     design.
 [-] TEST/INSPECT: dynamic alloc. failures.(OUT_OF_MEMORY)
