@@ -122,15 +122,14 @@ static int init_resources(conn *conn)
     }
 
     /* init defaults */
-    conn->in->can_free = 1;
-    conn->out->can_free = 1;
     conn->in->rbytes = 0;
-    conn->out->sbytes = 0;
     conn->in->rkey = NULL;
     conn->in->rdata = NULL;
     conn->in->rextra = NULL;
-    conn->out->sdata = NULL;
    
+    conn->out->sdata_vec = NULL;
+    conn->out->nitems = 0;
+    
     return 1;
 }
 
