@@ -1,7 +1,7 @@
 
 OPTIMIZATION?=-O3
 DEBUG?= -pg -g -rdynamic -ggdb -D DEBUG
-CFLAGS?= -std=c99 -pedantic -Wall -W
+CFLAGS?= -std=c99 -pedantic -Wall -W -lm
 TEST_FLAGS= -D LC_TEST
 
 INSTALL_TOP= /usr/local
@@ -18,7 +18,7 @@ debug :
 	$(CC) $(CFLAGS) $(DEBUG) $(FILES) -o $(PRGNAME)
 
 release:
-	$(CC) $(CFLAGS) $(OPTIMIZATION)  $(FILES) -o $(PRGNAME)
+	$(CC) $(CFLAGS) $(OPTIMIZATION) $(FILES) -o $(PRGNAME)
 	
 clean:
 	rm -f $(PRGNAME)
