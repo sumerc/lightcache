@@ -2,10 +2,10 @@
 #include "protocol.h"
 #include "socket.h"
 #include "hashtab.h"
-#include "freelist.h"
 #include "event.h"
 #include "mem.h"
 #include "util.h"
+#include "slab.h"
 
 /* forward declarations */
 void set_conn_state(struct conn* conn, conn_states state);
@@ -17,18 +17,8 @@ struct stats stats;
 /* module globals */
 static conn *conns = NULL; /* linked list head */
 static _htab *cache = NULL;
-static freelist *response_trash; /* freelist to create response object(s) from. */
-static freelist *request_trash;
 
-void
-init_freelists(void)
-{
-    response_trash = flcreate(sizeof(response), 1);
-    request_trash = flcreate(sizeof(request), 1);
-}
-
-void
-init_settings(void)
+void init_settings(void)
 {
 #ifndef DEBUG
     settings.deamon_mode = 1;
@@ -39,20 +29,17 @@ init_settings(void)
 #endif
     settings.mem_avail = 64 * 1024 * 1024; // in bytes -- 64 mb -- default same as memcached
     settings.socket_path = NULL;    // unix domain socket is off by default.
+    settings.use_sys_malloc = 0;
 }
 
-void
-init_log(void)
+void init_log(void)
 {
     openlog("lightcache", LOG_PID, LOG_LOCAL5);
     syslog(LOG_INFO, "lightcache started.");
 }
 
-void
-init_stats(void)
+void init_stats(void)
 {
-    stats.mem_used = 0;
-    stats.mem_request_count = 0;
     stats.start_time = CURRENT_TIME;
     stats.curr_connections = 0;
     stats.cmd_get = 0;
@@ -63,8 +50,7 @@ init_stats(void)
     stats.bytes_written = 0;
 }
 
-struct conn*
-make_conn(int fd) {
+struct conn*make_conn(int fd) {
     struct conn *conn, *item;
 
     conn = NULL;
@@ -93,14 +79,13 @@ make_conn(int fd) {
     conn->free = 0;
     conn->in = NULL;
     conn->out = NULL;
-    
+
     stats.curr_connections++;
 
     return conn;
 }
 
-static void
-free_request(request *req)
+static void free_request(request *req)
 {
 
     if (!req) {
@@ -108,19 +93,18 @@ free_request(request *req)
     }
 
     if (req->can_free) {
-        //LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
+        LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
         li_free(req->rkey);
         li_free(req->rdata);
         li_free(req->rextra);
         req->rkey = NULL;
         req->rdata = NULL;
         req->rextra = NULL;
-        flput(request_trash, req);
+        li_free(req);
     }
 }
 
-static void
-free_response(response *resp)
+static void free_response(response *resp)
 {
 
     if (!resp) {
@@ -137,24 +121,25 @@ free_response(response *resp)
      * */
     resp->sdata = NULL;
 
-    flput(response_trash, resp);
+    li_free(resp);
 }
 
 
-static int
-init_resources(conn *conn)
+static int init_resources(conn *conn)
 {
 
     /* free previous request allocations if we have any */
     free_request(conn->in);
     free_response(conn->out);
+    conn->in = NULL;
+    conn->out = NULL;    
 
-    /* get req/resp resources from associated freelists */
-    conn->in = (request *)flget(request_trash);
+    /* allocate req/resp resources */
+    conn->in = (request *)li_malloc(sizeof(request));
     if (!conn->in) {
         return 0;
     }
-    conn->out = (response *)flget(response_trash);
+    conn->out = (response *)li_malloc(sizeof(response));
     if (!conn->out) {
         return 0;
     }
@@ -164,12 +149,15 @@ init_resources(conn *conn)
     conn->out->can_free = 1;
     conn->in->rbytes = 0;
     conn->out->sbytes = 0;
-
+    conn->in->rkey = NULL;
+    conn->in->rdata = NULL;
+    conn->in->rextra = NULL;
+    conn->out->sdata = NULL;
+   
     return 1;
 }
 
-static void
-disconnect_conn(conn* conn)
+static void disconnect_conn(conn* conn)
 {
     LC_DEBUG(("disconnect conn called.\r\n"));
 
@@ -180,14 +168,13 @@ disconnect_conn(conn* conn)
 
     conn->free = 1;
     close(conn->fd);
-    
+
     stats.curr_connections--;
 
     set_conn_state(conn, CONN_CLOSED);
 }
 
-static void
-send_response(conn *conn, errors err)
+static void send_response(conn *conn, errors err)
 {
     assert(conn->out != NULL);
 
@@ -201,8 +188,7 @@ send_response(conn *conn, errors err)
     set_conn_state(conn, SEND_HEADER);
 }
 
-static int
-prepare_response(conn *conn, size_t data_length, int alloc_mem)
+static int prepare_response(conn *conn, size_t data_length, int alloc_mem)
 {
     assert(conn->out != NULL);
 
@@ -219,8 +205,7 @@ prepare_response(conn *conn, size_t data_length, int alloc_mem)
     return 1;
 }
 
-void
-set_conn_state(struct conn* conn, conn_states state)
+void set_conn_state(struct conn* conn, conn_states state)
 {
     switch(state) {
     case READ_HEADER:
@@ -228,6 +213,8 @@ set_conn_state(struct conn* conn, conn_states state)
             disconnect_conn(conn);
             return;
         }
+        
+        LC_DEBUG(("rkey:%p\r\n", conn->in->rkey));
 
         conn->in->rbytes = 0;
         event_set(conn, EVENT_READ);
@@ -272,8 +259,7 @@ set_conn_state(struct conn* conn, conn_states state)
 
 }
 
-static int
-flush_item_enum(_hitem *item, void *arg)
+static int flush_item_enum(_hitem *item, void *arg)
 {
     if (arg) {
         ;   // suppress unused param. warning.
@@ -291,8 +277,7 @@ flush_item_enum(_hitem *item, void *arg)
 }
 
 
-static void
-execute_cmd(struct conn* conn)
+static void execute_cmd(struct conn* conn)
 {
     int r;
     int quiet;
@@ -315,9 +300,9 @@ execute_cmd(struct conn* conn)
     case CMD_GETQ:
     	quiet = 1;
     case CMD_GET:
-    
+
         LC_DEBUG(("CMD_GET (Q:%d) [%s]\r\n", quiet, conn->in->rkey));
-        
+
         stats.cmd_get++;
 
         /* get item */
@@ -339,14 +324,14 @@ execute_cmd(struct conn* conn)
             hfree(cache, tab_item); // recycle tab_item
             goto GET_KEY_NOTEXISTS;
         }
-        
+
         stats.get_hits++;
-        
+
         prepare_response(conn, cached_req->req_header.request.data_length, 0); // do not alloc mem
-            
+
         conn->out->sdata = cached_req->rdata;
         conn->out->can_free = 0;
-        
+
         set_conn_state(conn, SEND_HEADER);
         break;
     case CMD_SETQ:
@@ -354,10 +339,10 @@ execute_cmd(struct conn* conn)
     case CMD_SET:
 
         LC_DEBUG(("CMD_SET (Q:%d) \r\n", quiet));
-        
+
         stats.cmd_set++;
 
-        /* validate params */
+        // validate params
         if (!conn->in->rdata) {
             LC_DEBUG(("Invalid data param in CMD_SET\r\n"));
             send_response(conn, INVALID_PARAM);
@@ -370,25 +355,29 @@ execute_cmd(struct conn* conn)
             return;
         }
 
-        /* add to cache */
+        // add to cache
         ret = hset(cache, conn->in->rkey, conn->in->req_header.request.key_length, conn->in);
         if (ret == HEXISTS) { // key exists? then force-update the data
             tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
             assert(tab_item != NULL);
 
+            // free the previous data
             cached_req = (request *)tab_item->val;
             cached_req->can_free = 1;
             free_request(cached_req);
+            
             tab_item->val = conn->in;
         }
         conn->in->can_free = 0;
         
+        LC_DEBUG(("req cannot be freed.\r\n"));
+
         send_response(conn, SUCCESS);
         break;
     case CMD_DELETE:
 
         LC_DEBUG(("CMD_DELETE [%s]\r\n", conn->in->rkey));
-        
+
         tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
         if (!tab_item) {
             LC_DEBUG(("Key not found:%s\r\n", conn->in->rkey));
@@ -484,7 +473,7 @@ execute_cmd(struct conn* conn)
                 "pid:%d\r\ntime:%lu\r\ncurr_items:%d\r\ncurr_connections:%llu\r\n"
                 "cmd_get:%llu\r\ncmd_set:%llu\r\nget_misses:%llu\r\nget_hits:%llu\r\n"
                 "bytes_read:%llu\r\nbytes_written:%llu\r\n",
-                (long long unsigned int)stats.mem_used,
+                (long long unsigned int)li_memused(),
                 (long long unsigned int)settings.mem_avail,
                 (long unsigned int)CURRENT_TIME-stats.start_time,
                 LIGHTCACHE_VERSION,
@@ -508,15 +497,14 @@ execute_cmd(struct conn* conn)
     }
 
     return;
-    
+
 GET_KEY_NOTEXISTS:
     stats.get_misses++;
     send_response(conn, KEY_NOTEXISTS);
     return;
 }
 
-void
-disconnect_idle_conns(void)
+void disconnect_idle_conns(void)
 {
     conn *conn, *next;
 
@@ -532,8 +520,7 @@ disconnect_idle_conns(void)
     }
 }
 
-socket_state
-read_nbytes(conn*conn, char *bytes, size_t total)
+socket_state read_nbytes(conn*conn, char *bytes, size_t total)
 {
     unsigned int needed;
     int nbytes;
@@ -548,9 +535,9 @@ read_nbytes(conn*conn, char *bytes, size_t total)
             return NEED_MORE;
         }
     }
-    
+
     stats.bytes_read += nbytes;
-    
+
     conn->in->rbytes += nbytes;
     if (conn->in->rbytes == total) {
         conn->in->rbytes = 0;
@@ -560,13 +547,12 @@ read_nbytes(conn*conn, char *bytes, size_t total)
     return NEED_MORE;
 }
 
-int
-try_read_request(conn* conn)
+int try_read_request(conn* conn)
 {
     socket_state ret;
 
     switch(conn->state) {
-    case READ_HEADER:
+    case READ_HEADER:        
         ret = read_nbytes(conn, (char *)conn->in->req_header.bytes, sizeof(req_header));
         if (ret == READ_COMPLETED) {
 
@@ -640,8 +626,7 @@ try_read_request(conn* conn)
     return ret;
 }
 
-socket_state
-send_nbytes(conn*conn, char *bytes, size_t total)
+socket_state send_nbytes(conn*conn, char *bytes, size_t total)
 {
     int needed, nbytes;
 
@@ -657,9 +642,9 @@ send_nbytes(conn*conn, char *bytes, size_t total)
         syslog(LOG_ERR, "%s (%s)", "socket write error.", strerror(errno));
         return SEND_ERR;
     }
-    
+
     stats.bytes_written += nbytes;
-    
+
     conn->out->sbytes += nbytes;
     if (conn->out->sbytes == total) {
         conn->out->sbytes = 0;
@@ -669,8 +654,7 @@ send_nbytes(conn*conn, char *bytes, size_t total)
     return NEED_MORE;
 }
 
-int
-try_send_response(conn *conn)
+int try_send_response(conn *conn)
 {
     socket_state ret;
 
@@ -705,8 +689,7 @@ try_send_response(conn *conn)
 
 }
 
-void
-event_handler(conn *conn, event ev)
+void event_handler(conn *conn, event ev)
 {
     int conn_sock;
     unsigned int slen;
@@ -735,7 +718,7 @@ event_handler(conn *conn, event ev)
             if (make_nonblocking(conn_sock)) {
                 LC_DEBUG(("make_nonblocking failed.\r\n"));
             }
-            conn = make_conn(conn_sock);
+            conn = make_conn(conn_sock);            
             if (!conn) {
                 close(conn_sock);
                 return;
@@ -762,20 +745,18 @@ event_handler(conn *conn, event ev)
 }
 
 
-/* Demands for memory that is statically allocated(such as frelists). 
-   This function will be called when application memory usage reaches a certain 
+/* 
+   This function will be called when application memory usage reaches a certain
    ratio of the total available mem. Here, we will shrink static resources to gain
    more memory for dynamic resources.
   */
-void
-collect_unused_memory(void)
+void collect_unused_memory(void)
 {
-    // todo:   
+    // todo:
 }
 
 
-static int
-init_server_socket(void)
+static int init_server_socket(void)
 {
     int s, optval, ret;
     struct sockaddr_in si_me;
@@ -869,8 +850,7 @@ init_server_socket(void)
     return 1;
 }
 
-int
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
     int ret, c;
 
@@ -901,9 +881,21 @@ main(int argc, char **argv)
     }
 
 
+    if (!init_cache_manager(settings.mem_avail/1024/1024, SLAB_SIZE_FACTOR)) {
+       goto err;
+    }
+    // if slabs cannot uniformly distributed to all caches, then fallback to
+    // system's malloc 
+    if (slab_stats.slab_count < slab_stats.cache_count) {
+        fprintf(stderr, "WARNING: not enough memory to use slab allocator.[%u,%u:%llu]", 
+            slab_stats.slab_count, slab_stats.cache_count, 
+            (unsigned long long)settings.mem_avail/1024/1024); // inform user.
+        settings.use_sys_malloc = 1;
+    } else {
+        LC_DEBUG(("using slab allocator with %llu MB of memory.\r\n", 
+            (unsigned long long int)settings.mem_avail/1024/1024));
+    }  
     init_stats();
-
-    init_freelists();
 
     init_log();
 
@@ -953,7 +945,7 @@ main(int argc, char **argv)
 
             disconnect_idle_conns();
 
-            if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD) {
+            if ( (li_memused() * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD) {
                 collect_unused_memory();
             }
 

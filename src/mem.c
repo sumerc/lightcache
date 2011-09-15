@@ -1,33 +1,53 @@
 
 #include "mem.h"
 #include "util.h"
+#include "slab.h"
 
-void *
-li_malloc(size_t size)
+static uint64_t mem_used = 0;
+
+uint64_t li_memused(void)
+{
+    if (!settings.use_sys_malloc) {
+        return slab_stats.mem_used;
+    } else {
+        return mem_used;
+    }
+}
+
+void *li_malloc(size_t size)
 {
     void *p;
 
-    if (size + stats.mem_used > (settings.mem_avail)) {
-        syslog(LOG_ERR, "No memory available![%llu MB]", (long long unsigned int)settings.mem_avail);
-        LC_DEBUG(("No memory available! %llu, %llu, %u", (long long unsigned int)settings.mem_avail,
-                (long long unsigned int)stats.mem_used, (unsigned int)size));
+    if (!size) {
         return NULL;
     }
+    
+    if (!settings.use_sys_malloc) {
+        p = scmalloc(size);
+    } else {
+        if (size + mem_used > (settings.mem_avail)) {
+            syslog(LOG_ERR, "No memory available![%llu MB]", (long long unsigned int)settings.mem_avail);
+            LC_DEBUG(("No memory available! %llu, %llu, %u", (long long unsigned int)settings.mem_avail,
+                      (long long unsigned int)mem_used, (unsigned int)size));
+            return NULL;
+        }
 
-    p = malloc(size+sizeof(size_t));
-    memset(p, 0, size+sizeof(size_t));
-    *(size_t *)p = size;
-    p = (char *)p + sizeof(size_t); /*suppress WARNING: pointer of type ‘void *’ used in arithmetic*/
+        p = malloc(size+sizeof(size_t));
+        memset(p, 0, size+sizeof(size_t));
+        *(size_t *)p = size;
+        p = (char *)p + sizeof(size_t);
 
-    /* update stats */
-    stats.mem_used += size;
-    stats.mem_request_count++;
+        mem_used += size;
+    }
+    
+//#ifdef MEM_DEBUG
+    LC_DEBUG(("Allocated memory.[%p]\r\n", p));
+//#endif
 
     return p;
 }
 
-void
-li_free(void *ptr)
+void li_free(void *ptr)
 {
     size_t size;
 
@@ -35,8 +55,16 @@ li_free(void *ptr)
         return;
     }
 
-    ptr = (char *)ptr - sizeof(size_t); /*suppress WARNING: pointer of type ‘void *’ used in arithmetic */
-    size = *(size_t *)ptr;
-    stats.mem_used -= size;
-    free(ptr);
+//#ifdef MEM_DEBUG
+    LC_DEBUG(("Freeing memory.[%p]\r\n", ptr));
+//#endif
+    
+    if (!settings.use_sys_malloc) {
+        scfree(ptr);
+    } else {
+        ptr = (char *)ptr - sizeof(size_t);
+        size = *(size_t *)ptr;
+        mem_used -= size;
+        free(ptr);
+    }
 }

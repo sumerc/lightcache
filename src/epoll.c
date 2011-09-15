@@ -9,8 +9,7 @@ static struct epoll_event events[POLL_MAX_EVENTS];
 /* constants */
 
 /* functions */
-int
-event_init(void (*ev_handler)(conn *c, event ev))
+int event_init(void (*ev_handler)(conn *c, event ev))
 {
     epollfd = epoll_create(POLL_MAX_EVENTS);
     if (epollfd == -1) {
@@ -21,8 +20,7 @@ event_init(void (*ev_handler)(conn *c, event ev))
     return  epollfd;
 }
 
-int
-event_del(conn *conn)
+int event_del(conn *conn)
 {
     /* todo : Note, Kernel < 2.6.9 requires a non null event pointer even for
          * EPOLL_CTL_DEL. */
@@ -33,8 +31,7 @@ event_del(conn *conn)
     return 1;
 }
 
-int
-event_set(conn *c, int flags)
+int event_set(conn *c, int flags)
 {
     int op;
     struct epoll_event ev;
@@ -64,8 +61,7 @@ event_set(conn *c, int flags)
     return 1;
 }
 
-void
-event_process(void)
+void event_process(void)
 {
     int nfds, n;
     conn *conn;

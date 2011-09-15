@@ -1,12 +1,16 @@
 
 #include "util.h"
+#include "config.h"
+
+#ifdef LC_TEST
+#include "assert.h"
+#endif
 
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
 
-// handle signals and exit the application gracefully
-void
-sig_handler(int signum)
+/* handle signals and exit the application gracefully */
+void sig_handler(int signum)
 {
     switch(signum) {
     case SIGALRM:
@@ -25,8 +29,7 @@ sig_handler(int signum)
 }
 
 
-void
-deamonize(void)
+void deamonize(void)
 {
     pid_t pid, sid, parent;
     FILE *dummy;
@@ -97,11 +100,9 @@ deamonize(void)
     //kill( parent, SIGUSR1 );
 }
 
-static uint64_t
-li_swap64(uint64_t in)
+static uint64_t li_swap64(uint64_t in)
 {
-
-#ifdef LITTLE_ENDIAN
+#ifdef LC_LITTLE_ENDIAN
     /* Little endian, flip the bytes around until someone makes a faster/better
     * way to do this. */
     int64_t rv = 0;
@@ -127,8 +128,7 @@ uint64_t htonll(uint64_t val)
     return li_swap64(val);
 }
 
-int
-atoull(const char *s, uint64_t *ret)
+int atoull(const char *s, uint64_t *ret)
 {
     errno = 0;
     *ret = strtoull(s, NULL, 10);
@@ -142,3 +142,51 @@ atoull(const char *s, uint64_t *ret)
 
     return 1;
 }
+
+#ifdef LC_TEST
+/* See if compile time params are really set correctly */
+void test_endianness(void)
+{
+    union {
+        uint32_t i;
+        uint8_t c[4];
+    } bint = {0x01020304};  
+  
+#ifdef LC_LITTLE_ENDIAN
+    assert(bint.c[0] == 4);
+#elif LC_BIG_ENDIAN
+    assert(bint.c[0] == 1);
+#endif
+}
+
+void test_util_routines(void)
+{
+    union {
+        uint64_t i;
+        uint8_t c[8];
+    } u64_test = {0x0102030405060708U};
+    uint8_t uch;
+    int ret;
+
+#ifdef LC_LITTLE_ENDIAN
+    uch = u64_test.c[0];
+    u64_test.i = ntohll(u64_test.i);
+    assert(uch == u64_test.c[7]);
+#elif LC_BIG_ENDIAN
+    uch = u64_test.c[0];
+    u64_test.i = ntohll(u64_test.i);
+    assert(uch == u64_test.c[0]); // same as before
+#endif
+    ret = atoull("1234567891234567891234", &u64_test.i); //out of bounds
+    assert(ret == 0);
+    
+    // test string conv is correct
+    ret = atoull("18446744073709551615", &u64_test.i); // max uint64
+    assert(ret == 1);
+    uch = u64_test.c[0];
+    u64_test.i = 18446744073709551615U;    
+    assert(uch == u64_test.c[0]); 
+}
+
+
+#endif

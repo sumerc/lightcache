@@ -29,18 +29,17 @@
 
 // version info
 #define LIGHTCACHE_VERSION 0.1
-#define LIGHTCACHE_BUILD 3
+#define LIGHTCACHE_BUILD 4
 
 struct settings {
     int deamon_mode; /* specify whether to run in deamon mode */
     uint64_t mem_avail; /*in bytes. max. memory this lightcache instance is allowed to use */
     uint64_t idle_conn_timeout; /* timeout in sec that idle connections will be disconnected */
     char *socket_path; /* path to the unix domain socket */
+    int use_sys_malloc; /* indicate whether to use sys malloc or our slab allocator. */
 };
 
 struct stats {
-    uint64_t mem_used;
-    uint64_t mem_request_count; /* TODO(After pre-alloc optimizations):number of times mem is demanded from OS */
     uint64_t req_per_sec;
     uint64_t resp_per_sec;
     time_t start_time;
@@ -57,6 +56,7 @@ struct stats {
 #define LIGHTCACHE_LISTEN_BACKLOG 100
 #define LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD 75 /*the ratio threshold that garbage collect functions will start demanding memory.*/
 #define LIGHTCACHE_STATS_SIZE 250
+#define SLAB_SIZE_FACTOR 1.25
 
 #endif
 
