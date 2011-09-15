@@ -175,6 +175,8 @@ static void disconnect_conn(conn* conn)
     set_conn_state(conn, CONN_CLOSED);
 }
 
+// TODO: defined as errors but contains SUCCESS, so change it to something 
+// like code_t and change the func.name.
 static void send_response(conn *conn, errors err)
 {
     assert(conn->out != NULL);
@@ -202,6 +204,15 @@ static int prepare_response(conn *conn, size_t data_length, int alloc_mem)
     conn->out->resp_header.response.data_length = htonl(data_length);
     conn->out->resp_header.response.opcode = conn->in->req_header.request.opcode;
     conn->out->resp_header.response.errcode = SUCCESS;
+
+    return 1;
+}
+
+static int add_response(conn *conn, char *data, size_t data_length)
+{
+    // queue up conn->out->sdata_vec
+    if (data == NULL) {
+    }
 
     return 1;
 }
@@ -303,7 +314,7 @@ static void execute_cmd(struct conn* conn)
     	conn->queue_responses = 1;
     case CMD_GET:
 
-        LC_DEBUG(("CMD_GET [%s]\r\n", conn->in->rkey));
+        LC_DEBUG(("CMD_GET [%s]\r\n", conn->queue_responses, conn->in->rkey));
 
         stats.cmd_get++;
 
@@ -331,6 +342,7 @@ static void execute_cmd(struct conn* conn)
 
         prepare_response(conn, cached_req->req_header.request.data_length, 0); // do not alloc mem
 
+        //add_response_data(cached_req->rdata, 0);
         conn->out->sdata = cached_req->rdata;
         conn->out->can_free = 0;
 

@@ -102,7 +102,7 @@ typedef struct conn {
     response *out;					/* response instance */
     int queue_responses;            /* flag indicates for queueing the responses. */
     int free; 						/* recycle connection structure */
-    struct conn *next;						/* next connection in the linked-list of the connections */
+    struct conn *next;				/* next connection in the linked-list of the connections */
 } conn;
 
 #endif
