@@ -160,6 +160,10 @@ static int add_response(conn *conn, void *data, size_t data_length)
         return 0;
     }
     memcpy(new_vec, conn->out->sdata_vec, conn->out->nitems*sizeof(struct iovec));
+    li_free(conn->out->sdata_vec);
+    
+    //li_malloc(sizeof());
+
     conn->out->sdata_vec[conn->out->nitems].iov_base = data;
     conn->out->sdata_vec[conn->out->nitems].iov_len = data_length;    
     conn->out->nitems++;
@@ -178,23 +182,6 @@ static void send_response_code(conn *conn, code_t code)
     add_response_data(conn, NULL, 0);
     
     set_conn_state(conn, SEND_HEADER);
-}
-
-static int prepare_response(conn *conn, size_t data_length, int alloc_mem)
-{
-    assert(conn->out != NULL);
-
-    if (alloc_mem) {
-        conn->out->sdata = (char *)li_malloc(data_length);
-        if (!conn->out->sdata) {
-            return 0;
-        }
-    }
-    conn->out->resp_header.response.data_length = htonl(data_length);
-    conn->out->resp_header.response.opcode = conn->in->req_header.request.opcode;
-    conn->out->resp_header.response.errcode = SUCCESS;
-
-    return 1;
 }
 
 void set_conn_state(struct conn* conn, conn_states state)

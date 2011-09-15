@@ -37,9 +37,9 @@ typedef struct request {
 } request;
 
 typedef struct response {
-    resp_header resp_header;    
     struct iovec *sdata_vec;
     unsigned int nitems;
+    unsigned int sbytes;
 } response;
 
 typedef enum {
