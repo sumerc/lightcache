@@ -26,7 +26,6 @@ v0.1
 [+] kqueue pass TESTS. Getting broken pipe errors on some occasions.
 v0.2
 ---------
-
 [*] TOO HARD from now on and memcached is also not doing like this.Subsequent read/write should be possible at the same time. And i don't expect any valid use case for this requirement. If you see one write here.
 [*] use HHASH algorithm same as memcached. Bob Jenkins is the expert there:)
     Maybe improve in next versions, currently it is ok using one_at_a_time hash.
