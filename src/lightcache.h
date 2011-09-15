@@ -18,7 +18,6 @@
 #include "netinet/tcp.h" // TODO:not sure BSD have this.
 #include "sys/un.h" // TODO:not sure BSD have this.
 
-
 #ifndef __linux__
 #include "sys/socket.h"
 #include "netinet/in.h"
