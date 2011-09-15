@@ -955,6 +955,7 @@ int main(int argc, char **argv)
 
     }
     
+    
 err:
     syslog(LOG_INFO, "lightcache stopped.");
     closelog();
