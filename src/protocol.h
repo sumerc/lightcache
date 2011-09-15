@@ -21,7 +21,7 @@ typedef union req_header {
 typedef union {
     struct {
         uint8_t opcode;
-        uint8_t errcode;
+        uint8_t code;
         uint32_t data_length;
     } response;
     uint8_t bytes[8];
@@ -74,7 +74,7 @@ typedef enum {
     SUCCESS = 0x04,
     INVALID_COMMAND = 0x05,
     OUT_OF_MEMORY = 0x06,
-} errors;
+} code_t;
 
 typedef struct conn {
     int fd; 						/* socket fd */
