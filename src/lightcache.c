@@ -88,53 +88,29 @@ struct conn*make_conn(int fd) {
 
 static void free_request(request *req)
 {
-
-    if (!req) {
-        return;
-    }
-
-    if (req->can_free) {
-        LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
-        li_free(req->rkey);
-        li_free(req->rdata);
-        li_free(req->rextra);
-        req->rkey = NULL;
-        req->rdata = NULL;
-        req->rextra = NULL;
-        li_free(req);
-    }
+    //LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
+    li_free(req->rkey);
+    li_free(req->rdata);
+    li_free(req->rextra);
+    req->rkey = NULL;
+    req->rdata = NULL;
+    req->rextra = NULL;
+    
+    li_free(req);
 }
 
 static void free_response(response *resp)
 {
-
-    if (!resp) {
-        return;
-    }
-
-    if (resp->can_free && resp->sdata) {
-        //LC_DEBUG(("FREEING response data.[%p]\r\n", (void *)resp));
-        li_free(resp->sdata);
-    }
-
-    /* can lose reference to mem, otherwise, later freelist usage of the same resp
-     * object may lead to invalid deletion of this data.
-     * */
-    resp->sdata = NULL;
-
+    li_free(resp->sdata_vec);
+    resp->sdata_vec = NULL;
+    resp->nitems = 0;
+    
     li_free(resp);
 }
 
-
+/* All previous allocations shall already be freed. */
 static int init_resources(conn *conn)
 {
-
-    /* free previous request allocations if we have any */
-    free_request(conn->in);
-    free_response(conn->out);
-    conn->in = NULL;
-    conn->out = NULL;    
-
     /* allocate req/resp resources */
     conn->in = (request *)li_malloc(sizeof(request));
     if (!conn->in) {

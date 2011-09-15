@@ -437,7 +437,8 @@ void *scmalloc(size_t size)
 
     // find relevant cache
     ccache = size_to_cache(cm->caches, cm->cache_count, size);
-
+    assert(ccache != NULL);
+    
     // need to allocate a slab_ctl?
     cslab = peek(&ccache->slabs_partial);
     if (cslab == NULL) {

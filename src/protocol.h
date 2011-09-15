@@ -1,4 +1,6 @@
 
+#include "sys/uio.h"
+
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
@@ -32,30 +34,12 @@ typedef struct request {
     char *rextra;
     unsigned int rbytes; /* current index in to the receive buf */
     time_t received;
-    int can_free; /* flag to indicate whether data can be freed. */
 } request;
 
-typedef struct response_data {
-    char *data;
-    unsigned int sbytes;
-    int can_free;
-    struct response_data *next;
-} response_data;
-
-typedef struct response_data_queue {
-    response_data *head;
-    response_data *tail;
-    unsigned int nitems;
-} response_data_queue;
-
 typedef struct response {
-    resp_header resp_header;
-    char *sdata;
-    unsigned int sbytes; /*current write index*/
-
-    response_data_queue sdata_vec;
-    
-    int can_free;
+    resp_header resp_header;    
+    struct iovec *sdata_vec;
+    unsigned int nitems;
 } response;
 
 typedef enum {
