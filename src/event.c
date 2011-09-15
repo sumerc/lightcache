@@ -1,4 +1,4 @@
-#include "event_config.h"
+#include "config.h"
 #include "event.h"
 
 #ifdef HAVE_EPOLL

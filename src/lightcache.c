@@ -79,6 +79,7 @@ struct conn*make_conn(int fd) {
     conn->free = 0;
     conn->in = NULL;
     conn->out = NULL;
+    conn->queue_responses = 0;
 
     stats.curr_connections++;
 
@@ -298,10 +299,11 @@ static void execute_cmd(struct conn* conn)
        protocol. */
     switch(cmd) {
     case CMD_GETQ:
-    	quiet = 1;
+        LC_DEBUG(("CMD_GETQ\r\n"));
+    	conn->queue_responses = 1;
     case CMD_GET:
 
-        LC_DEBUG(("CMD_GET (Q:%d) [%s]\r\n", quiet, conn->in->rkey));
+        LC_DEBUG(("CMD_GET [%s]\r\n", conn->in->rkey));
 
         stats.cmd_get++;
 
@@ -335,10 +337,11 @@ static void execute_cmd(struct conn* conn)
         set_conn_state(conn, SEND_HEADER);
         break;
     case CMD_SETQ:
-        quiet = 1;
+        LC_DEBUG(("CMD_SETQ\r\n"));
+        conn->queue_responses = 1;
     case CMD_SET:
 
-        LC_DEBUG(("CMD_SET (Q:%d) \r\n", quiet));
+        LC_DEBUG(("CMD_SET\r\n"));
 
         stats.cmd_set++;
 

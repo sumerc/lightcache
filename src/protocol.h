@@ -25,8 +25,7 @@ typedef union {
     uint8_t bytes[8];
 } resp_header;
 
-typedef struct request request;
-struct request {
+typedef struct request {
     req_header req_header;
     char *rdata;
     char *rkey;
@@ -34,15 +33,30 @@ struct request {
     unsigned int rbytes; /* current index in to the receive buf */
     time_t received;
     int can_free; /* flag to indicate whether data can be freed. */
-};
+} request;
 
-typedef struct response response;
-struct response {
+typedef struct response_data {
+    char *data;
+    unsigned int sbytes;
+    int can_free;
+    struct response_data *next;
+} response_data;
+
+typedef struct response_data_queue {
+    response_data *head;
+    response_data *tail;
+    unsigned int nitems;
+} response_data_queue;
+
+typedef struct response {
     resp_header resp_header;
     char *sdata;
     unsigned int sbytes; /*current write index*/
+
+    response_data_queue sdata_vec;
+    
     int can_free;
-};
+} response;
 
 typedef enum {
     CMD_GET = 0x00,
@@ -78,8 +92,7 @@ typedef enum {
     OUT_OF_MEMORY = 0x06,
 } errors;
 
-typedef struct conn conn;
-struct conn {
+typedef struct conn {
     int fd; 						/* socket fd */
     int listening;					/* listening socket? */
     int active;					    /* conn have active events on the I/O interface */
@@ -87,8 +100,9 @@ struct conn {
     conn_states state; 				/* state of the connection READ_KEY, READ_HEADER.etc...*/
     request *in;					/* request instance */
     response *out;					/* response instance */
+    int queue_responses;            /* flag indicates for queueing the responses. */
     int free; 						/* recycle connection structure */
-    conn *next;						/* next connection in the linked-list of the connections */
-};
+    struct conn *next;						/* next connection in the linked-list of the connections */
+} conn;
 
 #endif
