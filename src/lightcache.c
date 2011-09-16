@@ -150,38 +150,50 @@ static void disconnect_conn(conn* conn)
     set_conn_state(conn, CONN_CLOSED);
 }
 
-static int add_response(conn *conn, void *data, size_t data_length)
+static int add_response(conn *conn, void *data, size_t data_length, code_t code)
 {
     void *new_vec;
+    void *real_resp;    
+
+    assert(conn->out != NULL);
     
+    // realloc the old send data vector
     new_vec = li_malloc((conn->out->nitems+1)*sizeof(struct iovec));
     if (!new_vec) {
-        // todo: somehow send_response_code(conn, OUT_OF_MEMORY);
+        // todo: send_response_code(conn, OUT_OF_MEMORY);
         return 0;
     }
     memcpy(new_vec, conn->out->sdata_vec, conn->out->nitems*sizeof(struct iovec));
     li_free(conn->out->sdata_vec);
     
-    //li_malloc(sizeof());
-
-    conn->out->sdata_vec[conn->out->nitems].iov_base = data;
-    conn->out->sdata_vec[conn->out->nitems].iov_len = data_length;    
-    conn->out->nitems++;
+    // generate the actual response to be sent
+    real_resp = li_malloc(sizeof(resp_header)+data_length);
+    if (!new_vec) {
+        // todo: send_response_code(conn, OUT_OF_MEMORY);
+        return 0;
+    }
+    ((resp_header *)real_resp)->response.data_length = data_length;
+    ((resp_header *)real_resp)->response.opcode = conn->in->req_header.request.opcode;
+    ((resp_header *)real_resp)->response.code = code;
+    memcpy((char *)real_resp+sizeof(resp_header), data, data_length);    
     
+    // update the send vector
+    conn->out->sdata_vec[conn->out->nitems].iov_base = real_resp;
+    conn->out->sdata_vec[conn->out->nitems].iov_len = sizeof(resp_header)+data_length;   
+    conn->out->nitems++;
+
+    if (conn->queue_responses) {
+        set_conn_state(conn, SEND_HEADER);
+    } else {
+        set_conn_state(conn, READ_HEADER);
+    }
+
     return 1;
 }
 
 static void send_response_code(conn *conn, code_t code)
 {
-    assert(conn->out != NULL);
-
-    conn->out->resp_header.response.data_length = 0;
-    conn->out->resp_header.response.opcode = conn->in->req_header.request.opcode;
-    conn->out->resp_header.response.code = code;
-
-    add_response_data(conn, NULL, 0);
-    
-    set_conn_state(conn, SEND_HEADER);
+    add_response(conn, NULL, 0, code);
 }
 
 void set_conn_state(struct conn* conn, conn_states state)
@@ -281,7 +293,7 @@ static void execute_cmd(struct conn* conn)
     	conn->queue_responses = 1;
     case CMD_GET:
 
-        LC_DEBUG(("CMD_GET [%s]\r\n", conn->queue_responses, conn->in->rkey));
+        LC_DEBUG(("CMD_GET [%s]\r\n", conn->in->rkey));
 
         stats.cmd_get++;
 
@@ -299,7 +311,6 @@ static void execute_cmd(struct conn* conn)
 
         if ((unsigned int)(conn->in->received-cached_req->received) > val) {
             LC_DEBUG(("Time expired for key:%s\r\n", conn->in->rkey));
-            cached_req->can_free = 1;
             free_request(cached_req);
             hfree(cache, tab_item); // recycle tab_item
             goto GET_KEY_NOTEXISTS;
@@ -307,11 +318,7 @@ static void execute_cmd(struct conn* conn)
 
         stats.get_hits++;
 
-        prepare_response(conn, cached_req->req_header.request.data_length, 0); // do not alloc mem
-
-        //add_response_data(cached_req->rdata, 0);
-        conn->out->sdata = cached_req->rdata;
-        conn->out->can_free = 0;
+        add_response(conn, cached_req, cached_req->req_header.request.data_length, SUCCESS);
 
         set_conn_state(conn, SEND_HEADER);
         break;
@@ -345,12 +352,9 @@ static void execute_cmd(struct conn* conn)
 
             // free the previous data
             cached_req = (request *)tab_item->val;
-            cached_req->can_free = 1;
             free_request(cached_req);
-            
             tab_item->val = conn->in;
         }
-        conn->in->can_free = 0;
         
         LC_DEBUG(("req cannot be freed.\r\n"));
 
@@ -368,7 +372,6 @@ static void execute_cmd(struct conn* conn)
         }
 
         cached_req = (request *)tab_item->val;
-        cached_req->can_free = 1;
         free_request(cached_req);
 
         hfree(cache, tab_item);
