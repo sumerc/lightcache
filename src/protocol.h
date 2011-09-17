@@ -60,10 +60,9 @@ typedef enum {
     READ_DATA = 0x02,
     CONN_CLOSED = 0x03,
     CMD_RECEIVED = 0x04,
-    SEND_HEADER = 0x05,
-    SEND_DATA = 0x06,
-    READ_EXTRA = 0x07,
-    CMD_SENT = 0x08,
+    SEND_RESPONSE = 0x05,
+    READ_EXTRA = 0x06,
+    CMD_SENT = 0x07,
 } conn_states;
 
 typedef enum {

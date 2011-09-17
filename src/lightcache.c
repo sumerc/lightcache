@@ -183,7 +183,7 @@ static int add_response(conn *conn, void *data, size_t data_length, code_t code)
     conn->out->nitems++;
 
     if (conn->queue_responses) {
-        set_conn_state(conn, SEND_HEADER);
+        set_conn_state(conn, SEND_RESPONSE);
     } else {
         set_conn_state(conn, READ_HEADER);
     }
@@ -238,7 +238,7 @@ void set_conn_state(struct conn* conn, conn_states state)
         break;
     case CMD_SENT:
         break;
-    case SEND_HEADER:
+    case SEND_RESPONSE:
         conn->out->sbytes = 0;
         event_set(conn, EVENT_WRITE);
         break;
@@ -277,7 +277,8 @@ static void execute_cmd(struct conn* conn)
     uint64_t val;
     request *cached_req;
     _hitem *tab_item;
-
+    char *sval;
+    
     assert(conn->state == CMD_RECEIVED);
 
     /* here, the complete request is received from the connection */
@@ -318,9 +319,10 @@ static void execute_cmd(struct conn* conn)
 
         stats.get_hits++;
 
-        add_response(conn, cached_req, cached_req->req_header.request.data_length, SUCCESS);
+        if (!add_response(conn, cached_req, cached_req->req_header.request.data_length, SUCCESS)) {
+            // TODO: ?        
+        }
 
-        set_conn_state(conn, SEND_HEADER);
         break;
     case CMD_SETQ:
         LC_DEBUG(("CMD_SETQ\r\n"));
@@ -426,19 +428,15 @@ static void execute_cmd(struct conn* conn)
 
         /* validate params */
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
-            if (!prepare_response(conn, sizeof(uint64_t), 1)) {
-                send_response_code(conn, OUT_OF_MEMORY);
-                return;
+            val = htonll(settings.idle_conn_timeout);
+            if (!add_response(conn, &val, sizeof(uint64_t), SUCCESS)) {
+                // TODO:?
             }
-            *(uint64_t *)conn->out->sdata = htonll(settings.idle_conn_timeout);
-            set_conn_state(conn, SEND_HEADER);
         } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
-            if (!prepare_response(conn, sizeof(uint64_t), 1)) {
-                send_response_code(conn, OUT_OF_MEMORY);
-                return;
+            val = htonll(settings.mem_avail / 1024 / 1024);
+            if (!add_response(conn, &val, sizeof(uint64_t), SUCCESS)) {
+                // TODO:?            
             }
-            *(uint64_t *)conn->out->sdata = htonll(settings.mem_avail / 1024 / 1024);
-            set_conn_state(conn, SEND_HEADER);
         } else {
             LC_DEBUG(("Invalid setting received :%s\r\n", conn->in->rkey));
             send_response_code(conn, INVALID_PARAM);
@@ -448,12 +446,9 @@ static void execute_cmd(struct conn* conn)
     case CMD_GET_STATS:
 
         LC_DEBUG(("GET_STATS\r\n"));
-
-        if (!prepare_response(conn, LIGHTCACHE_STATS_SIZE, 1)) {
-            send_response_code(conn, OUT_OF_MEMORY);
-            return;
-        }
-        sprintf(conn->out->sdata,
+        
+        sval = (char *)li_malloc(sizeof(LIGHTCACHE_STATS_SIZE));        
+        sprintf(sval,
                 "mem_used:%llu\r\nmem_avail:%llu\r\nuptime:%lu\r\nversion: %0.1f Build.%d\r\n"
                 "pid:%d\r\ntime:%lu\r\ncurr_items:%d\r\ncurr_connections:%llu\r\n"
                 "cmd_get:%llu\r\ncmd_set:%llu\r\nget_misses:%llu\r\nget_hits:%llu\r\n"
@@ -473,7 +468,10 @@ static void execute_cmd(struct conn* conn)
                 (long long unsigned int)stats.get_hits,
                 (long long unsigned int)stats.bytes_read,
                 (long long unsigned int)stats.bytes_written);
-        set_conn_state(conn, SEND_HEADER);
+        if (!add_response(conn, sval, LIGHTCACHE_STATS_SIZE, SUCCESS)) {
+            // TODO:?        
+        }
+        li_free(sval);
         break;
     default:
         LC_DEBUG(("Unrecognized command.[%d]\r\n", cmd));
@@ -645,7 +643,8 @@ int try_send_response(conn *conn)
 
     switch(conn->state) {
 
-    case SEND_HEADER:
+    case SEND_RESPONSE:
+        /*
         ret = send_nbytes(conn, (char *)conn->out->resp_header.bytes, sizeof(resp_header));
         if (ret == SEND_COMPLETED) {
             if (ntohl(conn->out->resp_header.response.data_length) != 0) {
@@ -655,14 +654,9 @@ int try_send_response(conn *conn)
                 set_conn_state(conn, READ_HEADER);// wait for new commands
             }
         }
+        */
         break;
-    case SEND_DATA:
-        ret = send_nbytes(conn, conn->out->sdata, ntohl(conn->out->resp_header.response.data_length));
-        if (ret == SEND_COMPLETED) {
-            set_conn_state(conn, CMD_SENT);
-            set_conn_state(conn, READ_HEADER);// wait for new commands
-        }
-        break;
+    
     default:
         LC_DEBUG(("Invalid state in try_send_response %d\r\n", conn->state));
         ret = FAILED;
