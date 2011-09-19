@@ -97,7 +97,7 @@ static void free_request(request *req)
 
 static void free_response(response *resp)
 {
-    li_free(resp->sdata_vec);
+    // TODO: Free all queued responses
     li_free(resp);
 }
 
@@ -120,9 +120,8 @@ static int init_resources(conn *conn)
     conn->in->rdata = NULL;
     conn->in->rextra = NULL;
    
-    conn->out->sdata_vec = NULL;
-    conn->out->cur_bytes = 0;
-    conn->out->cur_vec = 0;
+    conn->out->svec_head = NULL;
+    conn->out->svec_tail = 0;
     
     return 1;
 }
@@ -167,12 +166,13 @@ static int add_response(conn *conn, void *data, size_t data_length, code_t code)
         // todo: send_response_code(conn, OUT_OF_MEMORY);
         return 0;
     }
-    ((resp_header *)resp_item->data)->hdr.response.data_length = data_length;
-    ((resp_header *)resp_item->data)->hdr.response.opcode = conn->in->req_header.request.opcode;
-    ((resp_header *)resp_item->data)->hdr.response.code = code;
+    ((resp_header *)resp_item->data)->response.data_length = data_length;
+    ((resp_header *)resp_item->data)->response.opcode = conn->in->req_header.request.opcode;
+    ((resp_header *)resp_item->data)->response.code = code;
     memcpy((char *)resp_item->data+sizeof(resp_header), data, data_length);
     resp_item->data_len = data_length+sizeof(resp_header);   
     resp_item->next = NULL;
+    resp_item->cur_bytes = 0;
     
     // add the item to client's response    
     if(conn->out->svec_tail == NULL) {
@@ -236,7 +236,6 @@ void set_conn_state(struct conn* conn, conn_states state)
     case CMD_SENT:
         break;
     case SEND_RESPONSE:
-        conn->out->sbytes = 0;
         event_set(conn, EVENT_WRITE);
         break;
     default:
@@ -611,21 +610,19 @@ socket_state send_nvectors(conn*conn)
     int nbytes;
     unsigned int i;
     struct iovec iobuf[10]; // todo: define max send per writev
-    response_item_t *it;
+    response_item_t *it,*nxt;
     
     // TODO: min(, 10)
-    it = conn->out->svec_head
     i = 0;
-    while(it)
-        iobuf[i].iov_base = it->data;
-        iobuf[i].iov_len = it->len;
+    it = conn->out->svec_head;
+    while(it) {
+        iobuf[i].iov_base = (char *)it->data+it->cur_bytes;
+        iobuf[i].iov_len = it->data_len-it->cur_bytes;
         it = it->next;
         i++;
     }
     
-    nbytes = writev(conn->fd, 
-        (&conn->out->sdata_vec[conn->out->cur_vec])+conn->out->cur_bytes, 
-        conn->out->nitems);
+    nbytes = writev(conn->fd, iobuf, i);
     if (nbytes == -1) {
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
             return NEED_MORE;
@@ -637,25 +634,21 @@ socket_state send_nvectors(conn*conn)
 
     stats.bytes_written += nbytes;
     
-    // drain sent vectors
-    nbytes += conn->out->cur_bytes;
-    conn->out->cur_bytes = 0;
-    for(i=0;i<conn->out->nitems;i++) {
-        if (nbytes >= conn->out->sdata_vec[i].iov_len) {
-            conn->out->cur_vec++;
-            nbytes -= conn->out->sdata_vec[i].iov_len;            
-        } else {
-            conn->out->cur_bytes = nbytes;
+    // drain sent responses       
+    it = conn->out->svec_head; 
+    while(it) {
+        nxt = it->next;
+        if (it->cur_bytes+nbytes < it->data_len) {
+            it->cur_bytes += nbytes;
             break;
         }
-    }
-    
-    // all vectors sent?
-    if()
-    
-    if (conn->out->sbytes == total) {
-        conn->out->sbytes = 0;
-        return SEND_COMPLETED;
+        li_free(it->data);
+        li_free(it);
+        conn->out->svec_head = it = nxt;
+        if (conn->out->svec_head == NULL) {
+            conn->out->svec_tail = NULL;
+            return SEND_COMPLETED; 
+        }
     }
 
     return NEED_MORE;
@@ -809,6 +802,7 @@ static int init_server_socket(void)
         su_me.sun_family = AF_UNIX;
         strncpy(su_me.sun_path, settings.socket_path, sizeof(su_me.sun_path) - 1);
         if (bind(s, (struct sockaddr *)&su_me, sizeof(su_me)) == -1) {
+
             LC_DEBUG(("%s (%s)\r\n", "socket bind error.", strerror(errno)));
             syslog(LOG_ERR, "%s (%s)", "socket bind error.", strerror(errno));
             close(s);

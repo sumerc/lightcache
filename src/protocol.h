@@ -39,14 +39,13 @@ typedef struct request {
 typedef struct response_item_t {
     void *data;
     unsigned int data_len;
+    unsigned int cur_bytes;
     struct response_item_t *next;
 } response_item_t ; 
 
 typedef struct response {
     response_item_t *svec_head;
     response_item_t *svec_tail;
-    unsigned int cur_bytes;
-    unsigned int cur_vec;
 } response;
 
 typedef enum {
