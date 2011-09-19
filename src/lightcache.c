@@ -166,7 +166,7 @@ static int add_response(conn *conn, void *data, size_t data_length, code_t code)
         // todo: send_response_code(conn, OUT_OF_MEMORY);
         return 0;
     }
-    ((resp_header *)resp_item->data)->response.data_length = data_length;
+    ((resp_header *)resp_item->data)->response.data_length = htonl(data_length);
     ((resp_header *)resp_item->data)->response.opcode = conn->in->req_header.request.opcode;
     ((resp_header *)resp_item->data)->response.code = code;
     memcpy((char *)resp_item->data+sizeof(resp_header), data, data_length);
@@ -315,7 +315,9 @@ static void execute_cmd(struct conn* conn)
 
         stats.get_hits++;
 
-        if (!add_response(conn, cached_req, cached_req->req_header.request.data_length, SUCCESS)) {
+        LC_DEBUG(("cmd get for %s %d\r\n", cached_req->rdata, cached_req->req_header.request.data_length));
+
+        if (!add_response(conn, cached_req->rdata, cached_req->req_header.request.data_length, SUCCESS)) {
             // TODO: ?        
         }
 
@@ -617,8 +619,8 @@ socket_state send_nvectors(conn*conn)
     it = conn->out->svec_head;
     while(it) {
         iobuf[i].iov_base = (char *)it->data+it->cur_bytes;
-        iobuf[i].iov_len = it->data_len-it->cur_bytes;
-        it = it->next;
+        iobuf[i].iov_len = it->data_len-it->cur_bytes;    
+        it = it->next;        
         i++;
     }
     
@@ -714,6 +716,7 @@ void event_handler(conn *conn, event ev)
                 close(conn_sock);
                 return;
             }
+            conn->queue_responses = 1;// TODO: DO NOT forget
             set_conn_state(conn, READ_HEADER);
         } else {
             sock_state = try_read_request(conn);
@@ -885,8 +888,8 @@ int main(int argc, char **argv)
             (unsigned long long)settings.mem_avail/1024/1024); // inform user.
         settings.use_sys_malloc = 1;
     } else {
-        LC_DEBUG(("using slab allocator with %llu MB of memory.\r\n", 
-            (unsigned long long int)settings.mem_avail/1024/1024));
+        LC_DEBUG(("using slab allocator with %llu MB of memory and with %u caches.\r\n", 
+            (unsigned long long int)settings.mem_avail/1024/1024, slab_stats.cache_count));
     }  
     init_stats();
 

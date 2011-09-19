@@ -81,7 +81,7 @@ class LightCacheClient(socket.socket):
         super(LightCacheClient, self).send(data)
 
     def recv_packet(self):
-        self.response.opcode, self.response.errcode, self.response.data_len = self._recv_header()    
+        self.response.opcode, self.response.errcode, self.response.data_len = self._recv_header()          
         self.response.data_len = socket.ntohl(self.response.data_len)
         if self.response.data_len == 0:
             return None 

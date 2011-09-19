@@ -26,7 +26,7 @@ Sumer Cip 2011
 #include "stdint.h"
 
 #define SLAB_SIZE (1024*1024)
-#define MIN_SLAB_CHUNK_SIZE (40)
+#define MIN_SLAB_CHUNK_SIZE (20)
 #define CHUNK_ALIGN_BYTES (8)
 
 typedef struct slab_stats_t {
