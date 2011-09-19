@@ -144,6 +144,10 @@ static void disconnect_conn(conn* conn)
     set_conn_state(conn, CONN_CLOSED);
 }
 
+/* Allocate and queue a response item obj to send buffer queue for the current 
+ incoming request.
+ */
+// TODO: Write a unit test for this
 static int add_response(conn *conn, void *data, size_t data_length, code_t code)
 {
     response_item_t *resp_item;
@@ -158,12 +162,17 @@ static int add_response(conn *conn, void *data, size_t data_length, code_t code)
         // todo: send_response_code(conn, OUT_OF_MEMORY);
         return 0;
     }
-    resp_item->data = data;
-    resp_item->len = data_length;   
-    resp_item->next = NULL;    
-    resp_item->hdr.response.data_length = data_length;
-    resp_item->hdr.response.opcode = conn->in->req_header.request.opcode;
-    resp_item->hdr.response.code = code;
+    resp_item->data = li_malloc(data_length+sizeof(resp_header));
+    if (!resp_item->data) {
+        // todo: send_response_code(conn, OUT_OF_MEMORY);
+        return 0;
+    }
+    ((resp_header *)resp_item->data)->hdr.response.data_length = data_length;
+    ((resp_header *)resp_item->data)->hdr.response.opcode = conn->in->req_header.request.opcode;
+    ((resp_header *)resp_item->data)->hdr.response.code = code;
+    memcpy((char *)resp_item->data+sizeof(resp_header), data, data_length);
+    resp_item->data_len = data_length+sizeof(resp_header);   
+    resp_item->next = NULL;
     
     // add the item to client's response    
     if(conn->out->svec_tail == NULL) {
@@ -171,8 +180,6 @@ static int add_response(conn *conn, void *data, size_t data_length, code_t code)
     } else {
         conn->out->svec_tail->next = resp_item;
     }
-    
-    conn->out->nitems++;
     
     if (conn->queue_responses) {
         set_conn_state(conn, SEND_RESPONSE);

@@ -37,9 +37,8 @@ typedef struct request {
 } request;
 
 typedef struct response_item_t {
-    resp_header hdr;
     void *data;
-    unsigned int len;
+    unsigned int data_len;
     struct response_item_t *next;
 } response_item_t ; 
 
