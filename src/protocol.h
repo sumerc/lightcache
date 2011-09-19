@@ -39,7 +39,8 @@ typedef struct request {
 typedef struct response {
     struct iovec *sdata_vec;
     unsigned int nitems;
-    unsigned int sbytes;
+    unsigned int cur_bytes;
+    unsigned int cur_vec;
 } response;
 
 typedef enum {

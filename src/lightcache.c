@@ -129,6 +129,8 @@ static int init_resources(conn *conn)
    
     conn->out->sdata_vec = NULL;
     conn->out->nitems = 0;
+    conn->out->cur_bytes = 0;
+    conn->out->cur_vec = 0;
     
     return 1;
 }
@@ -203,10 +205,8 @@ void set_conn_state(struct conn* conn, conn_states state)
         if (!init_resources(conn)) {
             disconnect_conn(conn);
             return;
-        }
-        
+        }        
         LC_DEBUG(("rkey:%p\r\n", conn->in->rkey));
-
         conn->in->rbytes = 0;
         event_set(conn, EVENT_READ);
         break;
@@ -609,26 +609,36 @@ int try_read_request(conn* conn)
     return ret;
 }
 
-socket_state send_nbytes(conn*conn, char *bytes, size_t total)
+socket_state send_nvectors(conn*conn)
 {
-    int needed, nbytes;
+    int nbytes;
+    unsigned int i,nvec;
 
-    //LC_DEBUG(("send_nbytes called.[left:%ld, fd:%d]\r\n", total - conn->out->sbytes, conn->fd));
-
-    needed = total - conn->out->sbytes;
-    nbytes = write(conn->fd, &bytes[conn->out->sbytes], 1); //needed
+    nbytes = writev(conn->fd, 
+        (&conn->out->sdata_vec[conn->out->cur_vec])+conn->out->cur_bytes, 
+        conn->out->nitems);
     if (nbytes == -1) {
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
             return NEED_MORE;
         }
-        LC_DEBUG(("%s (%s)", "socket write error.", strerror(errno)));
-        syslog(LOG_ERR, "%s (%s)", "socket write error.", strerror(errno));
+        LC_DEBUG(("%s (%s)", "socket writev error.", strerror(errno)));
+        syslog(LOG_ERR, "%s (%s)", "socket writev error.", strerror(errno));
         return SEND_ERR;
     }
 
     stats.bytes_written += nbytes;
-
-    conn->out->sbytes += nbytes;
+      
+    for(i=0;i<conn->out->nitems;i++) {
+        if (nbytes >= conn->out->sdata_vec[i].iov_len) {
+            conn->out->cur_vec++;
+            nbytes -= conn->out->sdata_vec[i].iov_len;            
+        } else {
+            conn->out->cur_bytes = nbytes;
+            break;
+        }
+    }
+    
+    
     if (conn->out->sbytes == total) {
         conn->out->sbytes = 0;
         return SEND_COMPLETED;
@@ -644,17 +654,12 @@ int try_send_response(conn *conn)
     switch(conn->state) {
 
     case SEND_RESPONSE:
-        /*
-        ret = send_nbytes(conn, (char *)conn->out->resp_header.bytes, sizeof(resp_header));
+        ret = send_nvectors(conn);
         if (ret == SEND_COMPLETED) {
-            if (ntohl(conn->out->resp_header.response.data_length) != 0) {
-                set_conn_state(conn, SEND_DATA);
-            } else {
-                set_conn_state(conn, CMD_SENT);
-                set_conn_state(conn, READ_HEADER);// wait for new commands
-            }
-        }
-        */
+            set_conn_state(conn, CMD_SENT);
+            set_conn_state(conn, READ_HEADER);// wait for new commands
+        } 
+        
         break;
     
     default:
@@ -801,6 +806,7 @@ static int init_server_socket(void)
         si_me.sin_port = htons(LIGHTCACHE_PORT);
         si_me.sin_addr.s_addr = htonl(INADDR_ANY);
         if (bind(s, (struct sockaddr *)&si_me, sizeof(si_me))==-1) {
+
             LC_DEBUG(("%s (%s)\r\n", "socket bind error.", strerror(errno)));
             syslog(LOG_ERR, "%s (%s)", "socket bind error.", strerror(errno));
             close(s);
