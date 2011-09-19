@@ -36,9 +36,16 @@ typedef struct request {
     time_t received;
 } request;
 
+typedef struct response_item_t {
+    resp_header hdr;
+    void *data;
+    unsigned int len;
+    struct response_item_t *next;
+} response_item_t ; 
+
 typedef struct response {
-    struct iovec *sdata_vec;
-    unsigned int nitems;
+    response_item_t *svec_head;
+    response_item_t *svec_tail;
     unsigned int cur_bytes;
     unsigned int cur_vec;
 } response;

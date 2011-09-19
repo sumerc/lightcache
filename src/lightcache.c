@@ -92,19 +92,12 @@ static void free_request(request *req)
     li_free(req->rkey);
     li_free(req->rdata);
     li_free(req->rextra);
-    req->rkey = NULL;
-    req->rdata = NULL;
-    req->rextra = NULL;
-    
     li_free(req);
 }
 
 static void free_response(response *resp)
 {
     li_free(resp->sdata_vec);
-    resp->sdata_vec = NULL;
-    resp->nitems = 0;
-    
     li_free(resp);
 }
 
@@ -128,7 +121,6 @@ static int init_resources(conn *conn)
     conn->in->rextra = NULL;
    
     conn->out->sdata_vec = NULL;
-    conn->out->nitems = 0;
     conn->out->cur_bytes = 0;
     conn->out->cur_vec = 0;
     
@@ -154,36 +146,34 @@ static void disconnect_conn(conn* conn)
 
 static int add_response(conn *conn, void *data, size_t data_length, code_t code)
 {
-    void *new_vec;
-    void *real_resp;    
+    response_item_t *resp_item;
 
     assert(conn->out != NULL);
+    assert(data_length < PROTOCOL_MAX_DATA_SIZE);
+    // TODO: assert nitems is smaller than the max allowed.
     
-    // realloc the old send data vector
-    new_vec = li_malloc((conn->out->nitems+1)*sizeof(struct iovec));
-    if (!new_vec) {
+    // alloc and initialize the response item
+    resp_item = li_malloc(sizeof(response_item_t));
+    if (!resp_item) {
         // todo: send_response_code(conn, OUT_OF_MEMORY);
         return 0;
     }
-    memcpy(new_vec, conn->out->sdata_vec, conn->out->nitems*sizeof(struct iovec));
-    li_free(conn->out->sdata_vec);
+    resp_item->data = data;
+    resp_item->len = data_length;   
+    resp_item->next = NULL;    
+    resp_item->hdr.response.data_length = data_length;
+    resp_item->hdr.response.opcode = conn->in->req_header.request.opcode;
+    resp_item->hdr.response.code = code;
     
-    // generate the actual response to be sent
-    real_resp = li_malloc(sizeof(resp_header)+data_length);
-    if (!new_vec) {
-        // todo: send_response_code(conn, OUT_OF_MEMORY);
-        return 0;
+    // add the item to client's response    
+    if(conn->out->svec_tail == NULL) {
+        conn->out->svec_head = conn->out->svec_tail = resp_item;
+    } else {
+        conn->out->svec_tail->next = resp_item;
     }
-    ((resp_header *)real_resp)->response.data_length = data_length;
-    ((resp_header *)real_resp)->response.opcode = conn->in->req_header.request.opcode;
-    ((resp_header *)real_resp)->response.code = code;
-    memcpy((char *)real_resp+sizeof(resp_header), data, data_length);    
     
-    // update the send vector
-    conn->out->sdata_vec[conn->out->nitems].iov_base = real_resp;
-    conn->out->sdata_vec[conn->out->nitems].iov_len = sizeof(resp_header)+data_length;   
     conn->out->nitems++;
-
+    
     if (conn->queue_responses) {
         set_conn_state(conn, SEND_RESPONSE);
     } else {
@@ -612,8 +602,20 @@ int try_read_request(conn* conn)
 socket_state send_nvectors(conn*conn)
 {
     int nbytes;
-    unsigned int i,nvec;
-
+    unsigned int i;
+    struct iovec iobuf[10]; // todo: define max send per writev
+    response_item_t *it;
+    
+    // TODO: min(, 10)
+    it = conn->out->svec_head
+    i = 0;
+    while(it)
+        iobuf[i].iov_base = it->data;
+        iobuf[i].iov_len = it->len;
+        it = it->next;
+        i++;
+    }
+    
     nbytes = writev(conn->fd, 
         (&conn->out->sdata_vec[conn->out->cur_vec])+conn->out->cur_bytes, 
         conn->out->nitems);
@@ -627,7 +629,10 @@ socket_state send_nvectors(conn*conn)
     }
 
     stats.bytes_written += nbytes;
-      
+    
+    // drain sent vectors
+    nbytes += conn->out->cur_bytes;
+    conn->out->cur_bytes = 0;
     for(i=0;i<conn->out->nitems;i++) {
         if (nbytes >= conn->out->sdata_vec[i].iov_len) {
             conn->out->cur_vec++;
@@ -638,6 +643,8 @@ socket_state send_nvectors(conn*conn)
         }
     }
     
+    // all vectors sent?
+    if()
     
     if (conn->out->sbytes == total) {
         conn->out->sbytes = 0;
