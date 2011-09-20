@@ -348,7 +348,7 @@ int init_cache_manager(size_t memory_limit, double chunk_size_factor)
     // SLAB_SIZE. This idea is being used on memcached() and proved to be well
     // on real-world.
     // TODO: !!!check below cannot return below 0.
-    cm->cache_count = (unsigned int)ceil(logbn(chunk_size_factor,
+    cm->cache_count = (unsigned int)floor(logbn(chunk_size_factor,
                                          SLAB_SIZE/MIN_SLAB_CHUNK_SIZE))-1;
     slab_stats.cache_count = cm->cache_count;
     
@@ -363,6 +363,7 @@ int init_cache_manager(size_t memory_limit, double chunk_size_factor)
         if (size % CHUNK_ALIGN_BYTES) {
             size += CHUNK_ALIGN_BYTES - (size % CHUNK_ALIGN_BYTES);
         }
+        assert(size <= SLAB_SIZE);            
         cm->caches[i].chunk_size = size;
         cm->caches[i].chunk_count_perslab = SLAB_SIZE / size;
     }
