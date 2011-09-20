@@ -183,6 +183,7 @@ static int add_response(conn *conn, void *data, size_t data_length, code_t code)
         conn->out->svec_head = conn->out->svec_tail = resp_item;
     } else {
         conn->out->svec_tail->next = resp_item;
+        conn->out->svec_tail = resp_item;
     }
     
     if (conn->queue_responses) {

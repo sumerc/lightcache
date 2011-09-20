@@ -40,9 +40,9 @@ void *li_malloc(size_t size)
         mem_used += size;
     }
     
-//#ifdef MEM_DEBUG
+#ifdef MEM_DEBUG
     LC_DEBUG(("Allocated memory.[%p]\r\n", p));
-//#endif
+#endif
 
     return p;
 }
@@ -55,9 +55,9 @@ void li_free(void *ptr)
         return;
     }
 
-//#ifdef MEM_DEBUG
+#ifdef MEM_DEBUG
     LC_DEBUG(("Freeing memory.[%p]\r\n", ptr));
-//#endif
+#endif
     
     if (!settings.use_sys_malloc) {
         scfree(ptr);
