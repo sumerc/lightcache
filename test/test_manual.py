@@ -31,6 +31,10 @@ if __name__ == '__main__':
             resp = client.get(key)
         elif cmd == 'SET':
             resp = client.set(key, data, extra)
+        elif cmd == 'GETQ':
+            resp = client.getq(key)
+        elif cmd == 'SETQ':
+            resp = client.setq(key, data, extra)
         elif cmd == 'CHG_SETTING':
             resp = client.chg_setting(key, data)
         elif cmd == 'GET_SETTING':

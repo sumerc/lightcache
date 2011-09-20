@@ -9,6 +9,8 @@ CMD_GET_SETTING = 0x03
 CMD_GET_STATS = 0x04
 CMD_DELETE = 0x05
 CMD_FLUSH_ALL = 0x06
+CMD_GETQ = 0x07
+CMD_SETQ = 0x08
 
 EVENT_TIMEOUT = 1 # in sec, (used for time critical tests, shall be added to every timing test code)
 IDLE_TIMEOUT = 2 + EVENT_TIMEOUT # in sec  

@@ -24,6 +24,7 @@ class Response:
 class LightCacheClient(socket.socket):
     
     response = Response()
+    queue_requests = 1
     
     def is_disconnected(self, in_secs=None):
         if in_secs:
@@ -117,6 +118,20 @@ class LightCacheClient(socket.socket):
         
         self.send_packet(key=key, command=CMD_DELETE)
         self.recv_packet()
+    
+    def getq(self, key):
+        assert key is not None
+        
+        self.queue_requests += 1
+        self.send_packet(key=key, command=CMD_GETQ)
+
+    def setq(self, key, value, timeout=3600):
+        assert key is not None
+        assert value is not None
+        assert timeout is not None
+        
+        self.queue_requests += 1
+        self.send_packet(key=key, data=value, command=CMD_SETQ, extra=timeout)  
         
     def get(self, key):
         assert key is not None

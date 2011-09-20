@@ -104,25 +104,29 @@ static void free_response(response *resp)
 /* All previous allocations shall already be freed. */
 static int init_resources(conn *conn)
 {
+    // TODO: No need to alloc. req/resp objects themselves?
+
     /* allocate req/resp resources */
     conn->in = (request *)li_malloc(sizeof(request));
     if (!conn->in) {
         return 0;
     }
-    conn->out = (response *)li_malloc(sizeof(response));
-    if (!conn->out) {
-        return 0;
-    }
-
-    /* init defaults */
     conn->in->rbytes = 0;
     conn->in->rkey = NULL;
     conn->in->rdata = NULL;
     conn->in->rextra = NULL;
-   
-    conn->out->svec_head = NULL;
-    conn->out->svec_tail = 0;
     
+    // are there queued messages?    
+    
+    if ((conn->out == NULL) || (conn->out->svec_head == NULL)) {
+        conn->out = (response *)li_malloc(sizeof(response));
+        if (!conn->out) {
+            return 0;
+        }
+        conn->out->svec_head = NULL;
+        conn->out->svec_tail = NULL;
+    }
+
     return 1;
 }
 
@@ -182,9 +186,9 @@ static int add_response(conn *conn, void *data, size_t data_length, code_t code)
     }
     
     if (conn->queue_responses) {
-        set_conn_state(conn, SEND_RESPONSE);
-    } else {
         set_conn_state(conn, READ_HEADER);
+    } else {
+        set_conn_state(conn, SEND_RESPONSE);
     }
 
     return 1;
@@ -202,9 +206,9 @@ void set_conn_state(struct conn* conn, conn_states state)
         if (!init_resources(conn)) {
             disconnect_conn(conn);
             return;
-        }        
-        LC_DEBUG(("rkey:%p\r\n", conn->in->rkey));
+        }     
         conn->in->rbytes = 0;
+        conn->queue_responses = 0; 
         event_set(conn, EVENT_READ);
         break;
     case READ_KEY:
@@ -315,8 +319,6 @@ static void execute_cmd(struct conn* conn)
 
         stats.get_hits++;
 
-        LC_DEBUG(("cmd get for %s %d\r\n", cached_req->rdata, cached_req->req_header.request.data_length));
-
         if (!add_response(conn, cached_req->rdata, cached_req->req_header.request.data_length, SUCCESS)) {
             // TODO: ?        
         }
@@ -354,10 +356,9 @@ static void execute_cmd(struct conn* conn)
             cached_req = (request *)tab_item->val;
             free_request(cached_req);
             tab_item->val = conn->in;
+            LC_DEBUG(("Updating key %s with value %s\r\n", conn->in->rkey, conn->in->rdata));
         }
         
-        LC_DEBUG(("req cannot be freed.\r\n"));
-
         send_response_code(conn, SUCCESS);
         break;
     case CMD_DELETE:
@@ -716,7 +717,6 @@ void event_handler(conn *conn, event ev)
                 close(conn_sock);
                 return;
             }
-            conn->queue_responses = 1;// TODO: DO NOT forget
             set_conn_state(conn, READ_HEADER);
         } else {
             sock_state = try_read_request(conn);
