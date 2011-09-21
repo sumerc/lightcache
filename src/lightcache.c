@@ -78,7 +78,7 @@ struct conn*make_conn(int fd) {
     conn->listening = 0;
     conn->free = 0;
     conn->in = NULL;
-    conn->out = NULL;
+        
     conn->queue_responses = 0;
 
     stats.curr_connections++;
@@ -88,56 +88,38 @@ struct conn*make_conn(int fd) {
 
 static void free_request(request *req)
 {
-    //LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
+    LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
     li_free(req->rkey);
     li_free(req->rdata);
     li_free(req->rextra);
     li_free(req);
 }
 
-static void free_response(response *resp)
-{
-    // TODO: Free all queued responses
-    li_free(resp);
-}
-
 /* All previous allocations shall already be freed. */
 static int init_resources(conn *conn)
 {
-    // TODO: No need to alloc. req/resp objects themselves?
-
-    /* allocate req/resp resources */
-    conn->in = (request *)li_malloc(sizeof(request));
-    if (!conn->in) {
-        return 0;
+    // if previous request is cached the do not free
+    if (conn->in) {    
+        if (conn->in->can_free) {
+            free_request(conn->in);
+        }    
     }
+
+    conn->in = li_malloc(sizeof(request));
     conn->in->rbytes = 0;
     conn->in->rkey = NULL;
     conn->in->rdata = NULL;
     conn->in->rextra = NULL;
-    
-    // are there queued messages?    
-    
-    if ((conn->out == NULL) || (conn->out->svec_head == NULL)) {
-        conn->out = (response *)li_malloc(sizeof(response));
-        if (!conn->out) {
-            return 0;
-        }
-        conn->out->svec_head = NULL;
-        conn->out->svec_tail = NULL;
-    }
+    conn->in->can_free = 1;
+
+    LC_DEBUG(("ALLOC request data:%p\r\n", conn->in));
 
     return 1;
 }
 
 static void disconnect_conn(conn* conn)
 {
-    LC_DEBUG(("disconnect conn called.\r\n"));
-
     event_del(conn);
-
-    free_request(conn->in);
-    free_response(conn->out);
 
     conn->free = 1;
     close(conn->fd);
@@ -145,6 +127,8 @@ static void disconnect_conn(conn* conn)
     stats.curr_connections--;
 
     set_conn_state(conn, CONN_CLOSED);
+    
+    LC_DEBUG(("disconnect conn called.\r\n"));
 }
 
 /* Allocate and queue a response item obj to send buffer queue for the current 
@@ -155,7 +139,6 @@ static int add_response(conn *conn, void *data, size_t data_length, code_t code)
 {
     response_item_t *resp_item;
 
-    assert(conn->out != NULL);
     assert(data_length < PROTOCOL_MAX_DATA_SIZE);
     // TODO: assert nitems is smaller than the max allowed.
     
@@ -179,11 +162,11 @@ static int add_response(conn *conn, void *data, size_t data_length, code_t code)
     resp_item->cur_bytes = 0;
     
     // add the item to client's response    
-    if(conn->out->svec_tail == NULL) {
-        conn->out->svec_head = conn->out->svec_tail = resp_item;
+    if(conn->out.svec_tail == NULL) {
+        conn->out.svec_head = conn->out.svec_tail = resp_item;
     } else {
-        conn->out->svec_tail->next = resp_item;
-        conn->out->svec_tail = resp_item;
+        conn->out.svec_tail->next = resp_item;
+        conn->out.svec_tail = resp_item;
     }
     
     if (conn->queue_responses) {
@@ -268,11 +251,9 @@ static int flush_item_enum(_hitem *item, void *arg)
     return 0;
 }
 
-
 static void execute_cmd(struct conn* conn)
 {
     int r;
-    int quiet;
     hresult ret;
     uint8_t cmd;
     uint64_t val;
@@ -285,8 +266,7 @@ static void execute_cmd(struct conn* conn)
     /* here, the complete request is received from the connection */
     conn->in->received = CURRENT_TIME;
     cmd = conn->in->req_header.request.opcode;
-    quiet = 0;
-
+    
     /* No need for the validation of conn->in->rkey as it is mandatory for the
        protocol. */
     switch(cmd) {
@@ -330,7 +310,7 @@ static void execute_cmd(struct conn* conn)
         conn->queue_responses = 1;
     case CMD_SET:
 
-        LC_DEBUG(("CMD_SET\r\n"));
+        LC_DEBUG(("CMD_SET \r\n"));
 
         stats.cmd_set++;
 
@@ -346,7 +326,7 @@ static void execute_cmd(struct conn* conn)
             send_response_code(conn, INVALID_PARAM);
             return;
         }
-
+        
         // add to cache
         ret = hset(cache, conn->in->rkey, conn->in->req_header.request.key_length, conn->in);
         if (ret == HEXISTS) { // key exists? then force-update the data
@@ -356,10 +336,12 @@ static void execute_cmd(struct conn* conn)
             // free the previous data
             cached_req = (request *)tab_item->val;
             free_request(cached_req);
+            
             tab_item->val = conn->in;
             LC_DEBUG(("Updating key %s with value %s\r\n", conn->in->rkey, conn->in->rdata));
         }
-        
+        conn->in->can_free = 0;
+
         send_response_code(conn, SUCCESS);
         break;
     case CMD_DELETE:
@@ -375,7 +357,6 @@ static void execute_cmd(struct conn* conn)
 
         cached_req = (request *)tab_item->val;
         free_request(cached_req);
-
         hfree(cache, tab_item);
 
         send_response_code(conn, SUCCESS);
@@ -514,7 +495,7 @@ socket_state read_nbytes(conn*conn, char *bytes, size_t total)
         return READ_ERR;
     } else if (nbytes == -1) {
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
-            LC_DEBUG(("socket read EWOUDLBLOCK, EAGAIN.\r\n"));
+            LC_DEBUG(("socket read EWOUDLBLOCK, EAGAin->\r\n"));
             return NEED_MORE;
         }
     }
@@ -618,7 +599,7 @@ socket_state send_nvectors(conn*conn)
     
     // TODO: min(, 10)
     i = 0;
-    it = conn->out->svec_head;
+    it = conn->out.svec_head;
     while(it) {
         iobuf[i].iov_base = (char *)it->data+it->cur_bytes;
         iobuf[i].iov_len = it->data_len-it->cur_bytes;    
@@ -639,7 +620,7 @@ socket_state send_nvectors(conn*conn)
     stats.bytes_written += nbytes;
     
     // drain sent responses       
-    it = conn->out->svec_head; 
+    it = conn->out.svec_head; 
     while(it) {
         nxt = it->next;
         if (it->cur_bytes+nbytes < it->data_len) {
@@ -648,9 +629,9 @@ socket_state send_nvectors(conn*conn)
         }
         li_free(it->data);
         li_free(it);
-        conn->out->svec_head = it = nxt;
-        if (conn->out->svec_head == NULL) {
-            conn->out->svec_tail = NULL;
+        conn->out.svec_head = it = nxt;
+        if (conn->out.svec_head == NULL) {
+            conn->out.svec_tail = NULL;
             return SEND_COMPLETED; 
         }
     }

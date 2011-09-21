@@ -120,8 +120,11 @@ hresult hset(_htab *ht, char* key, int klen, void *val)
     p = ht->_table[h];
     new = NULL;
     while(p) {
-        if ( (strcmp(p->key, key)==0) && (!p->free)) {
-            return HEXISTS;
+        //fprintf(stderr, "problem ptr:%p and %p\r\n", p, p->key);
+        if (!p->free) {
+            if (strcmp(p->key, key)==0) {
+                return HEXISTS;
+            }
         }
         if (p->free)
             new = p;

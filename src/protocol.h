@@ -34,6 +34,7 @@ typedef struct request {
     char *rextra;
     unsigned int rbytes; /* current index in to the receive buf */
     time_t received;
+    int can_free;
 } request;
 
 typedef struct response_item_t {
@@ -87,8 +88,8 @@ typedef struct conn {
     int active;					    /* conn have active events on the I/O interface */
     time_t last_heard; 				/* last time we heard from the client */
     conn_states state; 				/* state of the connection READ_KEY, READ_HEADER.etc...*/
-    request *in;					/* request instance */
-    response *out;					/* response instance */
+    request *in;					    /* request instance */
+    response out;					/* response instance */
     int queue_responses;            /* flag indicates for queueing the responses. */
     int free; 						/* recycle connection structure */
     struct conn *next;				/* next connection in the linked-list of the connections */
