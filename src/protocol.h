@@ -7,6 +7,7 @@
 #define PROTOCOL_MAX_EXTRA_SIZE 250 // in bytes --
 #define PROTOCOL_MAX_KEY_SIZE 250 // in bytes --
 #define PROTOCOL_MAX_DATA_SIZE 1024 + PROTOCOL_MAX_KEY_SIZE // in bytes -- same as memcached
+#define PROTOCOL_STATS_SIZE 512
 
 typedef union req_header {
     struct  {

@@ -434,7 +434,7 @@ static void execute_cmd(struct conn* conn)
 
         LC_DEBUG(("GET_STATS\r\n"));
         
-        sval = (char *)li_malloc(LIGHTCACHE_STATS_SIZE);     
+        sval = (char *)li_malloc(PROTOCOL_STATS_SIZE);     
         if (!sval) {
             out_of_memory(conn);
             return;
@@ -459,7 +459,7 @@ static void execute_cmd(struct conn* conn)
                 (long long unsigned int)stats.get_hits,
                 (long long unsigned int)stats.bytes_read,
                 (long long unsigned int)stats.bytes_written);
-        add_response(conn, sval, LIGHTCACHE_STATS_SIZE, SUCCESS);            
+        add_response(conn, sval, PROTOCOL_STATS_SIZE, SUCCESS);            
         li_free(sval);
         break;
 
@@ -603,13 +603,12 @@ socket_state send_nvectors(conn *conn)
 {
     int nbytes;
     unsigned int i;
-    struct iovec iobuf[10]; // todo: define max send per writev
+    struct iovec iobuf[MAX_WRITE_IOVEC_NUM];
     response_item_t *it,*nxt;
     
-    // TODO: min(, 10)
     i = 0;
     it = conn->out.svec_head;
-    while(it) {
+    while(it && i < MAX_WRITE_IOVEC_NUM) {
         iobuf[i].iov_base = (char *)it->data+it->cur_bytes;
         iobuf[i].iov_len = it->data_len-it->cur_bytes;    
         it = it->next;        

@@ -53,9 +53,9 @@ struct stats {
 
 #define LIGHTCACHE_PORT 13131
 #define LIGHTCACHE_LISTEN_BACKLOG 100
-#define LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD 75 /*the ratio threshold that garbage collect functions will start demanding memory.*/
-#define LIGHTCACHE_STATS_SIZE 512
+#define LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD 75 
 #define SLAB_SIZE_FACTOR 1.25
+#define MAX_WRITE_IOVEC_NUM 16 /* same as libevent */
 
 #endif
 

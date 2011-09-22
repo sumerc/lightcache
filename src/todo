@@ -159,7 +159,7 @@ v0.2
 [+] MAKE: LITTLE_ENDIAN flag should somehow be passed to Makefile. With configure script maybe?
 [+] Implement GETQ/SETQ.
 [+] TEST:Valgrind is necessary, especially after we removed the freelist. 
-[-] Sometimes we get:
+[*] Sometimes we get:
     Running MemTests...
     E...
     ======================================================================
@@ -173,6 +173,16 @@ v0.2
       File "/home/scip/projects/lightcache/test/testbase.py", line 26, in _stats2dict
         stats = stats.split("\r\n")
     AttributeError: 'NoneType' object has no attribute 'split'
+    This maybe because not freeing the unsent responses on disconnect_conn. From then on,
+    I don't receive it.
+[-] socket writev error. (Broken pipe)disconnect conn called.
+    request data or key length exceeded maximum allowed
+    disconnect conn called.
+    request data or key length exceeded maximum allowed
+    ptr not allocated. double free?(0xb398d040)
+    lightcache: slab.c:497: scfree: Assertion `0 == 1' failed.
+    Aborted
+[-] Maximize SEND_WND of the underlying OS.
 [-] TEST: GETQ/SETQ
 [-] show the rlimit hardlimit of the system like we do in esserver.
 [-] any way to exclude math.h that requires -lm dependency for the linker?
