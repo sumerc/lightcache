@@ -45,6 +45,8 @@ if __name__ == '__main__':
             resp = client.delete(key)
         elif cmd == 'FLUSH_ALL':
             resp = client.flush_all()
+        elif cmd == 'NOOP':
+            resp = client.noop()
         else:
             args = {}
             args["key"] = key

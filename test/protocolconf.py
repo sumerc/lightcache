@@ -11,6 +11,7 @@ CMD_DELETE = 0x05
 CMD_FLUSH_ALL = 0x06
 CMD_GETQ = 0x07
 CMD_SETQ = 0x08
+CMD_NOOP = 0x09
 
 EVENT_TIMEOUT = 1 # in sec, (used for time critical tests, shall be added to every timing test code)
 IDLE_TIMEOUT = 2 + EVENT_TIMEOUT # in sec  
@@ -27,7 +28,6 @@ INVALID_STATE = 0x02
 INVALID_PARAM_SIZE = 0x03
 SUCCESS = 0x04
 INVALID_COMMAND = 0x05
-OUT_OF_MEMORY = 0x06
 
 def err2str(e):
 

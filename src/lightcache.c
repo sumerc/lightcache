@@ -7,8 +7,6 @@
 #include "util.h"
 #include "slab.h"
 
-// TODO: hash functions can return HERROR
-
 /* forward declarations */
 void set_conn_state(struct conn* conn, conn_states state);
 
@@ -68,6 +66,7 @@ struct conn*make_conn(int fd) {
     if (conn == NULL) {
         conn = (struct conn*)li_malloc(sizeof(struct conn));
         if (!conn) {
+            LC_DEBUG(("Out of memory.\r\n"));
             return NULL;
         }
         conn->next = conns;
@@ -79,8 +78,7 @@ struct conn*make_conn(int fd) {
     conn->active = 0;
     conn->listening = 0;
     conn->free = 0;
-    conn->in = NULL;
-        
+    conn->in = NULL;        
     conn->queue_responses = 0;
 
     stats.curr_connections++;
@@ -90,7 +88,7 @@ struct conn*make_conn(int fd) {
 
 static void free_request(request *req)
 {
-    LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
+    //LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
     li_free(req->rkey);
     li_free(req->rdata);
     li_free(req->rextra);
@@ -108,6 +106,10 @@ static int init_resources(conn *conn)
     }
 
     conn->in = li_malloc(sizeof(request));
+    if (!conn->in) {
+        LC_DEBUG(("Out of memory.\r\n"));
+        return 0;
+    }
     conn->in->rbytes = 0;
     conn->in->rkey = NULL;
     conn->in->rdata = NULL;
@@ -131,6 +133,12 @@ static void disconnect_conn(conn* conn)
     LC_DEBUG(("disconnect conn called.\r\n"));
 }
 
+static void out_of_memory(conn *c)
+{
+    LC_DEBUG(("Out of memory.\r\n"));
+    disconnect_conn(c);
+}
+
 /* Allocate and queue a response item obj to send buffer queue for the current 
  incoming request.
  */
@@ -140,17 +148,16 @@ static int add_response(conn *conn, void *data, size_t data_length, code_t code)
     response_item_t *resp_item;
 
     assert(data_length < PROTOCOL_MAX_DATA_SIZE);
-    // TODO: assert nitems is smaller than the max allowed.
     
     // alloc and initialize the response item
     resp_item = li_malloc(sizeof(response_item_t));
     if (!resp_item) {
-        // todo: send_response_code(conn, OUT_OF_MEMORY);
+        out_of_memory(conn);
         return 0;
     }
     resp_item->data = li_malloc(data_length+sizeof(resp_header));
     if (!resp_item->data) {
-        // todo: send_response_code(conn, OUT_OF_MEMORY);
+        out_of_memory(conn);
         return 0;
     }
     ((resp_header *)resp_item->data)->response.data_length = htonl(data_length);
@@ -198,7 +205,7 @@ void set_conn_state(struct conn* conn, conn_states state)
     case READ_KEY:
         conn->in->rkey = (char *)li_malloc(conn->in->req_header.request.key_length + 1);
         if (!conn->in->rkey) {
-            send_response_code(conn, OUT_OF_MEMORY);
+            out_of_memory(conn);
             return;
         }
         conn->in->rkey[conn->in->req_header.request.key_length] = (char)0;
@@ -206,7 +213,7 @@ void set_conn_state(struct conn* conn, conn_states state)
     case READ_DATA:
         conn->in->rdata = (char *)li_malloc(conn->in->req_header.request.data_length + 1);
         if (!conn->in->rdata) {
-            send_response_code(conn, OUT_OF_MEMORY);
+            out_of_memory(conn);
             return;
         }
         conn->in->rdata[conn->in->req_header.request.data_length] = (char)0;
@@ -214,7 +221,7 @@ void set_conn_state(struct conn* conn, conn_states state)
     case READ_EXTRA:
         conn->in->rextra = (char *)li_malloc(conn->in->req_header.request.extra_length + 1);
         if (!conn->in->rextra) {
-            send_response_code(conn, OUT_OF_MEMORY);
+            out_of_memory(conn);
             return;
         }
         conn->in->rextra[conn->in->req_header.request.extra_length] = (char)0;
@@ -270,6 +277,9 @@ static void execute_cmd(struct conn* conn)
     /* No need for the validation of conn->in->rkey as it is mandatory for the
        protocol. */
     switch(cmd) {
+    case CMD_NOOP:
+        send_response_code(conn, SUCCESS);
+        break;
     case CMD_GETQ:
         LC_DEBUG(("CMD_GETQ\r\n"));
     	conn->queue_responses = 1;
@@ -329,7 +339,11 @@ static void execute_cmd(struct conn* conn)
         
         // add to cache
         ret = hset(cache, conn->in->rkey, conn->in->req_header.request.key_length, conn->in);
-        if (ret == HEXISTS) { // key exists? then force-update the data
+        if (ret == HERROR) {
+            LC_DEBUG(("hset failed in CMD_SET\r\n"));
+            out_of_memory(conn);
+            return;
+        } else if (ret == HEXISTS) { // key exists? then force-update the data
             tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
             assert(tab_item != NULL);
 
@@ -428,7 +442,11 @@ static void execute_cmd(struct conn* conn)
 
         LC_DEBUG(("GET_STATS\r\n"));
         
-        sval = (char *)li_malloc(LIGHTCACHE_STATS_SIZE);        
+        sval = (char *)li_malloc(LIGHTCACHE_STATS_SIZE);     
+        if (!sval) {
+            out_of_memory(conn);
+            return;
+        }   
         sprintf(sval,
                 "mem_used:%llu\r\nmem_avail:%llu\r\nuptime:%lu\r\nversion: %0.1f Build.%d\r\n"
                 "pid:%d\r\ntime:%lu\r\ncurr_items:%d\r\ncurr_connections:%llu\r\n"
@@ -449,7 +467,6 @@ static void execute_cmd(struct conn* conn)
                 (long long unsigned int)stats.get_hits,
                 (long long unsigned int)stats.bytes_read,
                 (long long unsigned int)stats.bytes_written);
-        //LC_DEBUG(("asdhasd:%d\r\n", strlen(sval)));
         if (!add_response(conn, sval, LIGHTCACHE_STATS_SIZE, SUCCESS)) {
             // TODO:?        
         }
@@ -592,7 +609,7 @@ int try_read_request(conn* conn)
     return ret;
 }
 
-socket_state send_nvectors(conn*conn)
+socket_state send_nvectors(conn *conn)
 {
     int nbytes;
     unsigned int i;
@@ -628,7 +645,7 @@ socket_state send_nvectors(conn*conn)
         if (it->cur_bytes+nbytes < it->data_len) {
             it->cur_bytes += nbytes;
             break;
-        }
+        } 
         li_free(it->data);
         li_free(it);
         conn->out.svec_head = it = nxt;

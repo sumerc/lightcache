@@ -135,6 +135,10 @@ class LightCacheClient(socket.socket):
         
         self.send_packet(key=key, command=CMD_GET)
         return self.recv_packet()
+
+    def noop(self):
+        self.send_packet(command=CMD_NOOP)
+        return self.recv_packet()
             
     def get_stats(self):
         self.send_packet(command=CMD_GET_STATS)

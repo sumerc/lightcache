@@ -59,6 +59,7 @@ typedef enum {
     CMD_FLUSH_ALL = 0x06,
     CMD_GETQ = 0x07,
     CMD_SETQ = 0x08,
+    CMD_NOOP = 0x09,
 } protocol_commands;
 
 typedef enum {
@@ -79,7 +80,6 @@ typedef enum {
     INVALID_PARAM_SIZE = 0x03,
     SUCCESS = 0x04,
     INVALID_COMMAND = 0x05,
-    OUT_OF_MEMORY = 0x06,
 } code_t;
 
 typedef struct conn {
