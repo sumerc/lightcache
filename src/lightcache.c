@@ -88,7 +88,6 @@ struct conn*make_conn(int fd) {
 
 static void free_request(request *req)
 {
-    //LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
     li_free(req->rkey);
     li_free(req->rdata);
     li_free(req->rextra);
@@ -143,7 +142,7 @@ static void out_of_memory(conn *c)
  incoming request.
  */
 // TODO: Write a unit test for this
-static int add_response(conn *conn, void *data, size_t data_length, code_t code)
+static void add_response(conn *conn, void *data, size_t data_length, code_t code)
 {
     response_item_t *resp_item;
 
@@ -153,13 +152,13 @@ static int add_response(conn *conn, void *data, size_t data_length, code_t code)
     resp_item = li_malloc(sizeof(response_item_t));
     if (!resp_item) {
         out_of_memory(conn);
-        return 0;
+        return;
     }
     resp_item->data = li_malloc(data_length+sizeof(resp_header));
     if (!resp_item->data) {
         out_of_memory(conn);
-        return 0;
-    }
+        return;        
+    }    
     ((resp_header *)resp_item->data)->response.data_length = htonl(data_length);
     ((resp_header *)resp_item->data)->response.opcode = conn->in->req_header.request.opcode;
     ((resp_header *)resp_item->data)->response.code = code;
@@ -182,7 +181,6 @@ static int add_response(conn *conn, void *data, size_t data_length, code_t code)
         set_conn_state(conn, SEND_RESPONSE);
     }
 
-    return 1;
 }
 
 static void send_response_code(conn *conn, code_t code)
@@ -232,6 +230,8 @@ void set_conn_state(struct conn* conn, conn_states state)
         break;
     case SEND_RESPONSE:
         event_set(conn, EVENT_WRITE);
+        break;
+    case CONN_CLOSED:
         break;
     default:
         break;
@@ -309,10 +309,7 @@ static void execute_cmd(struct conn* conn)
         }
 
         stats.get_hits++;
-
-        if (!add_response(conn, cached_req->rdata, cached_req->req_header.request.data_length, SUCCESS)) {
-            // TODO: ?        
-        }
+        add_response(conn, cached_req->rdata, cached_req->req_header.request.data_length, SUCCESS);
 
         break;
     case CMD_SETQ:
@@ -402,14 +399,6 @@ static void execute_cmd(struct conn* conn)
             }
             LC_DEBUG(("SET idle conn timeout :%llu\r\n", (long long unsigned int)val));
             settings.idle_conn_timeout = val;
-        } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
-            if (!atoull(conn->in->rdata, &val)) {
-                LC_DEBUG(("Invalid mem avail param.\r\n"));
-                send_response_code(conn, INVALID_PARAM);
-                return;
-            }
-            LC_DEBUG(("SET mem avail :%llu", (long long unsigned int)val));
-            settings.mem_avail = val * 1024 * 1024; /*todo:can overflow*/
         } else {
             LC_DEBUG(("Invalid setting received :%s\r\n", conn->in->rkey));
             send_response_code(conn, INVALID_PARAM);
@@ -424,14 +413,7 @@ static void execute_cmd(struct conn* conn)
         /* validate params */
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             val = htonll(settings.idle_conn_timeout);
-            if (!add_response(conn, &val, sizeof(uint64_t), SUCCESS)) {
-                // TODO:?
-            }
-        } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
-            val = htonll(settings.mem_avail / 1024 / 1024);
-            if (!add_response(conn, &val, sizeof(uint64_t), SUCCESS)) {
-                // TODO:?            
-            }
+            add_response(conn, &val, sizeof(uint64_t), SUCCESS);            
         } else {
             LC_DEBUG(("Invalid setting received :%s\r\n", conn->in->rkey));
             send_response_code(conn, INVALID_PARAM);
@@ -467,9 +449,7 @@ static void execute_cmd(struct conn* conn)
                 (long long unsigned int)stats.get_hits,
                 (long long unsigned int)stats.bytes_read,
                 (long long unsigned int)stats.bytes_written);
-        if (!add_response(conn, sval, LIGHTCACHE_STATS_SIZE, SUCCESS)) {
-            // TODO:?        
-        }
+        add_response(conn, sval, LIGHTCACHE_STATS_SIZE, SUCCESS);            
         li_free(sval);
         break;
 
