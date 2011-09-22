@@ -157,9 +157,23 @@ v0.2
 [*] MAKE: Makefile shall contain make tests which will run autotests.sh with TCP and domain sockets.
     Unit tests for C integrated as running under the shell scripts.
 [+] MAKE: LITTLE_ENDIAN flag should somehow be passed to Makefile. With configure script maybe?
-[-] Implement GETQ/SETQ.
+[+] Implement GETQ/SETQ.
+[+] TEST:Valgrind is necessary, especially after we removed the freelist. 
+[-] Sometimes we get:
+    Running MemTests...
+    E...
+    ======================================================================
+    ERROR: test_memleak_after_chg_get_setting (__main__.MemTests)
+    ----------------------------------------------------------------------
+    Traceback (most recent call last):
+      File "../test/test_mem.py", line 18, in test_memleak_after_chg_get_setting
+        self.check_for_memusage_delta( [ ("get_setting", "idle_conn_timeout"), ] )
+      File "/home/scip/projects/lightcache/test/testbase.py", line 39, in check_for_memusage_delta
+        pstats = self._stats2dict(self.client.get_stats())
+      File "/home/scip/projects/lightcache/test/testbase.py", line 26, in _stats2dict
+        stats = stats.split("\r\n")
+    AttributeError: 'NoneType' object has no attribute 'split'
 [-] TEST: GETQ/SETQ
-[-] TEST:Valgrind is necessary, especially after we removed the freelist. 
 [-] show the rlimit hardlimit of the system like we do in esserver.
 [-] any way to exclude math.h that requires -lm dependency for the linker?
 [-] lightcache clients shall be moved to clients folder. Maybe later make another rep.

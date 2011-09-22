@@ -7,6 +7,8 @@
 #include "util.h"
 #include "slab.h"
 
+// TODO: hash functions can return HERROR
+
 /* forward declarations */
 void set_conn_state(struct conn* conn, conn_states state);
 
@@ -111,8 +113,6 @@ static int init_resources(conn *conn)
     conn->in->rdata = NULL;
     conn->in->rextra = NULL;
     conn->in->can_free = 1;
-
-    LC_DEBUG(("ALLOC request data:%p\r\n", conn->in));
 
     return 1;
 }
@@ -428,7 +428,7 @@ static void execute_cmd(struct conn* conn)
 
         LC_DEBUG(("GET_STATS\r\n"));
         
-        sval = (char *)li_malloc(sizeof(LIGHTCACHE_STATS_SIZE));        
+        sval = (char *)li_malloc(LIGHTCACHE_STATS_SIZE);        
         sprintf(sval,
                 "mem_used:%llu\r\nmem_avail:%llu\r\nuptime:%lu\r\nversion: %0.1f Build.%d\r\n"
                 "pid:%d\r\ntime:%lu\r\ncurr_items:%d\r\ncurr_connections:%llu\r\n"
@@ -449,11 +449,13 @@ static void execute_cmd(struct conn* conn)
                 (long long unsigned int)stats.get_hits,
                 (long long unsigned int)stats.bytes_read,
                 (long long unsigned int)stats.bytes_written);
+        //LC_DEBUG(("asdhasd:%d\r\n", strlen(sval)));
         if (!add_response(conn, sval, LIGHTCACHE_STATS_SIZE, SUCCESS)) {
             // TODO:?        
         }
         li_free(sval);
         break;
+
     default:
         LC_DEBUG(("Unrecognized command.[%d]\r\n", cmd));
         send_response_code(conn, INVALID_COMMAND);
@@ -858,7 +860,6 @@ int main(int argc, char **argv)
         }
     }
 
-
     if (!init_cache_manager(settings.mem_avail/1024/1024, SLAB_SIZE_FACTOR)) {
        goto err;
     }
@@ -872,7 +873,8 @@ int main(int argc, char **argv)
     } else {
         LC_DEBUG(("using slab allocator with %llu MB of memory and with %u caches.\r\n", 
             (unsigned long long int)settings.mem_avail/1024/1024, slab_stats.cache_count));
-    }  
+    } 
+ 
     init_stats();
 
     init_log();
