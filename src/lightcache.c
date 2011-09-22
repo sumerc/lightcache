@@ -120,12 +120,22 @@ static int init_resources(conn *conn)
 
 static void disconnect_conn(conn* conn)
 {
+    response_item_t *it,*nxt;
     event_del(conn);
 
     conn->free = 1;
     close(conn->fd);
 
     stats.curr_connections--;
+
+    // del any remaining unsent data
+    it = conn->out.svec_head; 
+    while(it) {
+        nxt = it->next;        
+        li_free(it->data);
+        li_free(it);
+        it = nxt;
+    }
 
     set_conn_state(conn, CONN_CLOSED);
     

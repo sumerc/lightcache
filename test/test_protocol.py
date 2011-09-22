@@ -119,6 +119,10 @@ class ProtocolTests(LightCacheTestBase):
         self.assertKeyNotExists("k1")
         self.assertKeyNotExists("k2")
         self.assertKeyNotExists("k3")
+
+    def test_noop(self):
+        self.client.noop()     
+        self.assertErrorResponse(SUCCESS)
         
 if __name__ == '__main__':
     print "Running ProtocolTests..."
