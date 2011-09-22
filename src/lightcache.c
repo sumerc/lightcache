@@ -152,7 +152,6 @@ static void out_of_memory(conn *c)
 /* Allocate and queue a response item obj to send buffer queue for the current 
  incoming request.
  */
-// TODO: Write a unit test for this
 static void add_response(conn *conn, void *data, size_t data_length, code_t code)
 {
     response_item_t *resp_item;
@@ -815,7 +814,10 @@ static int init_server_socket(void)
             return 0;
         }
     }
-
+    
+    if (!maximize_sndbuf(s)) {
+        LC_DEBUG(("maximize_sndbuf failed.\r\n"));
+    }
 
     if (make_nonblocking(s)) {
         LC_DEBUG(("make_nonblocking failed.\r\n"));

@@ -183,7 +183,8 @@ v0.2
     lightcache: slab.c:497: scfree: Assertion `0 == 1' failed.
     Aborted
     Fixed by NULLing the unsent response items in disconnect_conn 
-[-] Maximize SEND_WND of the underlying OS.
+[*] Maximize SEND_WND of the underlying OS. Seems done but memcached only does it 
+    to UDP sockets.
 [-] TEST: GETQ/SETQ
 [-] show the rlimit hardlimit of the system like we do in esserver.
 [-] any way to exclude math.h that requires -lm dependency for the linker?

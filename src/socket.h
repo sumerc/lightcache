@@ -3,6 +3,7 @@
 #ifndef SOCKET_H
 #define SOCKET_H
 
+#define MAX_SENDBUF_SIZE (256 * 1024 * 1024) /* same as memcached */
 
 typedef enum {
     NEED_MORE = 0x00,
@@ -14,5 +15,6 @@ typedef enum {
 } socket_state;
 
 int make_nonblocking(int sock);
+int maximize_sndbuf(const int sfd);
 
 #endif
