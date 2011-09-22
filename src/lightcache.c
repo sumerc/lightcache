@@ -136,6 +136,7 @@ static void disconnect_conn(conn* conn)
         li_free(it);
         it = nxt;
     }
+    conn->out.svec_head = conn->out.svec_tail = NULL;
 
     set_conn_state(conn, CONN_CLOSED);
     
