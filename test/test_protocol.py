@@ -123,7 +123,7 @@ class ProtocolTests(LightCacheTestBase):
     def test_noop(self):
         self.client.noop()     
         self.assertErrorResponse(SUCCESS)
-        
+   
 if __name__ == '__main__':
     print "Running ProtocolTests..."
     unittest.main()

@@ -185,7 +185,7 @@ v0.2
     Fixed by NULLing the unsent response items in disconnect_conn 
 [*] Maximize SEND_WND of the underlying OS. Seems done but memcached only does it 
     to UDP sockets.
-[-] >getq sumer
+[*] >getq sumer
     Sending command: ['getq', 'sumer']
     >get_setting idle_conn_timeout
     Sending command: ['get_setting', 'idle_conn_timeout']
@@ -193,7 +193,15 @@ v0.2
     >get_stats
     Sending command: ['get_stats']
     Received response data: �k(, errcode:Success
-    >        
+    This is because get_stats() returns all the received packet but get_setting
+    does return the relevant integer param in the response. So the output seems 
+    different. 
+[-] How to solve this Queueing problem? We start queueing by getq/setq messages 
+    to queue the output, however when receiving different logic is needed since 
+    different responses have to be parsed differently.
+    Protocol Pipelining makes sense on multithreaded clients which we do not favor.
+    So open a new branch for this and continue from the latest TP+. Backport 
+    new fixes.
 [-] TEST: GETQ/SETQ
 [-] show the rlimit hardlimit of the system like we do in esserver.
 [-] any way to exclude math.h that requires -lm dependency for the linker?
