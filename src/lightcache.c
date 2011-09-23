@@ -288,6 +288,7 @@ static void execute_cmd(struct conn* conn)
        protocol. */
     switch(cmd) {
     case CMD_NOOP:
+        LC_DEBUG(("CMD_NOOP \r\n"));
         send_response_code(conn, SUCCESS);
         break;
     case CMD_GETQ:
@@ -419,10 +420,11 @@ static void execute_cmd(struct conn* conn)
     case CMD_GET_SETTING:
 
         LC_DEBUG(("GET_SETTING\r\n"));
-
+        
         /* validate params */
         if (strcmp(conn->in->rkey, "idle_conn_timeout") == 0) {
             val = htonll(settings.idle_conn_timeout);
+            LC_DEBUG(("idle_conn_timeout set to %llu\r\n", val));
             add_response(conn, &val, sizeof(uint64_t), SUCCESS);            
         } else {
             LC_DEBUG(("Invalid setting received :%s\r\n", conn->in->rkey));

@@ -185,6 +185,15 @@ v0.2
     Fixed by NULLing the unsent response items in disconnect_conn 
 [*] Maximize SEND_WND of the underlying OS. Seems done but memcached only does it 
     to UDP sockets.
+[-] >getq sumer
+    Sending command: ['getq', 'sumer']
+    >get_setting idle_conn_timeout
+    Sending command: ['get_setting', 'idle_conn_timeout']
+    Received response data: None, errcode:KeyNotExists
+    >get_stats
+    Sending command: ['get_stats']
+    Received response data: �k(, errcode:Success
+    >        
 [-] TEST: GETQ/SETQ
 [-] show the rlimit hardlimit of the system like we do in esserver.
 [-] any way to exclude math.h that requires -lm dependency for the linker?
