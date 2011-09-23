@@ -19,7 +19,7 @@ typedef union req_header {
 typedef union {
     struct {
         uint8_t opcode;
-        uint8_t errcode;
+        uint8_t retcode;
         uint32_t data_length;
     } response;
     uint8_t bytes[8];
@@ -31,7 +31,7 @@ struct request {
     char *rdata;
     char *rkey;
     char *rextra;
-    unsigned int rbytes; /* current index in to the receive buf */
+    unsigned int rbytes; /* current recv index */
     time_t received;
     int can_free; /* flag to indicate whether data can be freed. */
 };

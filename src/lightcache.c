@@ -174,13 +174,13 @@ static void disconnect_conn(conn* conn)
     set_conn_state(conn, CONN_CLOSED);
 }
 
-static void send_response(conn *conn, errors err)
+static void send_response(conn *conn, code_t code)
 {
     assert(conn->out != NULL);
 
     conn->out->resp_header.response.data_length = 0;
     conn->out->resp_header.response.opcode = conn->in->req_header.request.opcode;
-    conn->out->resp_header.response.errcode = err;
+    conn->out->resp_header.response.retcode = err;
 
     conn->out->sdata = NULL;
     conn->out->can_free = 1;

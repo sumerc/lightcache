@@ -130,14 +130,14 @@ hresult hset(_htab *ht, char* key, int klen, void *val)
     // have a free slot?
     if (new) {
         // do we need new allocation for the key?
-        if (new->klen >= klen+1) {
+        if (new->klen < klen+1) {
             li_free(new->key); // free previous
             new->key = (char*)li_malloc(klen+1);
             if (!new->key) {
                 return HERROR;
             }
         }
-        strncpy(new->key, key, klen+1); // copy the last "0" byte
+        memcpy(new->key, key, klen+1); // copy the last "0" byte
         new->klen = klen;
         new->val = val;
         new->free = 0;
@@ -151,7 +151,7 @@ hresult hset(_htab *ht, char* key, int klen, void *val)
         if (!new->key) {
             return HERROR;
         }
-        strncpy(new->key, key, klen+1);
+        memcpy(new->key, key, klen+1);
         new->klen = klen;
         new->val = val;
         new->next = ht->_table[h]; // add to front
