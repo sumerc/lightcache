@@ -86,14 +86,12 @@ struct conn*make_conn(int fd) {
 
 static void free_request(request *req)
 {
-    if (!req) {
-        return;
-    }    
-    if (!req->can_free) {
+    if ((!req) || (!req->can_free)) {
         return;
     }
 
-    //LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
+    //LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, 
+        // (unsigned int)sizeof(request *)));
     li_free(req->rkey);
     li_free(req->rdata);
     li_free(req->rextra);
