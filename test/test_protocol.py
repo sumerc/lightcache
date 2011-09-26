@@ -57,8 +57,6 @@ class ProtocolTests(LightCacheTestBase):
     def test_get_setting(self):
         self.client.chg_setting("idle_conn_timeout", 5)
         self.assertEqual(self.client.get_setting("idle_conn_timeout"), 5)
-        self.client.chg_setting("mem_avail", 65)
-        self.assertEqual(self.client.get_setting("mem_avail"), 65)
         
     def test_get_setting_invalid(self):
         self.client.get_setting("invalid_setting")

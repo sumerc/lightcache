@@ -52,8 +52,6 @@ typedef enum {
     CMD_GET_STATS = 0x04,
     CMD_DELETE = 0x05,
     CMD_FLUSH_ALL = 0x06,
-    CMD_GETQ = 0x07,
-    CMD_SETQ = 0x08,
 } protocol_commands;
 
 typedef enum {
@@ -76,7 +74,7 @@ typedef enum {
     SUCCESS = 0x04,
     INVALID_COMMAND = 0x05,
     OUT_OF_MEMORY = 0x06,
-} errors;
+} code_t;
 
 typedef struct conn conn;
 struct conn {
@@ -85,8 +83,8 @@ struct conn {
     int active;					    /* conn have active events on the I/O interface */
     time_t last_heard; 				/* last time we heard from the client */
     conn_states state; 				/* state of the connection READ_KEY, READ_HEADER.etc...*/
-    request *in;					/* request instance */
-    response *out;					/* response instance */
+    request *in;					/* request */
+    response out;					/* response */
     int free; 						/* recycle connection structure */
     conn *next;						/* next connection in the linked-list of the connections */
 };
