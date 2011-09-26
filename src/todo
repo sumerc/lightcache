@@ -162,15 +162,18 @@ v0.2
 [+] TEST:Valgrind is necessary, especially after we removed the freelist.
 [+] maybe prepare_response can be merged into send_response() function for better
     design.
-[-] Valgrind uninited var warnings. 
+[+] Valgrind uninited var warnings. 
+[*] Slab allocation solves the fragmentation problem. Redis makes a contest to stress the mem.
+    fragmentation. Can we have such chance to observe fragmentation via some tests? 
+    Not easy as redis because we support slab re-assignment that makes things harder.
+    Just observe the fragmentation manually.
+[+] TEST: more delete related tests especially in memleaks.
 [-] show the rlimit hardlimit of the system like we do in esserver.
 [-] any way to exclude math.h that requires -lm dependency for the linker?
 [-] lightcache clients shall be moved to clients folder. Maybe later make another rep.
     for all of them. tests will have dependencies on them.
 [-] TEST/INSPECT: dynamic alloc. failures.(OUT_OF_MEMORY)
-[-] Slab allocation solves the fragmentation problem. Redis makes a contest to stress the mem.
-    fragmentation. Can we have such chance to observe fragmentation via some tests? 
-[-] TEST: more delete related tests especially in memleaks.
+
 [-] write a php client, there is an unpack function for PHP4-5.
 [-] ruby client. there is an unpack() cmd.
 [-] solve distribution problem on client side. http://amix.dk/blog/post/19370.

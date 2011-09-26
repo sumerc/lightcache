@@ -16,3 +16,32 @@ int make_nonblocking(int sock)
     return ioctl(sock, FIOBIO, &flags);
 #endif
 }
+
+int maximize_sndbuf(const int sfd) {
+    socklen_t intsize = sizeof(int);
+    int last_good = 0;
+    int min, max, avg;
+    int old_size;
+
+    /* Start with the default size. */
+    if (getsockopt(sfd, SOL_SOCKET, SO_SNDBUF, (void *)&old_size, &intsize) != 0) { 
+        return 0;
+    }
+
+    /* Binary-search for the real maximum. */
+    min = old_size;
+    max = MAX_SENDBUF_SIZE;
+
+    while (min <= max) {
+        avg = ((unsigned int)(min + max)) / 2;
+        if (setsockopt(sfd, SOL_SOCKET, SO_SNDBUF, (void *)&avg, intsize) == 0) {
+            last_good = avg;
+            min = avg + 1;
+        } else {
+            max = avg - 1;
+        }
+    }
+
+    return 1;
+}
+

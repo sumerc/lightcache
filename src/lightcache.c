@@ -84,24 +84,43 @@ struct conn*make_conn(int fd) {
     return conn;
 }
 
-static void free_request(request *req)
+// NOTE: htab key is re-used so we do not free it. 
+static void del_cached_req(_hitem *it)
 {
+    request *req;
+        
+    req = ((request *)it->val);
+    if (req) {
+        li_free(req->rkey);
+        li_free(req->rdata);
+        li_free(req->rextra);
+        li_free(req);
+    }
+    it->val = NULL;
+}
+
+static void free_request(conn *conn)
+{
+    request *req;
+
+    req = conn->in;
     if ((!req) || (!req->can_free)) {
         return;
     }
 
-    //LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, 
-        // (unsigned int)sizeof(request *)));
     li_free(req->rkey);
     li_free(req->rdata);
     li_free(req->rextra);
     li_free(req);
+    conn->in = NULL;
 }
 
-static void free_response(response *resp)
+static void free_response(conn *conn)
 {
+    response *resp;
+    
+    resp = &conn->out;
     if (resp->can_free) {
-        //LC_DEBUG(("FREEING response data.[%p]\r\n", (void *)resp->sdata));
         li_free(resp->sdata);
     }
     resp->sdata = NULL;
@@ -110,8 +129,8 @@ static void free_response(response *resp)
 
 static int init_resources(conn *conn)
 {
-    free_request(conn->in);
-    free_response(&conn->out);
+    free_request(conn);
+    free_response(conn);
     
     conn->in = (request *)li_malloc(sizeof(request));
     if (!conn->in) {
@@ -135,15 +154,12 @@ static void disconnect_conn(conn* conn)
 {
     LC_DEBUG(("disconnect conn called.\r\n"));
 
-    event_del(conn);
-    
-    if (conn->in->can_free) {
-        free_request(conn->in);
-        conn->in = NULL;
-    }
-    free_response(&conn->out);
+    free_request(conn);
+    free_response(conn);
 
     conn->free = 1;
+
+    event_del(conn);
     close(conn->fd);
 
     stats.curr_connections--;
@@ -227,15 +243,8 @@ static int flush_item_enum(_hitem *item, void *arg)
     
     LC_DEBUG(("flush_item called.\r\n"));
     
-    if (item->val) {
-        ((request *)item->val)->can_free = 1;
-        free_request((request *)item->val);    
-        item->val = NULL;
-    }
-
-    if (!item->free) {
-        hfree(cache, item);
-    }
+    del_cached_req(item);
+    hfree(cache, item);
 
     return 0;
 }
@@ -281,10 +290,8 @@ static void execute_cmd(struct conn* conn)
 
         if ((unsigned int)(conn->in->received-cached_req->received) > val) {
             LC_DEBUG(("Time expired for key:%s\r\n", conn->in->rkey));
-            cached_req->can_free = 1;
-            free_request(cached_req);
-            tab_item->val = NULL; // update hashtab
-            hfree(cache, tab_item); // recycle tab_item
+            del_cached_req(tab_item);
+            hfree(cache, tab_item);
             goto GET_KEY_NOTEXISTS;
         }
 
@@ -317,12 +324,8 @@ static void execute_cmd(struct conn* conn)
         if (ret == HEXISTS) { // key exists? then force-update the data
             tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
             assert(tab_item != NULL);
-
-            // free the previous data
-            cached_req = (request *)tab_item->val;
-            cached_req->can_free = 1;
-            free_request(cached_req);
-            tab_item->val = conn->in;
+            del_cached_req(tab_item);
+            tab_item->val = conn->in; // update with the new request
         }
         conn->in->can_free = 0;
 
@@ -339,11 +342,7 @@ static void execute_cmd(struct conn* conn)
             return;
         }
 
-        cached_req = (request *)tab_item->val;
-        cached_req->can_free = 1;
-        free_request(cached_req);
-        tab_item->val = NULL;
-
+        del_cached_req(tab_item);        
         hfree(cache, tab_item);
 
         send_response(conn, SUCCESS);
@@ -579,8 +578,8 @@ socket_state send_nbytes(conn*conn, char *bytes, size_t total)
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
             return NEED_MORE;
         }
-        LC_DEBUG(("%s (%s)", "socket write error.\r\n", strerror(errno)));
-        syslog(LOG_ERR, "%s (%s)", "socket write error.\r\n", strerror(errno));
+        LC_DEBUG(("socket write error.[%s]\r\n", strerror(errno)));
+        syslog(LOG_ERR, "socket write error.[%s]\r\n", strerror(errno));
         return SEND_ERR;
     }
 
@@ -737,6 +736,11 @@ static int init_server_socket(void)
     ret = setsockopt(s, SOL_SOCKET, SO_LINGER, &ling, sizeof(ling));
     if (ret != 0) {
         syslog(LOG_ERR, "setsockopt(SO_LINGER) error.(%s)", strerror(errno));
+    }
+    ret = maximize_sndbuf(s);
+    if (!ret) {
+        LC_DEBUG(("maximize sendbuf failed.\r\n"));
+        syslog(LOG_ERR, "maximize_sndbuf error.(%s)", strerror(errno));
     }
 
     // only for TCP sockets.

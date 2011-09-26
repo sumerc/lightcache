@@ -211,6 +211,10 @@ int hcount(_htab *ht)
 
 void hfree(_htab *ht, _hitem *item)
 {
-    item->free = 1;
-    ht->freecount++;
+    if (!item->free) {
+        item->free = 1;
+        ht->freecount++;
+    }
 }
+
+

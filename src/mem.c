@@ -23,7 +23,7 @@ void *li_malloc(size_t size)
     }
     
     if (!settings.use_sys_malloc) {
-        p = malloc(size);
+        p = scmalloc(size);
     } else {
         if (size + mem_used > (settings.mem_avail)) {
             syslog(LOG_ERR, "No memory available![%llu MB]", (long long unsigned int)settings.mem_avail);
@@ -60,7 +60,7 @@ void li_free(void *ptr)
 #endif
     
     if (!settings.use_sys_malloc) {
-        free(ptr);
+        scfree(ptr);
     } else {
         ptr = (char *)ptr - sizeof(size_t);
         size = *(size_t *)ptr;

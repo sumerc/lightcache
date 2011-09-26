@@ -25,8 +25,7 @@ typedef union {
     uint8_t bytes[8];
 } resp_header;
 
-typedef struct request request;
-struct request {
+typedef struct request {
     req_header req_header;
     char *rdata;
     char *rkey;
@@ -34,15 +33,14 @@ struct request {
     unsigned int rbytes; /* current recv index */
     time_t received;
     int can_free; /* flag to indicate whether data can be freed. */
-};
+}request;
 
-typedef struct response response;
-struct response {
+typedef struct response {
     resp_header resp_header;
     char *sdata;
     unsigned int sbytes; /*current write index*/
     int can_free;
-};
+}response;
 
 typedef enum {
     CMD_GET = 0x00,
