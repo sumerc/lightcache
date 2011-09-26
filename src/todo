@@ -149,8 +149,8 @@ v0.2
     May that cause problem. Inspect that. No it doesnt cause. It is the best way
     pointer artihmetic is to restrict the arithmetic size. Normally it is one byte
     we cast to char * to indicate that which is correct of course for our case.
-[-] Implement GETQ/SETQ.
-[-] TEST: GETQ/SETQ
+[*] Implement GETQ/SETQ.
+[*] TEST: GETQ/SETQ
 [+] BUG: AUTOTESTS fail with new integration. Freelist removal causes double free 
     on some cases.
 [+] BUG: LC cannot run slab alloc failure with 1 MB of memory.
@@ -159,14 +159,14 @@ v0.2
 [*] MAKE: Makefile shall contain make tests which will run autotests.sh with TCP and domain sockets.
     Unit tests for C integrated as running under the shell scripts.
 [+] MAKE: LITTLE_ENDIAN flag should somehow be passed to Makefile. With configure script maybe?
-[-] TEST:Valgrind is necessary, especially after we removed the freelist. 
+[+] TEST:Valgrind is necessary, especially after we removed the freelist.
+[+] maybe prepare_response can be merged into send_response() function for better
+    design.
+[-] Valgrind uninited var warnings. 
 [-] show the rlimit hardlimit of the system like we do in esserver.
 [-] any way to exclude math.h that requires -lm dependency for the linker?
 [-] lightcache clients shall be moved to clients folder. Maybe later make another rep.
     for all of them. tests will have dependencies on them.
-
-[-] maybe prepare_response can be merged into send_response() function for better
-    design.
 [-] TEST/INSPECT: dynamic alloc. failures.(OUT_OF_MEMORY)
 [-] Slab allocation solves the fragmentation problem. Redis makes a contest to stress the mem.
     fragmentation. Can we have such chance to observe fragmentation via some tests? 

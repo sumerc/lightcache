@@ -84,26 +84,31 @@ struct conn*make_conn(int fd) {
     return conn;
 }
 
-static void free_request(request *req)
+static int free_request(request *req)
 {
-    if (!req || !req->can_free) {
-        return;
+    if (!req) {
+        return 0;
     }    
+    if (!req->can_free) {
+        return 0;
+    }
 
-    LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
+    //LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
     li_free(req->rkey);
     li_free(req->rdata);
     li_free(req->rextra);
-    //req->rkey = NULL;
-    //req->rdata = NULL;
-    //req->rextra = NULL;
+    req->rkey = NULL;
+    req->rdata = NULL;
+    req->rextra = NULL;
     li_free(req);
+
+    return 1;
 }
 
 static void free_response(response *resp)
 {
     if (resp->can_free) {
-        LC_DEBUG(("FREEING response data.[%p]\r\n", (void *)resp));
+        LC_DEBUG(("FREEING response data.[%p]\r\n", (void *)resp->sdata));
         li_free(resp->sdata);
     }
     resp->sdata = NULL;
@@ -139,8 +144,9 @@ static void disconnect_conn(conn* conn)
 
     event_del(conn);
 
-    free_request(conn->in);
-    conn->in = NULL;
+    if (free_request(conn->in)){
+        conn->in = NULL;
+    }
     free_response(&conn->out);
 
     conn->free = 1;
@@ -174,13 +180,9 @@ void set_conn_state(struct conn* conn, conn_states state)
     switch(state) {
     case READ_HEADER:
         if (!init_resources(conn)) {
-            disconnect_conn(conn);
+            disconnect_conn(conn); // we cannot receive anything.
             return;
         }
-        
-        LC_DEBUG(("rkey:%p\r\n", conn->in->rkey));
-
-        conn->in->rbytes = 0;
         event_set(conn, EVENT_READ);
         break;
     case READ_KEY:
@@ -228,10 +230,14 @@ static int flush_item_enum(_hitem *item, void *arg)
     if (arg) {
         ;   // suppress unused param. warning.
     }
-
+    
     LC_DEBUG(("flush_item called.\r\n"));
-
-    free_request((request *)item->val);
+    
+    if (item->val) {
+        ((request *)item->val)->can_free = 1;
+        free_request((request *)item->val);    
+        item->val = NULL;
+    }
 
     if (!item->free) {
         hfree(cache, item);
@@ -283,6 +289,7 @@ static void execute_cmd(struct conn* conn)
             LC_DEBUG(("Time expired for key:%s\r\n", conn->in->rkey));
             cached_req->can_free = 1;
             free_request(cached_req);
+            tab_item->val = NULL;
             hfree(cache, tab_item); // recycle tab_item
             goto GET_KEY_NOTEXISTS;
         }
@@ -320,13 +327,10 @@ static void execute_cmd(struct conn* conn)
             // free the previous data
             cached_req = (request *)tab_item->val;
             cached_req->can_free = 1;
-            free_request(cached_req);
-            
+            free_request(cached_req);            
             tab_item->val = conn->in;
         }
         conn->in->can_free = 0;
-        
-        LC_DEBUG(("req cannot be freed.\r\n"));
 
         send_response(conn, SUCCESS);
         break;
@@ -344,6 +348,7 @@ static void execute_cmd(struct conn* conn)
         cached_req = (request *)tab_item->val;
         cached_req->can_free = 1;
         free_request(cached_req);
+        tab_item->val = NULL;
 
         hfree(cache, tab_item);
 
@@ -413,7 +418,6 @@ static void execute_cmd(struct conn* conn)
     case CMD_GET_STATS:
 
         LC_DEBUG(("GET_STATS\r\n"));
-        
         sval = li_malloc(LIGHTCACHE_STATS_SIZE);
         if (!sval) {
             send_response(conn, OUT_OF_MEMORY);
