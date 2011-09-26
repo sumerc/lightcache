@@ -84,31 +84,26 @@ struct conn*make_conn(int fd) {
     return conn;
 }
 
-static int free_request(request *req)
+static void free_request(request *req)
 {
     if (!req) {
-        return 0;
+        return;
     }    
     if (!req->can_free) {
-        return 0;
+        return;
     }
 
     //LC_DEBUG(("FREEING request data.[%p], sizeof:[%u]\r\n", (void *)req, (unsigned int)sizeof(request *)));
     li_free(req->rkey);
     li_free(req->rdata);
     li_free(req->rextra);
-    req->rkey = NULL;
-    req->rdata = NULL;
-    req->rextra = NULL;
     li_free(req);
-
-    return 1;
 }
 
 static void free_response(response *resp)
 {
     if (resp->can_free) {
-        LC_DEBUG(("FREEING response data.[%p]\r\n", (void *)resp->sdata));
+        //LC_DEBUG(("FREEING response data.[%p]\r\n", (void *)resp->sdata));
         li_free(resp->sdata);
     }
     resp->sdata = NULL;
@@ -124,12 +119,12 @@ static int init_resources(conn *conn)
     if (!conn->in) {
         return 0;
     }
-
-    conn->in->can_free = 1;    
+  
     conn->in->rbytes = 0;    
     conn->in->rkey = NULL;
     conn->in->rdata = NULL;
-    conn->in->rextra = NULL;
+    conn->in->rextra = NULL;    
+    conn->in->can_free = 1;  
 
     conn->out.sdata = NULL;
     conn->out.sbytes = 0;
@@ -143,8 +138,9 @@ static void disconnect_conn(conn* conn)
     LC_DEBUG(("disconnect conn called.\r\n"));
 
     event_del(conn);
-
-    if (free_request(conn->in)){
+    
+    if (conn->in->can_free) {
+        free_request(conn->in);
         conn->in = NULL;
     }
     free_response(&conn->out);
@@ -289,7 +285,7 @@ static void execute_cmd(struct conn* conn)
             LC_DEBUG(("Time expired for key:%s\r\n", conn->in->rkey));
             cached_req->can_free = 1;
             free_request(cached_req);
-            tab_item->val = NULL;
+            tab_item->val = NULL; // update hashtab
             hfree(cache, tab_item); // recycle tab_item
             goto GET_KEY_NOTEXISTS;
         }
@@ -327,7 +323,7 @@ static void execute_cmd(struct conn* conn)
             // free the previous data
             cached_req = (request *)tab_item->val;
             cached_req->can_free = 1;
-            free_request(cached_req);            
+            free_request(cached_req);
             tab_item->val = conn->in;
         }
         conn->in->can_free = 0;
@@ -381,14 +377,6 @@ static void execute_cmd(struct conn* conn)
             }
             LC_DEBUG(("SET idle conn timeout :%llu\r\n", (long long unsigned int)val));
             settings.idle_conn_timeout = val;
-        } else if (strcmp(conn->in->rkey, "mem_avail") == 0) {
-            if (!atoull(conn->in->rdata, &val)) {
-                LC_DEBUG(("Invalid mem avail param.\r\n"));
-                send_response(conn, INVALID_PARAM);
-                return;
-            }
-            LC_DEBUG(("SET mem avail :%llu", (long long unsigned int)val));
-            settings.mem_avail = val * 1024 * 1024; /*todo:can overflow*/
         } else {
             LC_DEBUG(("Invalid setting received :%s\r\n", conn->in->rkey));
             send_response(conn, INVALID_PARAM);
