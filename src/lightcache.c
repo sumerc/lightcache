@@ -53,7 +53,7 @@ void init_stats(void)
     stats.bytes_written = 0;
 }
 
-struct conn*make_conn(int fd) {
+struct conn* make_conn(int fd) {
     struct conn *conn, *item;
 
     conn = NULL;
@@ -131,14 +131,12 @@ static void free_response(conn *conn)
 
 
 static int init_resources(conn *conn)
-{
+{         
     free_request(conn);
     free_response(conn);
-    
+             
     conn->in = (request *)li_malloc(sizeof(request));
     if (!conn->in) {
-        // TODO: if we really fail here, we shall do something as 
-        // nobody can connect till we do something.
         return 0;
     }
   
