@@ -137,6 +137,8 @@ static int init_resources(conn *conn)
     
     conn->in = (request *)li_malloc(sizeof(request));
     if (!conn->in) {
+        // TODO: if we really fail here, we shall do something as 
+        // nobody can connect till we do something.
         return 0;
     }
   
@@ -193,6 +195,7 @@ void set_conn_state(struct conn* conn, conn_states state)
     switch(state) {
     case READ_HEADER:
         if (!init_resources(conn)) {
+            LC_DEBUG(("req/resp resources cannot be initialized.\r\n"));
             disconnect_conn(conn); // we cannot receive anything.
             return;
         }
@@ -327,8 +330,7 @@ static void execute_cmd(struct conn* conn)
         if (ret == HERROR) {
             send_response(conn, OUT_OF_MEMORY);
             return;
-        }        
-        else if (ret == HEXISTS) { // key exists? then force-update the data
+        } else if (ret == HEXISTS) { // key exists? then force-update the data
             tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
             assert(tab_item != NULL);
             del_cached_req(tab_item);
@@ -836,19 +838,23 @@ int main(int argc, char **argv)
     // try to initialize the slab allocator. If slabs cannot uniformly distributed 
     // to all caches, then fallback to system's malloc 
     if (!init_cache_manager(settings.mem_avail/1024/1024, SLAB_SIZE_FACTOR)) {
-       goto err;
-    }
-    if (slab_stats.slab_count < slab_stats.cache_count) {
-        fprintf(stderr, "WARNING: at least %u MB of memory " 
-            "is required to utilize the slab allocator,\r\n"
-            "falling back to system malloc.[%u,%u:%llu]\r\n", 
-            slab_stats.cache_count, slab_stats.slab_count, slab_stats.cache_count, 
-            (unsigned long long)settings.mem_avail/1024/1024);
-        settings.use_sys_malloc = 1;
+        fprintf(stderr, "WARNING: falling back to system malloc.[%u,%u:%llu]\r\n", 
+                slab_stats.slab_count, slab_stats.cache_count, 
+                (unsigned long long)settings.mem_avail/1024/1024);
+        settings.use_sys_malloc = 1;           
     } else {
-        LC_DEBUG(("using slab allocator with %llu MB of memory.\r\n", 
-            (unsigned long long int)settings.mem_avail/1024/1024));
-    }  
+        if (slab_stats.slab_count < slab_stats.cache_count) {
+            fprintf(stderr, "WARNING: at least %u MB of memory " 
+                "is required to utilize the slab allocator,\r\n"
+                "falling back to system malloc.[%u,%u:%llu]\r\n", 
+                slab_stats.cache_count, slab_stats.slab_count, slab_stats.cache_count, 
+                (unsigned long long)settings.mem_avail/1024/1024);
+            settings.use_sys_malloc = 1;
+        } else {
+            LC_DEBUG(("using slab allocator with %llu MB of memory.\r\n", 
+                (unsigned long long int)settings.mem_avail/1024/1024));
+        }  
+    }
     
     // try to adjust system open file limit
     rlp.rlim_cur = rlp.rlim_max = settings.fd_limit; 

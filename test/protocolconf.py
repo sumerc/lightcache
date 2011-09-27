@@ -25,6 +25,7 @@ INVALID_STATE = 0x02
 INVALID_PARAM_SIZE = 0x03
 SUCCESS = 0x04
 INVALID_COMMAND = 0x05
+OUT_OF_MEMORY = 0x06
 
 def err2str(e):
 
@@ -43,5 +44,8 @@ def err2str(e):
         return "Success"
     elif e == INVALID_COMMAND:
         return "InvalidCommand"
+    elif e == OUT_OF_MEMORY:
+        return "OutOfMemory"
+    
     raise Exception, "Unrecognized error code received.[%d]" % (e)
         

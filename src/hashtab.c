@@ -149,6 +149,7 @@ hresult hset(_htab *ht, char* key, int klen, void *val)
         }
         new->key = (char*)li_malloc(klen+1);
         if (!new->key) {
+            li_free(new);
             return HERROR;
         }
         memcpy(new->key, key, klen+1);

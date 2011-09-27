@@ -84,6 +84,7 @@ struct conn {
     request *in;					/* request */
     response out;					/* response */
     int free; 						/* recycle connection structure */
+    //int disconnect_after_send;      /* set this flag to disconnects the socket after send is completed */
     conn *next;						/* next connection in the linked-list of the connections */
 };
 

@@ -29,6 +29,7 @@ class MemTests(LightCacheTestBase):
     #    self.assertRaises( AssertionError, self.check_for_memusage_delta, ([("set", "a_unique_long_key_to_be_malloced", "value1", 1),])  )
     
     def test_out_of_memory(self):
+        self.client.flush_all()
         i = 0        
         while(True):
             self.client.set("key%d" % (i), "value(%d)" % (i), 100000)
@@ -37,7 +38,8 @@ class MemTests(LightCacheTestBase):
             i += 1 
         # we are out of memory here, try to set some value
         self.client.set("oom_key", "oom_val", 1)
-        # TODO:        
+        self.assertErrorResponse(OUT_OF_MEMORY)       
+        
 
 if __name__ == '__main__':
     print "Running MemTests..."
