@@ -170,8 +170,10 @@ v0.2
 [+] TEST: more delete related tests especially in memleaks.
 [+] show the rlimit hardlimit of the system like we do in esserver.
 [+] any optimization window for malloc()'s?
-[-] TEST/INSPECT: dynamic alloc. failures.(OUT_OF_MEMORY)
+v0.1 Build 5
+------------
 [-] squeeze connection structures.
+[-] DEFERRED:TEST/INSPECT: dynamic alloc. failures.(OUT_OF_MEMORY)
 [-] any way to exclude math.h that requires -lm dependency for the linker?
 [-] lightcache clients shall be moved to clients folder. Maybe later make another rep.
     for all of them. tests will have dependencies on them.
