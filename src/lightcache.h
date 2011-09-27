@@ -28,7 +28,7 @@
 
 // version info
 #define LIGHTCACHE_VERSION 0.1
-#define LIGHTCACHE_BUILD 4
+#define LIGHTCACHE_BUILD 5
 
 struct settings {
     int deamon_mode; /* specify whether to run in deamon mode */
@@ -36,6 +36,7 @@ struct settings {
     uint64_t idle_conn_timeout; /* timeout in sec that idle connections will be disconnected */
     char *socket_path; /* path to the unix domain socket */
     int use_sys_malloc; /* indicate whether to use sys malloc or our slab allocator. */
+    int fd_limit; /* system open file limit */
 };
 
 struct stats {

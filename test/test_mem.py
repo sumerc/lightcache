@@ -1,10 +1,8 @@
 import unittest
 from testbase import LightCacheTestBase
+from protocolconf import *
 
 class MemTests(LightCacheTestBase):
-
-    # TODO:
-    # - memleak after key expired and new key is set.
     
     def test_memleak_after_get_set(self):
         self.client.set("key1", "value1", 11)
@@ -29,7 +27,18 @@ class MemTests(LightCacheTestBase):
     #def test_memleak_test_itself_is_valid(self):
         # below command should create a hash entry on server side.
     #    self.assertRaises( AssertionError, self.check_for_memusage_delta, ([("set", "a_unique_long_key_to_be_malloced", "value1", 1),])  )
-        
+    
+    def test_out_of_memory(self):
+        i = 0        
+        while(True):
+            self.client.set("key%d" % (i), "value(%d)" % (i), 100000)
+            if self.client.response.errcode == OUT_OF_MEMORY:
+                break
+            i += 1 
+        # we are out of memory here, try to set some value
+        self.client.set("oom_key", "oom_val", 1)
+        # TODO:        
+
 if __name__ == '__main__':
     print "Running MemTests..."
     unittest.main()

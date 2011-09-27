@@ -1,6 +1,8 @@
 
 host = 'localhost'
 port = 13131 
+mem_avail = 4
+fd_limit = 2048
 
 #use_unix_socket = True
 use_unix_socket = False

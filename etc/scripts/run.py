@@ -16,8 +16,10 @@ def main():
         
     params = ""
     if testconf.use_unix_socket:
-        params += "-s %s" % (testconf.unix_socket_path)
-    
+        params += "-s %s " % (testconf.unix_socket_path)
+    params += "-m %s " % (testconf.mem_avail)
+    params += "-l %s " % (testconf.fd_limit)
+        
     cmd = pre_cmd + " ../src/lightcache" + " " + params
     print "Executing %s..." % (cmd)    
     os.system(cmd)

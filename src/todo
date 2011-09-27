@@ -168,12 +168,13 @@ v0.2
     Not easy as redis because we support slab re-assignment that makes things harder.
     Just observe the fragmentation manually.
 [+] TEST: more delete related tests especially in memleaks.
-[-] show the rlimit hardlimit of the system like we do in esserver.
+[+] show the rlimit hardlimit of the system like we do in esserver.
+[+] any optimization window for malloc()'s?
+[-] TEST/INSPECT: dynamic alloc. failures.(OUT_OF_MEMORY)
+[-] squeeze connection structures.
 [-] any way to exclude math.h that requires -lm dependency for the linker?
 [-] lightcache clients shall be moved to clients folder. Maybe later make another rep.
     for all of them. tests will have dependencies on them.
-[-] TEST/INSPECT: dynamic alloc. failures.(OUT_OF_MEMORY)
-
 [-] write a php client, there is an unpack function for PHP4-5.
 [-] ruby client. there is an unpack() cmd.
 [-] solve distribution problem on client side. http://amix.dk/blog/post/19370.
@@ -187,4 +188,5 @@ v0.2
 	if ( (stats.mem_used * 100 / settings.mem_avail) > LIGHTCACHE_GARBAGE_COLLECT_RATIO_THRESHOLD)	
 [-] more tests & more tests.
 [-] We may need tests for MacOSx
-[-] any optimization window for malloc()'s?
+
+

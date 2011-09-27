@@ -6,6 +6,7 @@
 #include "mem.h"
 #include "util.h"
 #include "slab.h"
+#include "sys/resource.h"
 
 /* forward declarations */
 void set_conn_state(struct conn* conn, conn_states state);
@@ -18,6 +19,7 @@ struct stats stats;
 static conn *conns = NULL; /* linked list head */
 static _htab *cache = NULL;
 
+// initialize defaults for settings
 void init_settings(void)
 {
 #ifndef DEBUG
@@ -30,6 +32,7 @@ void init_settings(void)
     settings.mem_avail = 64 * 1024 * 1024; // in bytes -- 64 mb -- default same as memcached
     settings.socket_path = NULL;    // unix domain socket is off by default.
     settings.use_sys_malloc = 0;
+    settings.fd_limit = 1024; // rlimit_nofile -- requires root
 }
 
 void init_log(void)
@@ -321,7 +324,11 @@ static void execute_cmd(struct conn* conn)
 
         // add to cache
         ret = hset(cache, conn->in->rkey, conn->in->req_header.request.key_length, conn->in);
-        if (ret == HEXISTS) { // key exists? then force-update the data
+        if (ret == HERROR) {
+            send_response(conn, OUT_OF_MEMORY);
+            return;
+        }        
+        else if (ret == HEXISTS) { // key exists? then force-update the data
             tab_item = hget(cache, conn->in->rkey, conn->in->req_header.request.key_length);
             assert(tab_item != NULL);
             del_cached_req(tab_item);
@@ -737,11 +744,11 @@ static int init_server_socket(void)
     if (ret != 0) {
         syslog(LOG_ERR, "setsockopt(SO_LINGER) error.(%s)", strerror(errno));
     }
-    ret = maximize_sndbuf(s);
-    if (!ret) {
-        LC_DEBUG(("maximize sendbuf failed.\r\n"));
-        syslog(LOG_ERR, "maximize_sndbuf error.(%s)", strerror(errno));
-    }
+    //ret = maximize_sndbuf(s);
+    //if (!ret) {
+    //    LC_DEBUG(("maximize sendbuf failed.\r\n"));
+    //    syslog(LOG_ERR, "maximize_sndbuf error.(%s)", strerror(errno));
+    //}
 
     // only for TCP sockets.
     if (!settings.socket_path) {
@@ -774,7 +781,6 @@ static int init_server_socket(void)
         }
     }
 
-
     if (make_nonblocking(s)) {
         LC_DEBUG(("make_nonblocking failed.\r\n"));
     }
@@ -798,15 +804,14 @@ static int init_server_socket(void)
 int main(int argc, char **argv)
 {
     int ret, c;
-
     time_t ctime, ptime;
-    uint64_t param;
+    uint64_t param;    
+    struct rlimit rlp;
 
     init_settings();
 
     /* get cmd line args */
-    while (-1 != (c = getopt(argc, argv, "m: d: s:"
-                            ))) {
+    while (-1 != (c = getopt(argc, argv, "m: d: s: l:"))) {
         switch (c) {
         case 'm':
             ret = atoull(optarg, &param);
@@ -822,24 +827,43 @@ int main(int argc, char **argv)
         case 's':
             settings.socket_path = optarg;
             break;
+        case 'l':
+            settings.fd_limit = atoi(optarg);
+            break;
         }
     }
-
-
+    
+    // try to initialize the slab allocator. If slabs cannot uniformly distributed 
+    // to all caches, then fallback to system's malloc 
     if (!init_cache_manager(settings.mem_avail/1024/1024, SLAB_SIZE_FACTOR)) {
        goto err;
     }
-    // if slabs cannot uniformly distributed to all caches, then fallback to
-    // system's malloc 
     if (slab_stats.slab_count < slab_stats.cache_count) {
-        fprintf(stderr, "WARNING: not enough memory to use slab allocator.[%u,%u:%llu]", 
-            slab_stats.slab_count, slab_stats.cache_count, 
-            (unsigned long long)settings.mem_avail/1024/1024); // inform user.
+        fprintf(stderr, "WARNING: at least %u MB of memory " 
+            "is required to utilize the slab allocator,\r\n"
+            "falling back to system malloc.[%u,%u:%llu]\r\n", 
+            slab_stats.cache_count, slab_stats.slab_count, slab_stats.cache_count, 
+            (unsigned long long)settings.mem_avail/1024/1024);
         settings.use_sys_malloc = 1;
     } else {
         LC_DEBUG(("using slab allocator with %llu MB of memory.\r\n", 
             (unsigned long long int)settings.mem_avail/1024/1024));
     }  
+    
+    // try to adjust system open file limit
+    rlp.rlim_cur = rlp.rlim_max = settings.fd_limit; 
+    if (setrlimit(RLIMIT_NOFILE, &rlp) == -1) {
+        if (errno == EPERM) {
+            fprintf(stderr, "WARNING: need root privieleges for changing system open file limit.\r\n");
+        } else {
+            fprintf(stderr, "WARNING: setrlimit(%u) failed.[%s]\r\n", 
+                settings.fd_limit, strerror(errno));
+        } 
+    }
+    LC_DEBUG(("INFO: current system open file limit is %d.\r\n", settings.fd_limit)); 
+    syslog(LOG_ERR, "INFO: current system open file limit is %d.\r\n", 
+            settings.fd_limit); 
+    
     init_stats();
 
     init_log();
@@ -899,8 +923,7 @@ int main(int argc, char **argv)
 
 
     }
-    
-    
+       
 err:
     syslog(LOG_INFO, "lightcache stopped.");
     closelog();

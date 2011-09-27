@@ -26,8 +26,8 @@ void *li_malloc(size_t size)
         p = scmalloc(size);
     } else {
         if (size + mem_used > (settings.mem_avail)) {
-            syslog(LOG_ERR, "No memory available![%llu MB]", (long long unsigned int)settings.mem_avail);
-            LC_DEBUG(("No memory available! %llu, %llu, %u", (long long unsigned int)settings.mem_avail,
+            syslog(LOG_ERR, "No memory available![%llu MB]\r\n", (long long unsigned int)settings.mem_avail);
+            LC_DEBUG(("No memory available! [%llu, %llu, %u]\r\n", (long long unsigned int)settings.mem_avail,
                       (long long unsigned int)mem_used, (unsigned int)size));
             return NULL;
         }
