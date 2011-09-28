@@ -2,15 +2,6 @@ import struct
 import socket
 import testconf
 from protocolconf import *
-
-def make_client():
-    if testconf.use_unix_socket:
-        client = LightCacheClient(socket.AF_UNIX, socket.SOCK_STREAM) 
-        client.connect(testconf.unix_socket_path)
-    else:    
-        client = LightCacheClient(socket.AF_INET, socket.SOCK_STREAM)  	        
-        client.connect((testconf.host, testconf.port)) 
-    return client
     
 class Response:
     opcode = None
