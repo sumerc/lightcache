@@ -74,18 +74,15 @@ typedef enum {
     OUT_OF_MEMORY = 0x06,
 } code_t;
 
-typedef struct conn conn;
-struct conn {
-    int fd; 						/* socket fd */
-    int listening;					/* listening socket? */
-    int active;					    /* conn have active events on the I/O interface */
-    time_t last_heard; 				/* last time we heard from the client */
-    conn_states state; 				/* state of the connection READ_KEY, READ_HEADER.etc...*/
-    request *in;					/* request */
-    response out;					/* response */
-    int free; 						/* recycle connection structure */
-    //int disconnect_after_send;      /* set this flag to disconnects the socket after send is completed */
-    conn *next;						/* next connection in the linked-list of the connections */
-};
+typedef struct conn {
+    int fd;                         /* socket fd */
+    uint8_t listening;              /* listening socket? */
+    uint8_t free;                   /* recycle connection structure */
+    time_t last_heard;              /* last time we heard from the client */
+    conn_states state;              /* state of the connection READ_KEY, READ_HEADER.etc...*/
+    request *in;                    /* request */
+    response out;                   /* response */
+    struct conn *next;              /* next connection in the linked-list of the connections */
+} conn;
 
 #endif

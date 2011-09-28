@@ -172,7 +172,7 @@ v0.2
 [+] any optimization window for malloc()'s?
 v0.1 Build 5
 ------------
-[-] squeeze connection structures.
+[+] squeeze connection structures.
 [-] DEFERRED:TEST/INSPECT: dynamic alloc. failures.(OUT_OF_MEMORY)
 [-] any way to exclude math.h that requires -lm dependency for the linker?
 [-] lightcache clients shall be moved to clients folder. Maybe later make another rep.

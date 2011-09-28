@@ -1,5 +1,6 @@
 
 #include "sys/epoll.h"
+#include "util.h"
 
 /* globals */
 static int epollfd = 0;
@@ -12,7 +13,8 @@ static struct epoll_event events[POLL_MAX_EVENTS];
 int event_init(void (*ev_handler)(conn *c, event ev))
 {
     epollfd = epoll_create(POLL_MAX_EVENTS);
-    if (epollfd == -1) {
+    if (epollfd == -1) {        
+        LC_DEBUG(("epoll_ctl_create error.[%s]\r\n", strerror(errno)));
         syslog(LOG_ERR, "%s (%s)", "epoll create error.", strerror(errno));
         return 0;
     }
@@ -25,7 +27,8 @@ int event_del(conn *conn)
     /* todo : Note, Kernel < 2.6.9 requires a non null event pointer even for
          * EPOLL_CTL_DEL. */
     if (epoll_ctl(epollfd, EPOLL_CTL_DEL, conn->fd, 0) == -1) {
-        syslog(LOG_ERR, "%s (%s)", "epoll_ctl disconnect conn.", strerror(errno));
+        LC_DEBUG(("epoll_ctl_del error.[%s]\r\n", strerror(errno)));
+        syslog(LOG_ERR, "%s (%s)", "epoll_ctl_del error.", strerror(errno));
         return 0;
     }
     return 1;
@@ -45,18 +48,18 @@ int event_set(conn *c, int flags)
     if (flags & EVENT_WRITE) {
         ev.events |= EPOLLOUT;
     }
-
-    if (!c->active) {
-        op = EPOLL_CTL_ADD;
-        c->active = 1;
-    } else {
-        op = EPOLL_CTL_MOD;
-    }
-
+    
+    // default op is ADD because conns are usually short lived but many.
+    op = EPOLL_CTL_ADD; 
     ev.data.ptr = c;
     if (epoll_ctl(epollfd, op, c->fd, &ev) == -1) {
-        syslog(LOG_ERR, "%s (%s)", "epoll_ctl_mod connection error.", strerror(errno));
-        return 0;
+        if (errno == EEXIST) {
+            if (epoll_ctl(epollfd, EPOLL_CTL_MOD, c->fd, &ev) == -1) {
+                LC_DEBUG(("epoll_ctl_mod connection error.[%s]\r\n", strerror(errno)));
+                syslog(LOG_ERR, "epoll_ctl_mod connection error.[%s]\r\n", strerror(errno));
+                return 0;
+            }
+        }
     }
     return 1;
 }
@@ -68,7 +71,8 @@ void event_process(void)
 
 
     nfds = epoll_wait(epollfd, events, POLL_MAX_EVENTS, POLL_TIMEOUT);
-    if (nfds == -1) {
+    if (nfds == -1) {        
+        LC_DEBUG(("epoll_wait error.[%s]\r\n", strerror(errno)));
         syslog(LOG_ERR, "%s (%s)", "epoll wait error.", strerror(errno));
         return;
     }

@@ -77,7 +77,6 @@ struct conn* make_conn(int fd) {
 
     conn->fd = fd;
     conn->last_heard = CURRENT_TIME;
-    conn->active = 0;
     conn->listening = 0;
     conn->free = 0;
     conn->in = NULL;
@@ -694,12 +693,12 @@ void event_handler(conn *conn, event ev)
 
 /* 
    This function will be called when application memory usage reaches a certain
-   ratio of the total available mem. Here, we will shrink static resources to gain
+   threshold ratio of the total available mem. Here, we will shrink static resources to gain
    more memory for dynamic resources.
   */
 void collect_unused_memory(void)
 {
-    // todo:
+    // todo: timedout items and free conns can be collected here.
 }
 
 
