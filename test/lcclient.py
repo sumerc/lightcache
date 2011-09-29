@@ -1,6 +1,5 @@
 import struct
 import socket
-import testconf
 from protocolconf import *
     
 class Response:

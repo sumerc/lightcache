@@ -1,7 +1,7 @@
 import unittest
 import socket
 import testconf
-from lightcacheclient import LightCacheClient
+from lcclient import LightCacheClient
 from protocolconf import *
 
 def make_client():

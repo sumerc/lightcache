@@ -1,4 +1,5 @@
 
+
 CMD_GET = 0x00
 CMD_SET = 0x01  
 CMD_CHG_SETTING = 0x02
@@ -24,25 +25,27 @@ SUCCESS = 0x04
 INVALID_COMMAND = 0x05
 OUT_OF_MEMORY = 0x06
 
-def err2str(e):
+def err2str(e)
 
-    assert(e is not None)
-    assert(type(e)==int)       
+    assert(e != None)
+    assert(e.is_a Integer)       
     
-    if e == KEY_NOTEXISTS:
-        return "KeyNotExists"
-    elif e == INVALID_PARAM:
-        return "InvalidParam"
-    elif e == INVALID_STATE:
-        return "InvalidState"
-    elif e == INVALID_PARAM_SIZE:
-        return "InvalidParamSize"
-    elif e == SUCCESS:
-        return "Success"
-    elif e == INVALID_COMMAND:
-        return "InvalidCommand"
-    elif e == OUT_OF_MEMORY:
-        return "OutOfMemory"
+    if e == KEY_NOTEXISTS
+        return 'KeyNotExists'
+    elsif e == INVALID_PARAM
+        return 'InvalidParam'
+    elsif e == INVALID_STATE
+        return 'InvalidState'
+    elsif e == INVALID_PARAM_SIZE
+        return 'InvalidParamSize'
+    elsif e == SUCCESS
+        return 'Success'
+    elsif e == INVALID_COMMAND
+        return 'InvalidCommand'
+    elsif e == OUT_OF_MEMORY
+        return 'OutOfMemory'
+    end
+    raise Exception.new("Unrecognized error code received.[%d]" % [e])
+end   
+
     
-    raise Exception, "Unrecognized error code received.[%d]" % (e)
-        
